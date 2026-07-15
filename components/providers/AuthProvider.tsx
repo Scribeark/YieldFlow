@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Loader2, Phone, ShieldCheck, AlertCircle } from 'lucide-react';
 
@@ -9,7 +10,9 @@ export default function AuthProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { initialize, initialized, loading, needsPhoneLinking, linkAuthUidToPhone, signOut } = useAuthStore();
+  const router = useRouter();
+  const pathname = usePathname();
+  const { initialize, initialized, loading, user, needsPhoneLinking, linkAuthUidToPhone, signOut } = useAuthStore();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [linkingError, setLinkingError] = useState<string | null>(null);
   const [isLinking, setIsLinking] = useState(false);
@@ -18,7 +21,14 @@ export default function AuthProvider({
     initialize();
   }, [initialize]);
 
-  if (!initialized || loading) {
+  useEffect(() => {
+    if (initialized && !loading && !user && pathname.startsWith('/dashboard')) {
+      router.push('/login');
+    }
+  }, [initialized, loading, user, pathname, router]);
+
+  // Don't block /login or public pages while background initializing
+  if ((!initialized || loading) && pathname.startsWith('/dashboard')) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="text-center">
@@ -26,7 +36,7 @@ export default function AuthProvider({
             size={32}
             className="mx-auto mb-3 animate-spin text-agri-primary"
           />
-          <p className="text-sm text-foreground-muted">Loading Agri-Data Hub...</p>
+          <p className="text-sm text-foreground-muted">Loading your portal...</p>
         </div>
       </div>
     );
