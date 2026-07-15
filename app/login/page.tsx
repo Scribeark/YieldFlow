@@ -8,9 +8,10 @@ import { Sprout, Mail, Lock, User, Phone, ArrowRight, Loader2 } from 'lucide-rea
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, signUp, loading } = useAuthStore();
+  const { signIn, signUp } = useAuthStore();
 
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -23,44 +24,49 @@ export default function LoginPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+    setIsSubmitting(true);
 
-    if (isSignUp) {
-      if (!fullName.trim()) {
-        setError('Please enter your full name.');
-        return;
-      }
-      const result = await signUp(email, password, fullName, phoneNumber, role);
-      if (result.error) {
-        setError(result.error);
-      } else {
-        setSuccess('Account created! Please check your email for verification, or sign in directly.');
-        setIsSignUp(false);
-      }
-    } else {
-      const result = await signIn(email, password);
-      if (result.error) {
-        setError(result.error);
-      } else {
-        // Redirect based on declared_profession / role from the fetched profile
-        const profile = useAuthStore.getState().profile;
-        if (profile) {
-          const prof = profile.declared_profession || 'farmer';
-          if (prof === 'trader' || prof === 'farmer') {
-            router.push('/dashboard/farmer');
-          } else if (prof === 'buyer') {
-            router.push('/dashboard/buyer');
-          } else if (prof === 'carrier') {
-            router.push('/dashboard/carrier');
-          } else if (prof === 'admin') {
-            router.push('/dashboard/admin');
-          } else {
-            router.push('/dashboard/farmer');
-          }
+    try {
+      if (isSignUp) {
+        if (!fullName.trim()) {
+          setError('Please enter your full name.');
+          setIsSubmitting(false);
+          return;
+        }
+        const result = await signUp(email, password, fullName, phoneNumber, role);
+        if (result.error) {
+          setError(result.error);
+          setIsSubmitting(false);
         } else {
-          // If Profile is not found yet, navigate to farmer dashboard where Phone Linking modal will pop up
-          router.push('/dashboard/farmer');
+          setSuccess('Account created! Redirecting to your portal...');
+          const prof = role || 'farmer';
+          setTimeout(() => {
+            router.push(`/dashboard/${prof === 'admin' || prof === 'buyer' || prof === 'carrier' ? prof : 'farmer'}`);
+          }, 800);
+        }
+      } else {
+        const result = await signIn(email, password);
+        if (result.error) {
+          setError(result.error);
+          setIsSubmitting(false);
+        } else {
+          setSuccess('Login successful! Redirecting to dashboard...');
+          const profile = useAuthStore.getState().profile;
+          let targetRoute = '/dashboard/farmer';
+          if (profile) {
+            const prof = profile.declared_profession || 'farmer';
+            if (prof === 'buyer') targetRoute = '/dashboard/buyer';
+            else if (prof === 'carrier') targetRoute = '/dashboard/carrier';
+            else if (prof === 'admin') targetRoute = '/dashboard/admin';
+          }
+          setTimeout(() => {
+            router.push(targetRoute);
+          }, 500);
         }
       }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred.');
+      setIsSubmitting(false);
     }
   };
 
@@ -229,10 +235,10 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="btn btn-primary w-full"
             >
-              {loading ? (
+              {isSubmitting ? (
                 <Loader2 size={18} className="animate-spin" />
               ) : (
                 <>

@@ -121,15 +121,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       if (error) {
+        set({ loading: false });
         return { error: error.message };
       }
 
       if (data.user) {
-        await get().fetchProfile(data.user.id);
+        // Run fetchProfile with a 3-second timeout so it never blocks the login button indefinitely
+        await Promise.race([
+          get().fetchProfile(data.user.id),
+          new Promise((resolve) => setTimeout(resolve, 3000)),
+        ]);
       }
 
+      set({ loading: false });
       return { error: null };
     } catch (err: unknown) {
+      set({ loading: false });
       return { error: err instanceof Error ? err.message : 'An unexpected error occurred during sign in.' };
     } finally {
       set({ loading: false });
@@ -145,10 +152,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const canonical = normalizeNigerianPhone(phoneNumber);
       const rawTrimmed = phoneNumber.trim().replace(/\s+/g, '');
-      // E.g. +2348024757252 -> local 08024757252
       const localFormat = canonical.startsWith('+234') ? '0' + canonical.substring(4) : rawTrimmed;
 
-      // Query using OR filter so both +234... and 080... formats match
       const { data: matchedRows, error: searchError } = await supabase
         .from('users')
         .select('*')
@@ -161,7 +166,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const targetRow = matchedRows[0];
 
-      // Update auth_uid onto the matched profile row
       const { error: updateError } = await supabase
         .from('users')
         .update({ auth_uid: user.id })
@@ -213,15 +217,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   fetchProfile: async (userId: string) => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
+
       // 1. Query by auth_uid first
       let { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('auth_uid', userId)
+        .abortSignal(controller.signal)
         .maybeSingle();
 
+      clearTimeout(timeoutId);
+
       // 2. If not found by auth_uid, fallback to checking id directly (in case id == auth_uid)
-      if (!data) {
+      if (!data && !error) {
         const fallback = await supabase
           .from('users')
           .select('*')
@@ -232,7 +242,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (!data) {
-        // Profile not linked yet -> prompt Phone Linking modal
         set({ profile: null, needsPhoneLinking: true });
         return;
       }
