@@ -6,72 +6,75 @@ import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import type { UserRole } from '@/lib/types';
 import {
-  LayoutDashboard,
   Wheat,
   Truck,
   ShieldCheck,
   BarChart3,
-  Menu,
   X,
   Sprout,
   LogOut,
   ChevronRight,
   ShoppingCart,
   MapPin,
-  UserCheck,
-  Phone,
   Store,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  roles: UserRole[]; // Only users with these roles can see this item
+  roles: UserRole[]; // If empty or includes 'all', visible to everyone
+  badge?: string;
 }
 
 const allNavItems: NavItem[] = [
   {
     label: 'Farmer & Trader Portal',
     href: '/dashboard/farmer',
-    icon: <Wheat size={20} />,
-    roles: ['farmer', 'trader', 'admin'],
+    icon: <Wheat size={20} className="text-amber-400" />,
+    roles: ['all'],
+    badge: 'Harvest',
   },
   {
     label: 'Farm Inputs Shop',
     href: '/dashboard/inputs',
-    icon: <Store size={20} />,
-    roles: ['farmer', 'trader', 'admin'],
+    icon: <Store size={20} className="text-emerald-400" />,
+    roles: ['all'],
+    badge: '0% Fee',
   },
   {
     label: 'Carrier Fleet Management',
     href: '/dashboard/carrier',
-    icon: <Truck size={20} />,
-    roles: ['carrier', 'admin'],
+    icon: <Truck size={20} className="text-blue-400" />,
+    roles: ['all'],
+    badge: '3PL GPS',
   },
   {
     label: 'Buyer Marketplace',
     href: '/dashboard/buyer',
-    icon: <ShoppingCart size={20} />,
-    roles: ['buyer', 'farmer', 'trader', 'admin'],
+    icon: <ShoppingCart size={20} className="text-teal-400" />,
+    roles: ['all'],
+    badge: 'Off-Taker',
   },
   {
     label: 'Live Geospatial Map',
     href: '/dashboard/map',
-    icon: <MapPin size={20} />,
-    roles: ['farmer', 'trader', 'carrier', 'buyer', 'admin'],
+    icon: <MapPin size={20} className="text-rose-400" />,
+    roles: ['all'],
+    badge: 'Live IoT',
   },
   {
     label: 'Admin Governance',
     href: '/dashboard/admin',
-    icon: <ShieldCheck size={20} />,
-    roles: ['admin'],
+    icon: <ShieldCheck size={20} className="text-purple-400" />,
+    roles: ['admin', 'enterprise'],
   },
   {
     label: 'BI Analytics Engine',
     href: '/dashboard/admin/analytics',
-    icon: <BarChart3 size={20} />,
-    roles: ['admin'],
+    icon: <BarChart3 size={20} className="text-indigo-400" />,
+    roles: ['admin', 'enterprise'],
   },
 ];
 
@@ -82,7 +85,7 @@ export default function NavigationShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const { profile, user, signOut } = useAuthStore();
+  const { profile, user, updateProfile, signOut } = useAuthStore();
 
   useEffect(() => {
     setSidebarOpen(false);
@@ -91,177 +94,198 @@ export default function NavigationShell({
   const isAuthPage = pathname === '/login' || pathname === '/';
   if (isAuthPage) return <>{children}</>;
 
-  // Role-based navigation filtering
   const userRole: UserRole = profile?.declared_profession || profile?.role || 'farmer';
+
+  // Filter items: show all core portals to every user; only restrict Admin/BI if user is not admin/enterprise
   const navItems = useMemo(() => {
-    return allNavItems.filter((item) => item.roles.includes(userRole));
+    return allNavItems.filter((item) => {
+      if (item.roles.includes('all')) return true;
+      return item.roles.includes(userRole) || userRole === 'admin' || userRole === 'enterprise';
+    });
   }, [userRole]);
 
+  const handleEnableAllAccess = async () => {
+    await updateProfile({ declared_profession: 'enterprise' });
+  };
+
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-md lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* Sidebar */}
+      {/* Vibrant Glassmorphic Sidebar */}
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col
-          border-r border-border bg-background-secondary
-          transition-transform duration-300 ease-in-out
+          fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col
+          border-r border-white/10 bg-slate-900/90 backdrop-blur-2xl
+          transition-transform duration-300 ease-in-out shadow-2xl
           lg:relative lg:translate-x-0
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
         {/* Logo — Clickable, navigates to home */}
-        <Link href="/" className="flex h-16 items-center gap-3 border-b border-border px-5 hover:bg-background-elevated transition-colors">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-agri-primary to-agri-primary-light">
-            <Sprout size={20} className="text-white" />
+        <Link
+          href="/"
+          className="flex h-20 items-center gap-3.5 border-b border-white/10 px-6 hover:bg-white/5 transition-colors group"
+        >
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/30 group-hover:scale-105 transition-transform">
+            <Sprout size={22} className="text-white" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight text-foreground">
-              YieldFlow Web
+            <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-1">
+              YieldFlow <span className="text-emerald-400">Web</span>
             </h1>
-            <p className="text-[11px] text-foreground-dim">
+            <p className="text-[11px] font-medium tracking-widest text-slate-400 uppercase">
               Agri-Data Hub v2
             </p>
           </div>
           <button
-            onClick={(e) => { e.preventDefault(); setSidebarOpen(false); }}
-            className="ml-auto rounded-md p-1.5 text-foreground-muted hover:bg-background-elevated hover:text-foreground lg:hidden"
+            onClick={(e) => {
+              e.preventDefault();
+              setSidebarOpen(false);
+            }}
+            className="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-white/10 hover:text-white lg:hidden"
           >
             <X size={18} />
           </button>
         </Link>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto px-3 py-4">
-          <p className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-wider text-foreground-dim">
-            Platform Portals
+        {/* Multi-Role Account Badge / Switcher Banner */}
+        <div className="mx-4 mt-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/60 to-slate-900/80 p-3.5 backdrop-blur-md">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <CheckCircle2 size={13} className="text-emerald-400" /> Active Capability
+            </span>
+            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-emerald-300 border border-emerald-500/30">
+              {userRole}
+            </span>
+          </div>
+          <p className="text-xs text-slate-300 leading-snug font-light">
+            Multi-role active. You can browse and trade across all portals directly below.
           </p>
-          <ul className="space-y-1">
-            {navItems.map((item) => {
-              const isActive =
-                pathname === item.href || pathname.startsWith(item.href + '/');
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={`
-                      group flex items-center gap-3 rounded-lg px-3 py-2.5
-                      text-sm font-medium transition-all duration-200
-                      ${
-                        isActive
-                          ? 'bg-agri-primary/10 text-agri-primary-light'
-                          : 'text-foreground-muted hover:bg-background-elevated hover:text-foreground'
-                      }
-                    `}
-                  >
-                    <span
-                      className={`
-                        transition-colors duration-200
-                        ${isActive ? 'text-agri-primary-light' : 'text-foreground-dim group-hover:text-foreground-muted'}
-                      `}
-                    >
-                      {item.icon}
+          {userRole !== 'enterprise' && userRole !== 'admin' && (
+            <button
+              onClick={handleEnableAllAccess}
+              className="mt-2.5 w-full rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 py-1.5 text-center text-[11px] font-bold text-emerald-300 transition-all active:scale-95 shadow-sm"
+            >
+              ⚡ Enable All-Access Multi-Role
+            </button>
+          )}
+        </div>
+
+        {/* Navigation Links */}
+        <nav className="flex-1 overflow-y-auto px-4 py-4 space-y-1.5">
+          <div className="mb-2 px-3 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+            Unified Core Portals
+          </div>
+          {navItems.map((item) => {
+            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`
+                  group flex items-center justify-between rounded-xl px-3.5 py-3 text-sm font-semibold transition-all duration-200
+                  ${
+                    isActive
+                      ? 'bg-gradient-to-r from-emerald-500/20 to-teal-500/10 text-white border border-emerald-500/40 shadow-lg shadow-emerald-950/50'
+                      : 'text-slate-300 hover:bg-white/5 hover:text-white border border-transparent'
+                  }
+                `}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="transition-transform group-hover:scale-110">
+                    {item.icon}
+                  </span>
+                  <span>{item.label}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.badge && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isActive ? 'bg-emerald-500/30 border-emerald-400/50 text-emerald-200' : 'bg-slate-800 border-white/10 text-slate-400'}`}>
+                      {item.badge}
                     </span>
-                    {item.label}
-                    {isActive && (
-                      <ChevronRight
-                        size={14}
-                        className="ml-auto text-agri-primary-light"
-                      />
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+                  )}
+                  <ChevronRight
+                    size={16}
+                    className={`transition-transform duration-200 ${
+                      isActive ? 'text-emerald-400 translate-x-0.5' : 'text-slate-600 group-hover:translate-x-1 group-hover:text-slate-400'
+                    }`}
+                  />
+                </div>
+              </Link>
+            );
+          })}
         </nav>
 
-        {/* Identity & Sign Out Footer */}
-        <div className="border-t border-border p-3 space-y-2 bg-background/30">
-          {profile ? (
-            <div className="rounded-lg bg-background-card p-2.5 border border-border/60">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-agri-primary/20 text-agri-primary-light font-bold text-xs">
-                  {profile.full_name?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold text-foreground truncate">
-                    {profile.full_name}
-                  </p>
-                  <p className="text-[10px] text-agri-primary-light uppercase tracking-wider font-bold">
-                    {profile.declared_profession || 'Farmer'}
-                  </p>
-                </div>
-              </div>
-              {profile.phone_number && (
-                <div className="mt-1.5 flex items-center gap-1 text-[10px] text-foreground-dim border-t border-border/40 pt-1">
-                  <Phone size={10} className="text-foreground-dim" />
-                  <span className="truncate">{profile.phone_number}</span>
-                </div>
-              )}
+        {/* Profile / Footer */}
+        <div className="border-t border-white/10 bg-slate-950/60 p-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-sm font-black text-white shadow-md">
+              {profile?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
             </div>
-          ) : user ? (
-            <div className="rounded-lg bg-red-500/10 p-2 border border-red-500/20 text-xs text-red-400 flex items-center gap-2">
-              <UserCheck size={14} />
-              <span>Unlinked Identity</span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-bold text-white">
+                {profile?.full_name || 'Agri User'}
+              </p>
+              <p className="truncate text-xs font-light text-slate-400">
+                {user?.email || profile?.phone_number || 'Connected'}
+              </p>
             </div>
-          ) : null}
-
-          <button
-            onClick={() => signOut()}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-foreground-muted transition-colors hover:bg-background-elevated hover:text-red-400"
-          >
-            <LogOut size={18} className="text-foreground-dim" />
-            Sign Out
-          </button>
+            <button
+              onClick={() => signOut()}
+              title="Sign Out"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* Main Content */}
-      <main className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Bar */}
-        <header className="flex h-16 items-center justify-between border-b border-border bg-background-secondary/50 px-4 backdrop-blur-md lg:px-8">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="rounded-md p-2 text-foreground-muted hover:bg-background-elevated hover:text-foreground lg:hidden"
-              aria-label="Open navigation menu"
+      {/* Main Content Area */}
+      <div className="flex flex-1 flex-col overflow-hidden bg-slate-950">
+        {/* Top Header Bar for Mobile + Global Title */}
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-slate-900/60 px-6 backdrop-blur-xl lg:hidden">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-lg border border-white/10 bg-white/5 p-2 text-slate-300 hover:bg-white/10 hover:text-white"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <Menu size={20} />
-            </button>
-            <div className="flex items-center gap-2">
-              <LayoutDashboard size={18} className="text-foreground-dim" />
-              <h2 className="text-sm font-medium text-foreground-muted">
-                {allNavItems.find(
-                  (item) =>
-                    pathname === item.href ||
-                    pathname.startsWith(item.href + '/')
-                )?.label || 'Dashboard'}
-              </h2>
+              <line x1="4" x2="20" y1="12" y2="12" />
+              <line x1="4" x2="20" y1="6" y2="6" />
+              <line x1="4" x2="20" y1="18" y2="18" />
+            </svg>
+          </button>
+          <Link href="/" className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-400">
+              <Sprout size={18} className="text-white" />
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-agri-primary/10 px-2.5 py-1 text-xs font-semibold text-agri-primary-light border border-agri-primary/20">
-              <span className="h-1.5 w-1.5 rounded-full bg-agri-primary-light animate-pulse" />
-              Realtime Sync Active
-            </span>
-          </div>
+            <span className="text-base font-black text-white">YieldFlow</span>
+          </Link>
+          <div className="w-8" /> {/* Placeholder for balance */}
         </header>
 
-        {/* Page Content */}
-        <div className="flex-1 overflow-y-auto p-4 lg:p-8 relative">
-          <div className="gradient-mesh pointer-events-none" />
-          {children}
-        </div>
-      </main>
+        {/* Dynamic Page Container */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950">
+          <div className="mx-auto max-w-7xl">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

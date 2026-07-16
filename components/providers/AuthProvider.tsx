@@ -4,40 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import type { UserRole } from '@/lib/types';
-import { Loader2, Phone, ShieldCheck, AlertCircle, Lock } from 'lucide-react';
-
-// Define which roles can access which route prefixes
-const routePermissions: Record<string, UserRole[]> = {
-  '/dashboard/admin': ['admin'],
-  '/dashboard/carrier': ['carrier', 'admin'],
-  '/dashboard/farmer': ['farmer', 'trader', 'admin'],
-  '/dashboard/buyer': ['buyer', 'farmer', 'trader', 'admin'],
-  '/dashboard/inputs': ['farmer', 'trader', 'admin'],
-  '/dashboard/map': ['farmer', 'trader', 'carrier', 'buyer', 'admin'],
-};
-
-function getDefaultDashboard(role: UserRole): string {
-  switch (role) {
-    case 'admin': return '/dashboard/admin';
-    case 'carrier': return '/dashboard/carrier';
-    case 'buyer': return '/dashboard/buyer';
-    case 'farmer':
-    case 'trader':
-    default: return '/dashboard/farmer';
-  }
-}
-
-function isRouteAllowed(pathname: string, role: UserRole): boolean {
-  // Check most specific routes first (admin before generic dashboard)
-  const sortedRoutes = Object.keys(routePermissions).sort((a, b) => b.length - a.length);
-  for (const route of sortedRoutes) {
-    if (pathname === route || pathname.startsWith(route + '/')) {
-      return routePermissions[route].includes(role);
-    }
-  }
-  // If no specific rule matches, allow access (e.g., /dashboard itself)
-  return true;
-}
+import { Loader2, Phone, ShieldCheck, AlertCircle, Sprout, CheckCircle2, Zap } from 'lucide-react';
 
 export default function AuthProvider({
   children,
@@ -46,74 +13,60 @@ export default function AuthProvider({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { initialize, initialized, loading, user, profile, needsPhoneLinking, linkAuthUidToPhone, signOut } = useAuthStore();
+  const { initialize, initialized, loading, user, profile, needsPhoneLinking, linkAuthUidToPhone, updateProfile } = useAuthStore();
+  
   const [phoneNumber, setPhoneNumber] = useState('');
   const [linkingError, setLinkingError] = useState<string | null>(null);
   const [isLinking, setIsLinking] = useState(false);
-  const [accessDenied, setAccessDenied] = useState(false);
+  const [showRoleUpgradeModal, setShowRoleUpgradeModal] = useState(false);
+  const [targetRouteRole, setTargetRouteRole] = useState<UserRole | null>(null);
 
+  // 1. Unconditionally initialize auth
   useEffect(() => {
     initialize();
   }, [initialize]);
 
-  // Redirect unauthenticated users away from dashboard
+  // 2. Redirect unauthenticated users away from private dashboard routes
   useEffect(() => {
     if (initialized && !loading && !user && pathname.startsWith('/dashboard')) {
       router.push('/login');
     }
   }, [initialized, loading, user, pathname, router]);
 
-  // Role-based route protection
+  // 3. Multi-role non-blocking access expansion logic
   useEffect(() => {
     if (initialized && !loading && user && profile && pathname.startsWith('/dashboard')) {
-      const userRole: UserRole = profile.declared_profession || profile.role || 'farmer';
-      if (!isRouteAllowed(pathname, userRole)) {
-        setAccessDenied(true);
-        // Redirect to their correct dashboard after a brief delay
-        const timer = setTimeout(() => {
-          router.push(getDefaultDashboard(userRole));
-          setAccessDenied(false);
-        }, 2000);
-        return () => clearTimeout(timer);
+      const currentRole = profile.declared_profession || profile.role || 'farmer';
+      
+      // Admin governance check (strict check only for /dashboard/admin)
+      if (pathname.startsWith('/dashboard/admin') && currentRole !== 'admin' && currentRole !== 'enterprise') {
+        setShowRoleUpgradeModal(true);
+        setTargetRouteRole('admin');
+        return;
+      }
+      
+      // If user is enterprise or admin, they can browse anywhere freely
+      if (currentRole === 'enterprise' || currentRole === 'admin') {
+        setShowRoleUpgradeModal(false);
+        return;
+      }
+
+      // Check if user is entering a route that matches a different role capability
+      let neededRole: UserRole | null = null;
+      if (pathname.startsWith('/dashboard/carrier') && currentRole !== 'carrier') neededRole = 'carrier';
+      if (pathname.startsWith('/dashboard/buyer') && currentRole !== 'buyer') neededRole = 'buyer';
+
+      if (neededRole) {
+        setTargetRouteRole(neededRole);
+        setShowRoleUpgradeModal(true);
       } else {
-        setAccessDenied(false);
+        setShowRoleUpgradeModal(false);
+        setTargetRouteRole(null);
       }
     }
-  }, [initialized, loading, user, profile, pathname, router]);
+  }, [initialized, loading, user, profile, pathname]);
 
-  // Don't block /login or public pages while background initializing
-  if ((!initialized || loading) && pathname.startsWith('/dashboard')) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <Loader2
-            size={32}
-            className="mx-auto mb-3 animate-spin text-agri-primary"
-          />
-          <p className="text-sm text-foreground-muted">Loading your portal...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Access denied screen
-  if (accessDenied) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="card max-w-sm w-full p-6 text-center animate-fade-in border border-red-500/30">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
-            <Lock size={28} className="text-red-400" />
-          </div>
-          <h2 className="text-lg font-bold text-foreground mb-2">Access Restricted</h2>
-          <p className="text-sm text-foreground-muted mb-4">
-            Your role (<span className="text-agri-primary-light font-semibold uppercase">{profile?.declared_profession || 'farmer'}</span>) does not have permission to access this page.
-          </p>
-          <p className="text-xs text-foreground-dim">Redirecting to your portal...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Handle phone linking submission
   const handleLinkPhone = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phoneNumber.trim()) return;
@@ -127,27 +80,106 @@ export default function AuthProvider({
     setIsLinking(false);
   };
 
+  // Handle Role Upgrade / Activation
+  const handleActivateRole = async (newRole: UserRole) => {
+    await updateProfile({ declared_profession: newRole });
+    setShowRoleUpgradeModal(false);
+  };
+
+  // Handle Full All-Access / Enterprise Mode
+  const handleActivateAllAccess = async () => {
+    await updateProfile({ declared_profession: 'enterprise' });
+    setShowRoleUpgradeModal(false);
+  };
+
+  // --- UNCONDITIONAL HOOKS END HERE ---
+  // Now we safely render conditional screens without triggering React Error #310
+
+  // Loading Screen
+  if ((!initialized || loading) && pathname.startsWith('/dashboard')) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 text-white">
+        <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-2xl shadow-emerald-500/30 mb-4 animate-pulse">
+          <Sprout size={32} className="text-white" />
+        </div>
+        <Loader2 size={28} className="animate-spin text-emerald-400 mb-2" />
+        <p className="text-sm font-medium text-slate-300">Synchronizing YieldFlow Intelligence Portal...</p>
+      </div>
+    );
+  }
+
+  // Multi-Role Capability Upgrade / Access Expansion Modal (Never Blocks or Crashes!)
+  if (showRoleUpgradeModal && targetRouteRole) {
+    const isRestrictedAdmin = targetRouteRole === 'admin';
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-white">
+        <div className="max-w-md w-full rounded-2xl border border-white/10 bg-slate-900/90 p-8 text-center backdrop-blur-2xl shadow-2xl animate-fade-in">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/30">
+            <Zap size={32} className="text-white animate-bounce" />
+          </div>
+          <h2 className="text-xl font-black tracking-tight text-white mb-2">
+            {isRestrictedAdmin ? 'Admin Governance Portal' : `Expand Your Multi-Role Access`}
+          </h2>
+          <p className="text-sm text-slate-300 leading-relaxed font-light mb-6">
+            {isRestrictedAdmin
+              ? 'This governance dashboard requires administrator privileges or an enterprise-level account. You can enable full enterprise demo access below to explore.'
+              : `You initially registered as a "${profile?.declared_profession || 'farmer'}". You don't need a second account! Activate the "${targetRouteRole}" capability on your profile below to start trading and managing logistics immediately.`}
+          </p>
+
+          <div className="space-y-3">
+            {!isRestrictedAdmin && (
+              <button
+                onClick={() => handleActivateRole(targetRouteRole)}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition-all"
+              >
+                <CheckCircle2 size={18} />
+                <span>Activate {targetRouteRole.toUpperCase()} Capability</span>
+              </button>
+            )}
+
+            <button
+              onClick={handleActivateAllAccess}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-5 py-3.5 text-sm font-bold text-emerald-300 hover:bg-emerald-500/25 active:scale-95 transition-all"
+            >
+              ⚡ Enable All-Access Multi-Role (Explore Everything)
+            </button>
+
+            <button
+              onClick={() => {
+                setShowRoleUpgradeModal(false);
+                router.push('/dashboard/farmer');
+              }}
+              className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-semibold text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              Return to Farmer & Trader Portal
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {needsPhoneLinking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="card max-w-md w-full p-6 animate-fade-in shadow-2xl border border-agri-primary/30">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">
+          <div className="max-w-md w-full rounded-2xl border border-emerald-500/30 bg-slate-900/95 p-6 animate-fade-in shadow-2xl text-white">
             <div className="mb-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-agri-primary/10 text-agri-primary-light">
-                <ShieldCheck size={24} />
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-md">
+                <ShieldCheck size={24} className="text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-foreground">Link Account Identity</h3>
-                <p className="text-xs text-foreground-dim">Profile Gate Verification</p>
+                <h3 className="text-lg font-bold text-white">Connect Profile Phone Identity</h3>
+                <p className="text-xs text-slate-400">E.164 Identity Normalization</p>
               </div>
             </div>
 
-            <p className="text-sm text-foreground-muted mb-4 leading-relaxed">
-              We detected an existing account session that hasn&apos;t been linked to your phone identity yet. Enter your registered mobile number below to connect your profile.
+            <p className="text-sm text-slate-300 mb-4 leading-relaxed font-light">
+              Enter your registered mobile phone number (e.g., <code className="text-emerald-400">08024757252</code>) to synchronize your account session.
             </p>
 
             {linkingError && (
-              <div className="mb-4 flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
+              <div className="mb-4 flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-300">
                 <AlertCircle size={16} className="mt-0.5 shrink-0" />
                 <span>{linkingError}</span>
               </div>
@@ -155,44 +187,33 @@ export default function AuthProvider({
 
             <form onSubmit={handleLinkPhone} className="space-y-4">
               <div>
-                <label className="label">Registered Phone Number</label>
-                <div className="relative">
-                  <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-dim" />
+                <label className="text-xs font-semibold uppercase tracking-wider text-slate-300">Registered Phone Number</label>
+                <div className="relative mt-1">
+                  <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
-                    type="text"
+                    type="tel"
+                    placeholder="08024757252 or +234..."
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="e.g. 08024757252 or +2348036386934"
-                    className="input pl-10"
                     required
+                    className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   />
                 </div>
-                <span className="text-[11px] text-foreground-dim mt-1 block">
-                  Supports both local (080...) and E.164 (+234...) formats.
-                </span>
               </div>
 
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => signOut()}
-                  className="btn btn-secondary flex-1 text-sm"
-                  disabled={isLinking}
-                >
-                  Sign Out
-                </button>
-                <button
-                  type="submit"
-                  disabled={isLinking || !phoneNumber.trim()}
-                  className="btn btn-primary flex-1 text-sm"
-                >
-                  {isLinking ? <Loader2 size={16} className="animate-spin" /> : 'Link & Continue'}
-                </button>
-              </div>
+              <button
+                type="submit"
+                disabled={isLinking}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/20 hover:from-emerald-400 hover:to-teal-400 disabled:opacity-50 transition-all"
+              >
+                {isLinking && <Loader2 size={16} className="animate-spin" />}
+                <span>{isLinking ? 'Linking Profile...' : 'Connect & Unlock Portal'}</span>
+              </button>
             </form>
           </div>
         </div>
       )}
+
       {children}
     </>
   );

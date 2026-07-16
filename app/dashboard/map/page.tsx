@@ -100,6 +100,27 @@ export default function GeospatialMapPage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [activeMarker, setActiveMarker] = useState<MarkerInfo | null>(null);
 
+  const [simGPS, setSimGPS] = useState(true);
+  const [simProgress, setSimProgress] = useState(20);
+  const [simPos, setSimPos] = useState<google.maps.LatLngLiteral>({ lat: 7.2069, lng: 3.8322 });
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (simGPS) {
+      interval = setInterval(() => {
+        setSimProgress((prev) => {
+          const next = prev >= 100 ? 0 : prev + 3;
+          // Interpolate Ibadan (7.3775, 3.9470) -> Lagos Port (6.5244, 3.3792)
+          const lat = 7.3775 - ((7.3775 - 6.5244) * (next / 100));
+          const lng = 3.9470 - ((3.9470 - 3.3792) * (next / 100));
+          setSimPos({ lat: parseFloat(lat.toFixed(4)), lng: parseFloat(lng.toFixed(4)) });
+          return next;
+        });
+      }, 1800);
+    }
+    return () => clearInterval(interval);
+  }, [simGPS]);
+
   // ── Supabase fetch ──────────────────────────────────────────────────────────
   const fetchMapData = useCallback(async () => {
     setDataLoading(true);
@@ -294,17 +315,32 @@ export default function GeospatialMapPage() {
           </div>
         </div>
 
-        <button
-          onClick={() => fetchMapData()}
-          disabled={dataLoading}
-          className="btn btn-secondary px-4 py-2 text-xs flex items-center gap-2 self-start sm:self-center"
-        >
-          <RefreshCw
-            size={14}
-            className={dataLoading ? 'animate-spin text-agri-primary-light' : ''}
-          />
-          <span>Sync Network Map</span>
-        </button>
+        <div className="flex items-center gap-2 self-start sm:self-center">
+          <button
+            onClick={() => setSimGPS(!simGPS)}
+            className={`px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-md ${
+              simGPS
+                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30'
+                : 'bg-slate-800 text-slate-300 border border-white/10 hover:bg-slate-700'
+            }`}
+          >
+            <span className={`h-2 w-2 rounded-full ${simGPS ? 'bg-white animate-ping' : 'bg-slate-500'}`} />
+            <span>{simGPS ? `Tracking GPS: ${simProgress}%` : 'Simulate GPS Corridor'}</span>
+          </button>
+
+          <button
+            onClick={() => fetchMapData()}
+            disabled={dataLoading}
+            className="rounded-xl border border-white/10 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-300 flex items-center gap-2 hover:bg-slate-800 hover:text-white transition-all"
+          >
+            <RefreshCw
+              size={14}
+              className={dataLoading ? 'animate-spin text-emerald-400' : ''}
+            />
+            <span>Sync Network Map</span>
+          </button>
+        </div>
+
       </div>
 
       {/* Map + Stats Grid */}
@@ -349,6 +385,41 @@ export default function GeospatialMapPage() {
                 onClick={() => setActiveMarker(m)}
               />
             ))}
+
+            {/* Active GPS Dispatch Simulation Marker (Ibadan -> Lagos Corridor) */}
+            {simGPS && (
+              <MarkerF
+                position={simPos}
+                icon={
+                  isLoaded
+                    ? {
+                        path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                        fillColor: '#f59e0b',
+                        fillOpacity: 1,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2.5,
+                        scale: 7.5,
+                        rotation: 220,
+                      }
+                    : undefined
+                }
+                title="Active 3PL Dispatch: Cassava Haulage (Live GPS)"
+                onClick={() =>
+                  setActiveMarker({
+                    id: 'sim-active-fleet',
+                    type: 'vehicle',
+                    position: simPos,
+                    title: 'Active Haulage Fleet #104 (Plate: KJA-482XY)',
+                    details: {
+                      Status: 'In-Transit (68 km/h)',
+                      Route: 'Ibadan Depot -> Lagos Port Hub',
+                      Progress: `${simProgress}% (${Math.floor(128 * (simProgress/100))} km completed)`,
+                      FuelEfficiency: 'Optimal (AI Route Bypassed Sagamu Toll Jam)',
+                    },
+                  })
+                }
+              />
+            )}
 
             {activeMarker && (
               <InfoWindowF

@@ -132,35 +132,50 @@ export default function BuyerDashboard() {
   });
 
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-agri-accent to-amber-500 shadow-lg shadow-agri-accent/20">
-            <ShoppingCart size={24} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              Welcome, {profile?.full_name || 'Enterprise Crop Buyer'}
-            </h1>
-            <p className="text-sm text-foreground-muted">
-              Explore Farms Ready for Harvest (`soil_moisture &lt; 30%`), inspect verification photos, and lock in crop supply
-            </p>
-          </div>
-        </div>
+    <div className="space-y-6 animate-fade-in text-white">
+      {/* Vibrant Buyer Off-Taker Header Banner */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-teal-950/80 via-slate-900 to-amber-950/80 p-6 sm:p-8 shadow-2xl backdrop-blur-2xl">
+        <div className="absolute right-0 top-0 -mr-16 -mt-16 h-72 w-72 rounded-full bg-teal-500/20 blur-[100px] pointer-events-none" />
+        <div className="absolute left-1/3 bottom-0 -mb-16 h-64 w-64 rounded-full bg-amber-500/15 blur-[90px] pointer-events-none" />
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setOnlyReady(!onlyReady)}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 ${
-              onlyReady
-                ? 'bg-amber-500/20 border-amber-500 text-amber-400 shadow-sm shadow-amber-500/20'
-                : 'bg-background-elevated border-border text-foreground-muted hover:text-foreground'
-            }`}
-          >
-            <Droplets size={14} className={onlyReady ? 'text-amber-400 animate-pulse' : ''} />
-            <span>{onlyReady ? 'Showing Ready Farms Only (< 30% Moisture)' : 'Filter: Farms Ready for Harvest'}</span>
-          </button>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-400 to-amber-500 p-0.5 shadow-xl shadow-teal-500/30">
+              <div className="flex h-full w-full items-center justify-center rounded-[14px] bg-slate-950/50 backdrop-blur-md">
+                <ShoppingCart size={28} className="text-white animate-bounce" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="rounded-full bg-teal-500/20 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-widest text-teal-300 border border-teal-500/30">
+                  Enterprise Buyer Marketplace
+                </span>
+                <span className="flex items-center gap-1 text-xs text-amber-300 font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping" /> Direct Off-Taker Portal
+                </span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow">
+                Welcome, {profile?.full_name || 'Enterprise Crop Off-Taker'}
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 font-light mt-0.5">
+                Acquire verified farm crops ready for harvest (&lt; 30% soil moisture), review rear-camera verification photos, and dispatch logistics.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setOnlyReady(!onlyReady)}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-2 shadow-lg ${
+                onlyReady
+                  ? 'bg-gradient-to-r from-amber-500 to-orange-500 border-amber-400 text-white shadow-amber-500/30'
+                  : 'bg-slate-800/80 border-white/10 text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Droplets size={14} className={onlyReady ? 'text-white animate-pulse' : 'text-amber-400'} />
+              <span>{onlyReady ? 'Ready Farms (< 30% Moisture)' : 'Filter: Farms Ready for Harvest'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
