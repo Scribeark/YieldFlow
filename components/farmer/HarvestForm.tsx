@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/lib/supabaseClient';
-import { Droplets, Thermometer, Wind, MapPin, Plus, Loader2, CheckCircle2, Wheat, Scale, Camera, AlertCircle } from 'lucide-react';
+import { Droplets, Thermometer, Wind, MapPin, Plus, Loader2, CheckCircle2, Wheat, Scale, AlertCircle } from 'lucide-react';
+import CameraCapture from '@/components/ui/CameraCapture';
 
 const CROP_VARIETIES = ['Maize (White)', 'Maize (Yellow)', 'Cassava Tubers', 'Rice (Paddy)', 'Yam Tubers', 'Sorghum', 'Cocoa Beans', 'Palm Oil (Drums)', 'Groundnut'];
 
@@ -81,7 +82,7 @@ export default function HarvestForm({ onSubmitted }: { onSubmitted?: () => void 
         commodity_variety: commodity,
         quantity: parseFloat(quantity),
         address: address || profile.macro_region || 'Ibadan Central Farm',
-        harvest_photo_url: photoUrl || 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?auto=format&fit=crop&w=800&q=80',
+        harvest_photo_url: photoUrl || null,
         status: 'pending',
       });
 
@@ -270,22 +271,12 @@ export default function HarvestForm({ onSubmitted }: { onSubmitted?: () => void 
             </div>
           </div>
 
-          <div>
-            <label className="label">Harvest Inspection Photo URL (Verification)</label>
-            <div className="relative">
-              <Camera size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-dim" />
-              <input
-                type="url"
-                value={photoUrl}
-                onChange={(e) => setPhotoUrl(e.target.value)}
-                placeholder="https://..."
-                className="input pl-10"
-              />
-            </div>
-            <span className="text-[10px] text-foreground-dim mt-1 block">
-              Leave blank to use verified default harvest verification photo.
-            </span>
-          </div>
+          <CameraCapture
+            bucketName="harvest-photos"
+            onCapture={(url) => setPhotoUrl(url)}
+            existingUrl={photoUrl}
+            label="Harvest Inspection Photo"
+          />
 
           <button type="submit" disabled={loading} className="btn btn-primary w-full">
             {loading ? <Loader2 size={18} className="animate-spin" /> : <><Plus size={16} /> Submit Trade Offer to Buyers</>}

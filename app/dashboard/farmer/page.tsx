@@ -5,6 +5,7 @@ import HarvestForm from '@/components/farmer/HarvestForm';
 import ActiveLogs from '@/components/farmer/ActiveLogs';
 import IoTReadout from '@/components/farmer/IoTReadout';
 import DeviceRegistrationToggle from '@/components/farmer/DeviceRegistrationToggle';
+import NearbyBuyers from '@/components/farmer/NearbyBuyers';
 import { Wheat } from 'lucide-react';
 
 export default function FarmerDashboard() {
@@ -46,6 +47,9 @@ export default function FarmerDashboard() {
           <ActiveLogs />
         </div>
       </div>
+
+      {/* Bottom Row: Nearby Verified Buyers with Data Minimization */}
+      <NearbyBuyers />
     </div>
   );
 }

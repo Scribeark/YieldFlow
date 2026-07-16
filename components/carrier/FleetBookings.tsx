@@ -16,7 +16,11 @@ interface BookingWithTrade {
   pickup_time: string | null;
   delivery_time: string | null;
   status: TradeStatus;
+  payer_id?: string | null;
+  payment_status?: string | null;
+  estimated_cost_ngn?: number | null;
   created_at: string;
+
   trade_requests?: {
     commodity_variety: string;
     quantity: number;
@@ -162,6 +166,7 @@ export default function FleetBookings() {
               <th>Commodity / Crop</th>
               <th>Quantity</th>
               <th>Pickup / Hub Address</th>
+              <th>Logistics Settlement</th>
               <th>Transit Status</th>
               <th>Booked Date</th>
               <th>Dispatch Action</th>
@@ -173,6 +178,7 @@ export default function FleetBookings() {
               const qty = booking.trade_requests?.quantity || booking.harvest_logs?.quantity_kg || 0;
               const location = booking.trade_requests?.address || booking.harvest_logs?.farm_location || 'Standard Hub';
               const nextSt = nextStatusMap[booking.status || 'matched'];
+              const estCost = booking.estimated_cost_ngn || (qty * 45);
 
               return (
                 <tr key={booking.id}>
@@ -190,6 +196,14 @@ export default function FleetBookings() {
                     </div>
                   </td>
                   <td>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-xs font-bold text-emerald-400">₦{Number(estCost).toLocaleString()}</span>
+                      <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold text-amber-400 border border-amber-500/20 w-max">
+                        {booking.payment_status === 'paid' ? 'Paid by Buyer' : 'Buyer Settlement Pending'}
+                      </span>
+                    </div>
+                  </td>
+                  <td>
                     <span className={statusBadgeClass[booking.status || 'matched'] || 'badge badge-matched'}>
                       {statusLabel[booking.status || 'matched'] || booking.status}
                     </span>
@@ -197,6 +211,7 @@ export default function FleetBookings() {
                   <td className="text-xs text-foreground-dim">
                     {booking.created_at ? format(new Date(booking.created_at), 'MMM d, HH:mm') : 'Recent'}
                   </td>
+
                   <td>
                     {nextSt ? (
                       <button

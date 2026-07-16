@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
+import type { UserRole } from '@/lib/types';
 import {
   LayoutDashboard,
   Wheat,
@@ -19,44 +20,58 @@ import {
   MapPin,
   UserCheck,
   Phone,
+  Store,
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  roles: UserRole[]; // Only users with these roles can see this item
 }
 
-const navItems: NavItem[] = [
+const allNavItems: NavItem[] = [
   {
     label: 'Farmer & Trader Portal',
     href: '/dashboard/farmer',
     icon: <Wheat size={20} />,
+    roles: ['farmer', 'trader', 'admin'],
+  },
+  {
+    label: 'Farm Inputs Shop',
+    href: '/dashboard/inputs',
+    icon: <Store size={20} />,
+    roles: ['farmer', 'trader', 'admin'],
   },
   {
     label: 'Carrier Fleet Management',
     href: '/dashboard/carrier',
     icon: <Truck size={20} />,
+    roles: ['carrier', 'admin'],
   },
   {
-    label: 'Buyer Ready Harvests',
+    label: 'Buyer Marketplace',
     href: '/dashboard/buyer',
     icon: <ShoppingCart size={20} />,
+    roles: ['buyer', 'farmer', 'trader', 'admin'],
   },
   {
     label: 'Live Geospatial Map',
     href: '/dashboard/map',
     icon: <MapPin size={20} />,
+    roles: ['farmer', 'trader', 'carrier', 'buyer', 'admin'],
   },
   {
-    label: 'Admin User Governance',
+    label: 'Admin Governance',
     href: '/dashboard/admin',
     icon: <ShieldCheck size={20} />,
+    roles: ['admin'],
   },
   {
     label: 'BI Analytics Engine',
     href: '/dashboard/admin/analytics',
     icon: <BarChart3 size={20} />,
+    roles: ['admin'],
   },
 ];
 
@@ -75,6 +90,12 @@ export default function NavigationShell({
 
   const isAuthPage = pathname === '/login' || pathname === '/';
   if (isAuthPage) return <>{children}</>;
+
+  // Role-based navigation filtering
+  const userRole: UserRole = profile?.declared_profession || profile?.role || 'farmer';
+  const navItems = useMemo(() => {
+    return allNavItems.filter((item) => item.roles.includes(userRole));
+  }, [userRole]);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -96,8 +117,8 @@ export default function NavigationShell({
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
       >
-        {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-5">
+        {/* Logo — Clickable, navigates to home */}
+        <Link href="/" className="flex h-16 items-center gap-3 border-b border-border px-5 hover:bg-background-elevated transition-colors">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-agri-primary to-agri-primary-light">
             <Sprout size={20} className="text-white" />
           </div>
@@ -110,12 +131,12 @@ export default function NavigationShell({
             </p>
           </div>
           <button
-            onClick={() => setSidebarOpen(false)}
+            onClick={(e) => { e.preventDefault(); setSidebarOpen(false); }}
             className="ml-auto rounded-md p-1.5 text-foreground-muted hover:bg-background-elevated hover:text-foreground lg:hidden"
           >
             <X size={18} />
           </button>
-        </div>
+        </Link>
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4">
@@ -218,7 +239,7 @@ export default function NavigationShell({
             <div className="flex items-center gap-2">
               <LayoutDashboard size={18} className="text-foreground-dim" />
               <h2 className="text-sm font-medium text-foreground-muted">
-                {navItems.find(
+                {allNavItems.find(
                   (item) =>
                     pathname === item.href ||
                     pathname.startsWith(item.href + '/')

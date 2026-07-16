@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuthStore } from '@/store/authStore';
 import type { VehicleState, VehicleStatus } from '@/lib/types';
-import { Truck, Plus, CheckCircle2, AlertCircle, MapPin, Camera, Loader2, Radio } from 'lucide-react';
+import { Truck, Plus, CheckCircle2, AlertCircle, MapPin, Loader2, Radio } from 'lucide-react';
+import CameraCapture from '@/components/ui/CameraCapture';
 
 export default function VehicleRegistry() {
   const { profile, user } = useAuthStore();
@@ -69,7 +70,7 @@ export default function VehicleRegistry() {
         carrier_id: carrierId,
         carrier_status: 'available',
         vehicle_type: vehicleType,
-        vehicle_photo_url: photoUrl || 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&w=800&q=80',
+        vehicle_photo_url: photoUrl || null,
         location: locationStr,
         latitude: profile?.business_latitude || 6.5244,
         longitude: profile?.business_longitude || 3.3792,
@@ -190,22 +191,12 @@ export default function VehicleRegistry() {
               </div>
             </div>
 
-            <div>
-              <label className="label">Vehicle Verification Photo URL</label>
-              <div className="relative">
-                <Camera size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-dim" />
-                <input
-                  type="url"
-                  value={photoUrl}
-                  onChange={(e) => setPhotoUrl(e.target.value)}
-                  placeholder="https://..."
-                  className="input pl-10"
-                />
-              </div>
-              <span className="text-[10px] text-foreground-dim mt-1 block">
-                Leave blank to assign default verified transport inspection photo.
-              </span>
-            </div>
+            <CameraCapture
+              bucketName="vehicle-photos"
+              onCapture={(url) => setPhotoUrl(url)}
+              existingUrl={photoUrl}
+              label="Vehicle Verification Photo"
+            />
 
             <div className="flex gap-3 pt-2">
               <button

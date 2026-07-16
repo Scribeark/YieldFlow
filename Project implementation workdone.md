@@ -1,10 +1,11 @@
 # Project Implementation & Work Done Brief: YieldFlow Web (`Agri-Data Hub v2`)
 
-**Document Version:** 1.0 (Phase 1 Complete — Live Vercel Production Deployment)  
+**Document Version:** 2.0 (Phase 2 Complete — Production Ready & Hardened)  
 **Target Repository:** [`Scribeark/YieldFlow`](https://github.com/Scribeark/YieldFlow)  
 **Cloud Deployment:** Vercel (`Joenny Agro` Organization)  
 **Backend & Database:** Live Supabase Project (`ymihyyqdwwwdbsuhtjbv`)  
-**Technology Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS, Zustand, Recharts, Lucide Icons, `@supabase/supabase-js`
+**Technology Stack:** Next.js 16 (App Router), TypeScript, Tailwind CSS, Zustand, Recharts, Lucide Icons, `@react-google-maps/api`, `@supabase/supabase-js`
+
 
 ---
 
@@ -106,11 +107,47 @@ Route (app)
 ```
 **Audit Result:** 100% of all 13 application routes, TypeScript types, and UI components passed static site generation and type checking with **zero errors**. The project was subsequently pushed to GitHub (`Scribeark/YieldFlow`) and deployed to Vercel (`Joenny Agro`), where it is currently active and fully operational.
 
+## 5. Phase 2 Deliverables & Architectural Enhancements
+
+In Phase 2 of the project lifecycle, we executed a comprehensive overhaul of the platform's security boundaries, map visualization, PWA camera capabilities, and agricultural commerce capabilities:
+
+### A. Role-Based Access Control (`RBAC`) & Security Hardening (`P0`)
+- **Strict Route Gating (`AuthProvider.tsx`)**: Implemented dynamic role checking (`isRouteAllowed`) against the user's `declared_profession`. Unauthorized access attempts to restricted routes (e.g., `/dashboard/admin` by a `farmer`) trigger a styled **"Access Restricted"** gate and auto-redirect to the user's authorized dashboard within 2 seconds.
+- **Dynamic Navigation Gating (`NavigationShell.tsx`)**: Navigation sidebar items are dynamically filtered by role. Farmers no longer see Carrier or Admin portals, eliminating vertical privilege escalation.
+- **YieldFlow Branding & Navigation**: Replaced generic text with **YieldFlow Web (`Agri-Data Hub v2`)**. Wrapped the header logo in clickable `<Link href="/">` tags for instant home navigation.
+
+### B. Live Interactive Google Maps Integration (`P1`)
+- **`app/dashboard/map/page.tsx`**: Migrated from static SVG illustrations to `@react-google-maps/api`.
+- **API Key & Hub Fallback Engine**: Hardcoded Google Maps API key (`AIzaSyCt45_kXs1MbaP6fDv3bcMkPk0uh9cnOhA`) with automatic, deterministic fallback coordinates and spatial jitter across 6 regional Nigerian hubs (`Lagos Port Hub`, `Ibadan Central Hub`, `Abuja Depot`, `Kano Market Hub`, `Kaduna Terminal`, `Benue River Basin`).
+- **Live Supabase Channels**: Real-time subscriptions plot active `trade_requests` (Green circles), carrier `vehicle_states` (Blue arrows), and compute regional soil moisture statistics dynamically.
+
+### C. Native PWA Camera Capture & Visual Audit Gate (`P1`)
+- **`components/ui/CameraCapture.tsx`**: Engineered a native camera verification component.
+  - **Live Web Stream**: Leverages `navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })` for real-time rear-camera preview and `<canvas>` snapshots.
+  - **OS Native Fallback**: Seamlessly falls back to `<input type="file" accept="image/*" capture="environment">` on mobile PWAs when web stream permissions are restricted.
+  - **Storage Integration**: Directly compresses and uploads verification blobs to Supabase Storage (`harvest-photos`, `vehicle-photos`).
+- **Universal Visual Audit Gate (`handleConfirmOrder`)**: Enforced a strict **"No photo, no confirm"** security rule across harvest trades and vehicle registration (`HarvestForm.tsx`, `VehicleRegistry.tsx`).
+
+### D. Data Minimization & Farmer-to-Buyer Trade Inquiries (`P2`)
+- **`components/farmer/NearbyBuyers.tsx`**: Enables farmers to discover nearby commercial off-takers while strictly shielding phone numbers, emails, and exact coordinates (**Data Minimization**).
+- **`components/ui/TradeInquiryModal.tsx` & `IncomingInquiries.tsx`**: Farmers can submit direct, custom trade proposals (`trade_inquiries` table). Commercial buyers manage incoming proposals right from their dashboard and can transition them into verified trade negotiations.
+
+### E. Farm Inputs Marketplace Shop (`P2`)
+- **`/dashboard/inputs` (`app/dashboard/inputs/page.tsx`)**: Created a dedicated, commission-free agricultural input marketplace (`InputListings.tsx`, `CreateInputListing.tsx`).
+- **Supplies Catalog**: Farmers and commodity suppliers can publish and purchase verified hybrid seeds (`TME-419`, `DTMA-10`), organic NPK fertilizers, soil boosters, pesticides, and solar irrigation kits.
+
+### F. Buyer-Pays-Logistics Financial Chain (`P2`)
+- **Automatic Freight Assignment**: Upon visual confirmation of a harvest offer by an enterprise buyer (`handleConfirmOrder`), the system automatically generates a `logistics_bookings` transaction with `payer_id = profile.id` and `payment_status = 'pending'`.
+- **Carrier Transparency**: Carrier dispatch logs (`FleetBookings.tsx`) explicitly highlight the **Logistics Settlement (Buyer Pays)** badge and estimated freight rates (`₦...`).
+
+### G. Stress Testing & Master SQL Migration Engine (`P3`)
+- **`scripts/seed-test-data.ts` (`npm run seed:test`)**: Automated database seeder populating 50 trade requests, 30 carrier vehicles, 60 IoT telemetry logs, and 15 farm input listings across Nigeria with synthetic fallback accounts (`11111111-1111...`).
+- **`scripts/stress-test.ts` (`npm run test:stress`)**: Concurrent benchmarking engine executing 80 simultaneous read/write queries to measure throughput, average latency (`ms`), and 95th percentile (`p95`) system resilience.
+- **Master SQL Migration (`supabase/migrations/20260716_phase2_complete_schema.sql`)**: Complete SQL schema defining all columns, tables (`trade_inquiries`, `farm_input_listings`, `logistics_bookings`), RLS policies, and storage buckets.
+
 ---
 
-## 5. Future Scope & Feature Additions Roadmap
-*(This section is reserved for our upcoming collaboration sessions as we outline additional pages, workflow optimizations, and feature integrations.)*
+## 6. Build Verification & Next Steps
+- **Build Metric**: `npm run build` compiled 100% cleanly across all 14 routes (`/`, `/dashboard/farmer`, `/dashboard/buyer`, `/dashboard/carrier`, `/dashboard/admin`, `/dashboard/map`, `/dashboard/inputs`, etc.) with zero TypeScript errors.
+- **Immediate Action**: The complete SQL schema is available in `supabase/migrations/20260716_phase2_complete_schema.sql` for instant execution in the Supabase SQL Editor if required.
 
-- `[ ]` **Pending Feature Request 1:** *To be defined by user.*
-- `[ ]` **Pending Feature Request 2:** *To be defined by user.*
-- `[ ]` **Pending Feature Request 3:** *To be defined by user.*

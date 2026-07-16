@@ -1,98 +1,281 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLoadScript, GoogleMap, MarkerF, InfoWindowF } from '@react-google-maps/api';
 import { supabase } from '@/lib/supabaseClient';
 import type { IoTTelemetryLog, VehicleState, TradeRequest } from '@/lib/types';
-import { MapPin, Truck, Droplets, Wheat, RefreshCw, Radio } from 'lucide-react';
+import {
+  MapPin,
+  Truck,
+  Droplets,
+  Wheat,
+  RefreshCw,
+  Radio,
+  Loader2,
+  Activity,
+  ArrowRightLeft,
+} from 'lucide-react';
 
-interface HubNode {
-  id: string;
-  name: string;
-  state: string;
-  x: number; // percentage width on SVG map
-  y: number; // percentage height on SVG map
-  lat: number;
-  lng: number;
-  moisture?: number | null;
-  activeVehicles: number;
-  activeTrades: number;
+// ─── Constants ────────────────────────────────────────────────────────────────
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCt45_kXs1MbaP6fDv3bcMkPk0uh9cnOhA';
+
+const MAP_CENTER = { lat: 9.082, lng: 8.6753 };
+const MAP_ZOOM = 6;
+
+const FALLBACK_HUBS: Record<string, { lat: number; lng: number }> = {
+  lagos:  { lat: 6.5244,  lng: 3.3792 },
+  ibadan: { lat: 7.3775,  lng: 3.947 },
+  abuja:  { lat: 9.0579,  lng: 7.4951 },
+  kano:   { lat: 12.0022, lng: 8.592 },
+  kaduna: { lat: 10.5264, lng: 7.4383 },
+  benue:  { lat: 7.3369,  lng: 8.7404 },
+};
+
+const FALLBACK_KEYS = Object.keys(FALLBACK_HUBS);
+
+/** Picks a deterministic fallback hub based on a string id */
+function fallbackCoords(id: string) {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  }
+  const key = FALLBACK_KEYS[Math.abs(hash) % FALLBACK_KEYS.length];
+  // Small jitter so markers don't stack exactly
+  const jitter = () => (Math.random() - 0.5) * 0.15;
+  return {
+    lat: FALLBACK_HUBS[key].lat + jitter(),
+    lng: FALLBACK_HUBS[key].lng + jitter(),
+  };
 }
 
-const REGIONAL_HUBS: HubNode[] = [
-  { id: 'lagos', name: 'Alimosho / Ikeja Port Hub', state: 'Lagos State', x: 22, y: 78, lat: 6.5244, lng: 3.3792, activeVehicles: 0, activeTrades: 0 },
-  { id: 'ibadan', name: 'Oyo Central Farm Hub', state: 'Oyo State', x: 26, y: 66, lat: 7.3775, lng: 3.9470, activeVehicles: 0, activeTrades: 0 },
-  { id: 'benue', name: 'Makurdi Food Basket Basin', state: 'Benue State', x: 65, y: 58, lat: 7.7322, lng: 8.5391, activeVehicles: 0, activeTrades: 0 },
-  { id: 'kaduna', name: 'Zaria Grain Terminal', state: 'Kaduna State', x: 52, y: 35, lat: 10.5105, lng: 7.4165, activeVehicles: 0, activeTrades: 0 },
-  { id: 'kano', name: 'Dawanau International Market', state: 'Kano State', x: 64, y: 20, lat: 12.0022, lng: 8.5920, activeVehicles: 0, activeTrades: 0 },
-  { id: 'abuja', name: 'Federal Capital Logistics Depot', state: 'FCT Abuja', x: 48, y: 52, lat: 9.0765, lng: 7.3986, activeVehicles: 0, activeTrades: 0 },
+// ─── Dark map style ──────────────────────────────────────────────────────────
+const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
+  { elementType: 'geometry', stylers: [{ color: '#0f172a' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#0f172a' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#64748b' }] },
+  { featureType: 'administrative', elementType: 'geometry.stroke', stylers: [{ color: '#334155' }] },
+  { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#94a3b8' }] },
+  { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#334155' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#1e3a5f' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1e3a5f' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#1e293b' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#134e4a' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#5eead4' }] },
 ];
 
+const MAP_OPTIONS: google.maps.MapOptions = {
+  styles: DARK_MAP_STYLES,
+  disableDefaultUI: true,
+  zoomControl: true,
+  mapTypeControl: false,
+  streetViewControl: false,
+  fullscreenControl: true,
+};
+
+const containerStyle = { width: '100%', height: '100%' };
+
+// ─── Typed marker helpers ────────────────────────────────────────────────────
+interface MarkerInfo {
+  id: string;
+  type: 'trade' | 'vehicle';
+  position: google.maps.LatLngLiteral;
+  title: string;
+  details: Record<string, string>;
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
 export default function GeospatialMapPage() {
-  const [hubs, setHubs] = useState<HubNode[]>(REGIONAL_HUBS);
-  const [loading, setLoading] = useState(true);
-  const [selectedHub, setSelectedHub] = useState<HubNode | null>(REGIONAL_HUBS[1]); // Default Ibadan
+  // Google Maps loader
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+  });
+
+  // Data state
+  const [trades, setTrades] = useState<TradeRequest[]>([]);
   const [vehicles, setVehicles] = useState<VehicleState[]>([]);
   const [telemetry, setTelemetry] = useState<IoTTelemetryLog[]>([]);
-  const [trades, setTrades] = useState<TradeRequest[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [activeMarker, setActiveMarker] = useState<MarkerInfo | null>(null);
 
+  // ── Supabase fetch ──────────────────────────────────────────────────────────
   const fetchMapData = useCallback(async () => {
-    setLoading(true);
+    setDataLoading(true);
     try {
-      const [vehRes, telRes, tradeRes] = await Promise.all([
-        supabase.from('vehicle_states').select('*').limit(30),
-        supabase.from('iot_telemetry_logs').select('*').order('recorded_at', { ascending: false }).limit(30),
-        supabase.from('trade_requests').select('*').eq('status', 'pending').limit(30),
+      const [tradeRes, vehRes, telRes] = await Promise.all([
+        supabase.from('trade_requests').select('*').eq('status', 'pending').limit(50),
+        supabase.from('vehicle_states').select('*').limit(50),
+        supabase
+          .from('iot_telemetry_logs')
+          .select('*')
+          .order('recorded_at', { ascending: false })
+          .limit(100),
       ]);
 
-      const fetchedVeh = (vehRes.data as VehicleState[]) || [];
-      const fetchedTel = (telRes.data as IoTTelemetryLog[]) || [];
-      const fetchedTra = (tradeRes.data as TradeRequest[]) || [];
-
-      setVehicles(fetchedVeh);
-      setTelemetry(fetchedTel);
-      setTrades(fetchedTra);
-
-      // Map counts back to regional hubs
-      const updated = REGIONAL_HUBS.map((hub) => {
-        // Count vehicles matching region keyword
-        const vCount = fetchedVeh.filter(
-          (v) => (v.location && v.location.toLowerCase().includes(hub.state.split(' ')[0].toLowerCase())) ||
-                 (v.carrier_status === 'available')
-        ).length;
-
-        // Find latest telemetry moisture nearby
-        const nearTel = fetchedTel.find(
-          (t) => (t.associated_lga && t.associated_lga.toLowerCase().includes(hub.state.split(' ')[0].toLowerCase()))
-        );
-
-        const tCount = fetchedTra.filter(
-          (tr) => (tr.address && tr.address.toLowerCase().includes(hub.state.split(' ')[0].toLowerCase()))
-        ).length;
-
-        return {
-          ...hub,
-          moisture: nearTel ? nearTel.soil_moisture_percentage : hub.id === 'ibadan' ? 27.5 : hub.id === 'kano' ? 22.0 : 38.4,
-          activeVehicles: Math.max(vCount, hub.id === 'lagos' ? 4 : hub.id === 'ibadan' ? 3 : 1),
-          activeTrades: Math.max(tCount, hub.id === 'ibadan' ? 5 : hub.id === 'benue' ? 3 : 2),
-        };
-      });
-
-      setHubs(updated);
-      if (selectedHub) {
-        const refreshed = updated.find((h) => h.id === selectedHub.id);
-        if (refreshed) setSelectedHub(refreshed);
-      }
+      setTrades((tradeRes.data as TradeRequest[]) || []);
+      setVehicles((vehRes.data as VehicleState[]) || []);
+      setTelemetry((telRes.data as IoTTelemetryLog[]) || []);
     } catch (err) {
       console.error('Map data fetch error:', err);
     } finally {
-      setLoading(false);
+      setDataLoading(false);
     }
-  }, [selectedHub]);
+  }, []);
 
+  // ── Initial fetch + real-time channel ───────────────────────────────────────
   useEffect(() => {
     fetchMapData();
+
+    const channel = supabase
+      .channel('map-live-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trade_requests' },
+        () => fetchMapData(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vehicle_states' },
+        () => fetchMapData(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'iot_telemetry_logs' },
+        () => fetchMapData(),
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchMapData]);
 
+  // ── Derived markers ─────────────────────────────────────────────────────────
+  const markers: MarkerInfo[] = useMemo(() => {
+    const list: MarkerInfo[] = [];
+
+    // Green markers → pending harvest / trade requests
+    trades.forEach((t) => {
+      const hasGPS =
+        t.address &&
+        /\d/.test(t.address); // rough check — real GPS is on hub fallback
+      // We use fallback coords because trade_requests has no lat/lng columns
+      const pos = fallbackCoords(t.id);
+
+      list.push({
+        id: `trade-${t.id}`,
+        type: 'trade',
+        position: pos,
+        title: t.commodity_variety || 'Harvest',
+        details: {
+          Commodity: t.commodity_variety ?? '—',
+          Quantity: `${t.quantity ?? t.quantity_kg ?? '—'} kg`,
+          Status: t.status ?? 'pending',
+          Address: t.address ?? t.farm_location ?? '—',
+        },
+      });
+    });
+
+    // Blue markers → available vehicles
+    vehicles.forEach((v) => {
+      const hasGPS =
+        typeof v.latitude === 'number' &&
+        typeof v.longitude === 'number' &&
+        v.latitude !== 0;
+      const pos = hasGPS
+        ? { lat: v.latitude!, lng: v.longitude! }
+        : fallbackCoords(v.id);
+
+      list.push({
+        id: `veh-${v.id}`,
+        type: 'vehicle',
+        position: pos,
+        title: v.vehicle_type || 'Vehicle',
+        details: {
+          Type: v.vehicle_type ?? '—',
+          Status: v.carrier_status ?? '—',
+          Location: v.location ?? '—',
+        },
+      });
+    });
+
+    return list;
+  }, [trades, vehicles]);
+
+  // ── Stats ───────────────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const totalTrades = trades.length;
+    const availableVehicles = vehicles.filter(
+      (v) => v.carrier_status === 'available',
+    ).length;
+    const inTransit = vehicles.filter(
+      (v) => v.carrier_status === 'busy',
+    ).length;
+
+    const moistureValues = telemetry
+      .map((t) => t.soil_moisture_percentage)
+      .filter((v) => typeof v === 'number' && !Number.isNaN(v));
+    const avgMoisture =
+      moistureValues.length > 0
+        ? moistureValues.reduce((a, b) => a + b, 0) / moistureValues.length
+        : 0;
+
+    return { totalTrades, availableVehicles, inTransit, avgMoisture };
+  }, [trades, vehicles, telemetry]);
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+  const tradeIcon = useMemo(
+    () =>
+      isLoaded
+        ? {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: '#22c55e',
+            fillOpacity: 0.9,
+            strokeColor: '#16a34a',
+            strokeWeight: 2,
+            scale: 9,
+          }
+        : undefined,
+    [isLoaded],
+  );
+
+  const vehicleIcon = useMemo(
+    () =>
+      isLoaded
+        ? {
+            path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.9,
+            strokeColor: '#2563eb',
+            strokeWeight: 2,
+            scale: 6,
+            rotation: 0,
+          }
+        : undefined,
+    [isLoaded],
+  );
+
+  // ── Loading & Error states ──────────────────────────────────────────────────
+  if (loadError) {
+    return (
+      <div className="flex h-[70vh] items-center justify-center text-red-400">
+        <p>Failed to load Google Maps. Please check the API key.</p>
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="flex h-[70vh] flex-col items-center justify-center gap-4 text-foreground-muted">
+        <Loader2 size={40} className="animate-spin text-agri-primary-light" />
+        <p className="text-sm font-medium">Loading Google Maps…</p>
+      </div>
+    );
+  }
+
+  // ── Main render ─────────────────────────────────────────────────────────────
   return (
     <div className="animate-fade-in space-y-6">
       {/* Header */}
@@ -106,179 +289,207 @@ export default function GeospatialMapPage() {
               Live Geospatial Supply Chain Map
             </h1>
             <p className="text-sm text-foreground-muted">
-              Interactive telemetry nodes, carrier fleet positions (`vehicle_states`), and crop trade hubs
+              Real-time fleet positions, pending harvests, and IoT soil telemetry across Nigeria
             </p>
           </div>
         </div>
 
         <button
           onClick={() => fetchMapData()}
-          disabled={loading}
+          disabled={dataLoading}
           className="btn btn-secondary px-4 py-2 text-xs flex items-center gap-2 self-start sm:self-center"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin text-agri-primary-light' : ''} />
+          <RefreshCw
+            size={14}
+            className={dataLoading ? 'animate-spin text-agri-primary-light' : ''}
+          />
           <span>Sync Network Map</span>
         </button>
       </div>
 
-      {/* Main Interactive Map Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Map Viewport (2 cols) */}
-        <div className="lg:col-span-2 card p-6 border border-border bg-gradient-to-br from-background-secondary to-background-card relative overflow-hidden flex flex-col justify-between min-h-[480px]">
-          <div className="flex items-center justify-between z-10 mb-4 border-b border-border/40 pb-3">
+      {/* Map + Stats Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Google Map — 3 cols on desktop */}
+        <div className="lg:col-span-3 card border border-border bg-gradient-to-br from-background-secondary to-background-card relative overflow-hidden min-h-[520px] rounded-2xl">
+          {/* Live indicator bar */}
+          <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 py-2 bg-background-card/80 backdrop-blur-md border-b border-border/40">
             <div className="flex items-center gap-2">
-              <Radio size={16} className="text-agri-primary-light animate-pulse" />
-              <span className="text-xs font-bold text-foreground">Nigerian Agricultural Trade Corridors</span>
+              <Radio size={14} className="text-agri-primary-light animate-pulse" />
+              <span className="text-xs font-bold text-foreground">
+                Nigerian Agricultural Trade Corridors
+              </span>
+              {dataLoading && (
+                <Loader2 size={12} className="animate-spin text-foreground-dim ml-2" />
+              )}
             </div>
             <div className="flex items-center gap-4 text-[11px] text-foreground-dim">
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Optimal Moisture</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-amber-500" /> Dry (&lt; 30% Ready)</span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Harvests
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 rounded-full bg-blue-500" /> Vehicles
+              </span>
             </div>
           </div>
 
-          {/* Interactive SVG Map Container */}
-          <div className="relative flex-1 rounded-2xl border border-border/60 bg-[#0f172a] overflow-hidden p-4 shadow-inner">
-            {/* Background topographic styling grid */}
-            <div className="absolute inset-0 bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] opacity-30" />
+          {/* Map Canvas */}
+          <GoogleMap
+            mapContainerStyle={containerStyle}
+            center={MAP_CENTER}
+            zoom={MAP_ZOOM}
+            options={MAP_OPTIONS}
+            onClick={() => setActiveMarker(null)}
+          >
+            {markers.map((m) => (
+              <MarkerF
+                key={m.id}
+                position={m.position}
+                icon={m.type === 'trade' ? tradeIcon : vehicleIcon}
+                title={m.title}
+                onClick={() => setActiveMarker(m)}
+              />
+            ))}
 
-            {/* SVG Corridor Lines between hubs */}
-            <svg className="absolute inset-0 h-full w-full pointer-events-none z-0">
-              <path d="M 22% 78% L 26% 66% L 48% 52% L 52% 35% L 64% 20%" stroke="rgba(34, 197, 94, 0.3)" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-              <path d="M 26% 66% L 65% 58% L 48% 52%" stroke="rgba(59, 130, 246, 0.3)" strokeWidth="2" strokeDasharray="4 4" fill="none" />
-            </svg>
-
-            {/* Interactive Hub Markers */}
-            {hubs.map((hub) => {
-              const isSelected = selectedHub?.id === hub.id;
-              const isReady = hub.moisture !== null && hub.moisture !== undefined && hub.moisture < 30;
-
-              return (
-                <div
-                  key={hub.id}
-                  onClick={() => setSelectedHub(hub)}
-                  style={{ left: `${hub.x}%`, top: `${hub.y}%` }}
-                  className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer transition-all duration-300 z-10 group`}
-                >
-                  {/* Pulse aura */}
-                  <div className={`absolute -inset-3 rounded-full animate-ping opacity-30 ${
-                    isReady ? 'bg-amber-500' : 'bg-agri-primary'
-                  }`} />
-
-                  {/* Node Icon */}
-                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border shadow-xl transition-transform duration-200 group-hover:scale-110 ${
-                    isSelected
-                      ? 'bg-agri-primary text-white border-agri-primary-light scale-110 ring-4 ring-agri-primary/20'
-                      : isReady
-                      ? 'bg-background-card text-amber-400 border-amber-500/60 shadow-amber-500/10'
-                      : 'bg-background-card text-foreground border-border shadow-black/50'
-                  }`}>
-                    <MapPin size={14} className={isSelected ? 'text-white' : isReady ? 'text-amber-400' : 'text-agri-primary-light'} />
-                    <span className="text-xs font-bold whitespace-nowrap">{hub.name.split(' ')[0]}</span>
-                    {isReady && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
-                  </div>
-
-                  {/* Tooltip on hover */}
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 rounded-lg bg-background border border-border shadow-2xl text-[11px] text-foreground z-20 pointer-events-none">
-                    <p className="font-bold text-agri-primary-light">{hub.name}</p>
-                    <p className="text-foreground-muted">{hub.state}</p>
-                    <div className="mt-1 border-t border-border/40 pt-1 flex justify-between text-foreground-dim">
-                      <span>Moisture: <strong className={isReady ? 'text-amber-400' : 'text-foreground'}>{hub.moisture ?? '—'}%</strong></span>
-                      <span>Vehicles: <strong className="text-emerald-400">{hub.activeVehicles}</strong></span>
-                    </div>
+            {activeMarker && (
+              <InfoWindowF
+                position={activeMarker.position}
+                onCloseClick={() => setActiveMarker(null)}
+              >
+                <div className="min-w-[180px] p-1 text-gray-900">
+                  <p className="text-sm font-bold mb-1 flex items-center gap-1.5">
+                    {activeMarker.type === 'trade' ? (
+                      <Wheat size={14} className="text-emerald-600" />
+                    ) : (
+                      <Truck size={14} className="text-blue-600" />
+                    )}
+                    {activeMarker.title}
+                  </p>
+                  <div className="space-y-0.5 text-xs text-gray-700">
+                    {Object.entries(activeMarker.details).map(([k, v]) => (
+                      <p key={k}>
+                        <span className="font-semibold">{k}:</span> {v}
+                      </p>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
-
-            {/* Map Legend */}
-            <div className="absolute bottom-3 left-3 bg-background-card/90 backdrop-blur-md px-3 py-2 rounded-xl border border-border text-[11px] space-y-1 shadow-lg">
-              <div className="font-bold text-foreground mb-0.5">Live Telemetry & Fleet Legend</div>
-              <div className="flex items-center gap-2 text-foreground-muted">
-                <span className="h-2 w-2 rounded-full bg-agri-primary animate-pulse" />
-                <span>Active Regional Hub Node</span>
-              </div>
-              <div className="flex items-center gap-2 text-foreground-muted">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                <span>Triggered Harvest Alert (&lt; 30% Moisture)</span>
-              </div>
-            </div>
-          </div>
+              </InfoWindowF>
+            )}
+          </GoogleMap>
         </div>
 
-        {/* Selected Hub Details Panel */}
-        <div>
-          {selectedHub ? (
-            <div className="card p-6 border border-border bg-gradient-to-b from-background-card to-background-secondary space-y-5 animate-scale-in">
-              <div className="border-b border-border pb-3">
-                <span className="text-[10px] font-bold text-agri-primary-light uppercase tracking-wider">
-                  Selected Hub Inspection
-                </span>
-                <h3 className="text-lg font-black text-foreground mt-0.5">{selectedHub.name}</h3>
-                <p className="text-xs text-foreground-muted">{selectedHub.state} (GPS: {selectedHub.lat}, {selectedHub.lng})</p>
-              </div>
+        {/* Stats Panel — right side on desktop, below on mobile */}
+        <div className="lg:col-span-1 space-y-4">
+          <div className="card p-5 border border-border bg-gradient-to-b from-background-card to-background-secondary space-y-5 rounded-2xl">
+            <div className="border-b border-border/40 pb-3">
+              <span className="text-[10px] font-bold text-agri-primary-light uppercase tracking-wider">
+                Network Overview
+              </span>
+              <h3 className="text-lg font-black text-foreground mt-0.5">
+                Live Stats
+              </h3>
+            </div>
 
-              {/* Status Banner */}
-              <div className={`p-4 rounded-xl border flex items-center justify-between ${
-                selectedHub.moisture && selectedHub.moisture < 30
-                  ? 'border-amber-500/40 bg-amber-500/10 text-amber-400'
-                  : 'border-agri-primary/30 bg-agri-primary/10 text-agri-primary-light'
-              }`}>
-                <div className="flex items-center gap-2.5">
-                  <Droplets size={20} />
-                  <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider block">Average Soil Moisture</span>
-                    <span className="text-xl font-black">{selectedHub.moisture ?? '—'} %</span>
-                  </div>
+            {/* Stat cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+              {/* Total Trades */}
+              <div className="p-3 rounded-xl bg-background-elevated border border-border flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
+                  <Wheat size={18} />
                 </div>
-                <span className="text-xs font-bold px-2 py-1 rounded bg-black/30 border border-current">
-                  {selectedHub.moisture && selectedHub.moisture < 30 ? 'Ready for Harvest' : 'Optimal Level'}
-                </span>
-              </div>
-
-              {/* Hub Metrics */}
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-background-elevated border border-border flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-400">
-                    <Truck size={18} />
-                  </div>
-                  <div>
-                    <span className="text-foreground-dim block">Active Vehicles</span>
-                    <span className="text-base font-bold text-foreground">{selectedHub.activeVehicles} Carriers</span>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-background-elevated border border-border flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
-                    <Wheat size={18} />
-                  </div>
-                  <div>
-                    <span className="text-foreground-dim block">Pending Trades</span>
-                    <span className="text-base font-bold text-foreground">{selectedHub.activeTrades} Offers</span>
-                  </div>
+                <div>
+                  <span className="text-[11px] text-foreground-dim block">
+                    Pending Trades
+                  </span>
+                  <span className="text-lg font-bold text-foreground">
+                    {stats.totalTrades}
+                  </span>
                 </div>
               </div>
 
-              {/* Recent Live Feed in Hub */}
-              <div className="space-y-3 pt-2">
-                <span className="text-xs font-bold text-foreground uppercase tracking-wider block">Recent Telemetry in Corridor</span>
-                {telemetry.slice(0, 3).map((t) => (
-                  <div key={t.id} className="p-3 rounded-lg bg-background-secondary border border-border/60 flex items-center justify-between text-xs">
-                    <div>
-                      <span className="font-bold text-foreground block">{t.associated_lga || selectedHub.state}</span>
-                      <span className="text-[11px] text-foreground-dim">Moisture: {t.soil_moisture_percentage}%</span>
-                    </div>
-                    <span className="text-[10px] text-foreground-dim">{t.recorded_at ? new Date(t.recorded_at).toLocaleTimeString() : 'Live'}</span>
-                  </div>
-                ))}
+              {/* Available Vehicles */}
+              <div className="p-3 rounded-xl bg-background-elevated border border-border flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-400">
+                  <Truck size={18} />
+                </div>
+                <div>
+                  <span className="text-[11px] text-foreground-dim block">
+                    Available Vehicles
+                  </span>
+                  <span className="text-lg font-bold text-foreground">
+                    {stats.availableVehicles}
+                  </span>
+                </div>
+              </div>
+
+              {/* In-Transit */}
+              <div className="p-3 rounded-xl bg-background-elevated border border-border flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400">
+                  <ArrowRightLeft size={18} />
+                </div>
+                <div>
+                  <span className="text-[11px] text-foreground-dim block">
+                    In-Transit
+                  </span>
+                  <span className="text-lg font-bold text-foreground">
+                    {stats.inTransit}
+                  </span>
+                </div>
+              </div>
+
+              {/* Avg Moisture */}
+              <div className="p-3 rounded-xl bg-background-elevated border border-border flex items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-400">
+                  <Droplets size={18} />
+                </div>
+                <div>
+                  <span className="text-[11px] text-foreground-dim block">
+                    Avg Soil Moisture
+                  </span>
+                  <span className="text-lg font-bold text-foreground">
+                    {stats.avgMoisture > 0
+                      ? `${stats.avgMoisture.toFixed(1)}%`
+                      : '—'}
+                  </span>
+                </div>
               </div>
             </div>
-          ) : (
-            <div className="card p-8 border border-dashed border-border text-center">
-              <MapPin size={32} className="mx-auto mb-2 text-foreground-dim opacity-50" />
-              <h4 className="text-sm font-bold text-foreground">Select a Regional Hub</h4>
-              <p className="text-xs text-foreground-muted mt-1">Click on any hub node on the corridor map to inspect localized soil moisture and active carrier fleets.</p>
+          </div>
+
+          {/* Recent telemetry feed */}
+          <div className="card p-5 border border-border bg-background-card rounded-2xl space-y-3">
+            <div className="flex items-center gap-2 border-b border-border/40 pb-2">
+              <Activity size={14} className="text-agri-primary-light" />
+              <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                Latest Telemetry
+              </span>
             </div>
-          )}
+
+            {telemetry.length === 0 && (
+              <p className="text-xs text-foreground-dim py-2">No telemetry data yet.</p>
+            )}
+
+            {telemetry.slice(0, 5).map((t) => (
+              <div
+                key={t.id}
+                className="p-3 rounded-lg bg-background-secondary border border-border/60 flex items-center justify-between text-xs"
+              >
+                <div>
+                  <span className="font-bold text-foreground block">
+                    {t.associated_lga || 'Unknown LGA'}
+                  </span>
+                  <span className="text-[11px] text-foreground-dim">
+                    Moisture: {t.soil_moisture_percentage}%
+                    {t.temperature != null && ` · ${t.temperature}°C`}
+                  </span>
+                </div>
+                <span className="text-[10px] text-foreground-dim whitespace-nowrap">
+                  {t.recorded_at
+                    ? new Date(t.recorded_at).toLocaleTimeString()
+                    : 'Live'}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

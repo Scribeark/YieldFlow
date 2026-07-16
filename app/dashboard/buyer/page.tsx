@@ -6,6 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import type { TradeRequest, IoTTelemetryLog } from '@/lib/types';
 import { ShoppingCart, CheckCircle2, AlertCircle, Camera, Droplets, MapPin, Scale, Search, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import IncomingInquiries from '@/components/buyer/IncomingInquiries';
 
 interface EnrichedTradeRequest extends TradeRequest {
   moisture_percentage?: number | null;
@@ -89,12 +90,25 @@ export default function BuyerDashboard() {
     setConfirming(true);
     setError(null);
     try {
+      // 1. Update trade request status
       const { error: updateErr } = await supabase
         .from('trade_requests')
         .update({ status: 'confirmed_by_buyer' })
         .eq('id', selectedOrder.id);
 
       if (updateErr) throw new Error(updateErr.message);
+
+      // 2. Buyer-Pays-Logistics Flow: Automatically create/assign a logistics booking where buyer is the payer
+      if (profile) {
+        await supabase.from('logistics_bookings').insert({
+          trade_request_id: selectedOrder.id,
+          harvest_id: selectedOrder.id,
+          payer_id: profile.id,
+          payment_status: 'pending',
+          status: 'matched',
+          estimated_cost_ngn: (selectedOrder.quantity || 1000) * 45, // Estimated standard logistics transport rate
+        }).select().single();
+      }
 
       setOrderSuccess(true);
       setTimeout(() => {
@@ -108,6 +122,7 @@ export default function BuyerDashboard() {
       setConfirming(false);
     }
   };
+
 
   const filteredRequests = requests.filter((req) => {
     const matchesSearch = req.commodity_variety.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -176,6 +191,9 @@ export default function BuyerDashboard() {
           />
         </div>
       </div>
+
+      {/* Incoming Farmer Trade Proposals (`trade_inquiries`) */}
+      <IncomingInquiries />
 
       {/* Main Grid: Offers vs Inspection Modal */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
