@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import NavigationShell from "@/components/layout/NavigationShell";
 import OfflineBanner from "@/components/ui/OfflineBanner";
+import PwaRegister from "@/components/providers/PwaRegister";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default function RootLayout({
       className="h-full antialiased font-sans"
     >
       <body className="min-h-full">
+        <PwaRegister />
         <OfflineBanner />
         <ErrorBoundary>
           <NavigationShell>{children}</NavigationShell>
