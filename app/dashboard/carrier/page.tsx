@@ -12,13 +12,13 @@ type Tab = 'route' | 'fleet' | 'available' | 'bookings';
 
 export default function CarrierDashboard() {
   const { profile } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<Tab>('route');
+  const [activeTab, setActiveTab] = useState<Tab>('fleet');
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'route', label: 'AI Route & GPS Tracking', icon: <Compass size={16} className="text-blue-400" />, badge: 'Live GPS' },
-    { id: 'fleet', label: 'My Vehicles & Fleet Registry', icon: <Radio size={16} className="text-emerald-400" /> },
+    { id: 'fleet', label: 'My Vehicles & Fleet Registry', icon: <Radio size={16} className="text-emerald-400" />, badge: 'Multi-Asset' },
     { id: 'available', label: 'Available Load Board', icon: <Package size={16} className="text-amber-400" /> },
     { id: 'bookings', label: 'Active Transit Bookings', icon: <ClipboardList size={16} className="text-purple-400" /> },
+    { id: 'route', label: 'Route Corridor Analytics', icon: <Compass size={16} className="text-blue-400" /> },
   ];
 
   return (
@@ -47,7 +47,7 @@ export default function CarrierDashboard() {
                 Welcome, {profile?.full_name || 'Carrier Fleet Operator'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 font-light mt-0.5">
-                Optimize carrier haulage routes, simulate live GPS dispatch coordinates, and accept verified harvest loads.
+                Register multiple transport vehicles with PWA camera verification, accept trade requests directly from buyers, and monitor haulage corridors.
               </p>
             </div>
           </div>

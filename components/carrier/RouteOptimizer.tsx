@@ -67,31 +67,6 @@ export default function RouteOptimizer() {
               Real-time GPS dispatch tracking visible to both farmers and commercial off-taker buyers for total supply chain transparency.
             </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (progress === 100) setProgress(0);
-                setIsSimulating(!isSimulating);
-              }}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-teal-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-500/25 hover:from-blue-400 hover:to-teal-400 active:scale-95 transition-all"
-            >
-              {isSimulating ? <Pause size={16} /> : <Play size={16} />}
-              <span>{isSimulating ? 'Pause GPS Simulation' : progress === 100 ? 'Restart Route Simulation' : 'Launch Route Simulation'}</span>
-            </button>
-            <button
-              onClick={() => {
-                setIsSimulating(false);
-                setProgress(0);
-                setCurrentLat(7.3775);
-                setCurrentLng(3.9470);
-              }}
-              className="rounded-xl border border-white/10 bg-white/5 p-3 text-slate-300 hover:bg-white/10 hover:text-white transition-colors"
-              title="Reset Route"
-            >
-              <RotateCcw size={16} />
-            </button>
-          </div>
         </div>
       </div>
 

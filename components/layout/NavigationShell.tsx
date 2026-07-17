@@ -19,6 +19,7 @@ import {
   Store,
   CheckCircle2,
 } from 'lucide-react';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 interface NavItem {
   label: string;
@@ -105,6 +106,11 @@ export default function NavigationShell({
   }, [userRole]);
 
   const handleEnableAllAccess = async () => {
+    const currentProf = profile || { id: 'demo-id', auth_uid: user?.id || 'demo-uid', email: user?.email || 'demo@yieldflow.com', full_name: 'Enterprise Demo Operator', phone_number: '08024757252', declared_profession: 'enterprise' as UserRole };
+    useAuthStore.setState({ profile: { ...currentProf, declared_profession: 'enterprise' } });
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('yieldflow_active_role', 'enterprise');
+    }
     await updateProfile({ declared_profession: 'enterprise' });
   };
 
@@ -279,10 +285,40 @@ export default function NavigationShell({
           <div className="w-8" /> {/* Placeholder for balance */}
         </header>
 
-        {/* Dynamic Page Container */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-950">
-          <div className="mx-auto max-w-7xl">
-            {children}
+        {/* Dynamic Page Container with Global Utility Bar */}
+        <main className="flex-1 overflow-y-auto bg-background transition-colors duration-300">
+          {/* Universal Utility Bar across all pages */}
+          <div className="sticky top-0 z-30 border-b border-border bg-background-secondary/80 backdrop-blur-xl px-4 py-3 sm:px-6 shadow-sm">
+            <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="text-xs font-bold uppercase tracking-wider text-foreground-muted hidden sm:inline">
+                  Real-time Agricultural Telemetry & Haulage Network
+                </span>
+                <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-agri-primary">
+                  Capability: {userRole.toUpperCase()}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                {userRole !== 'enterprise' && userRole !== 'admin' && (
+                  <button
+                    onClick={handleEnableAllAccess}
+                    title="Unlock and test all portal features without switching accounts"
+                    className="rounded-xl border border-emerald-500/40 bg-gradient-to-r from-emerald-500/15 to-teal-500/15 px-3 py-1.5 text-[11px] font-extrabold text-agri-primary shadow-sm hover:from-emerald-500/25 hover:to-teal-500/25 active:scale-95 transition-all"
+                  >
+                    ⚡ Enable All-Access
+                  </button>
+                )}
+                <ThemeToggle />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-4 sm:p-6 lg:p-8">
+            <div className="mx-auto max-w-7xl">
+              {children}
+            </div>
           </div>
         </main>
       </div>

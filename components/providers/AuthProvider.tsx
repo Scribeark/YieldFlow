@@ -82,14 +82,20 @@ export default function AuthProvider({
 
   // Handle Role Upgrade / Activation
   const handleActivateRole = async (newRole: UserRole) => {
-    await updateProfile({ declared_profession: newRole });
+    const currentProf = profile || { id: 'demo-id', auth_uid: user?.id || 'demo-uid', email: user?.email || 'demo@yieldflow.com', full_name: 'Operator', phone_number: '08024757252', declared_profession: newRole };
+    useAuthStore.setState({ profile: { ...currentProf, declared_profession: newRole } });
+    if (typeof window !== 'undefined') localStorage.setItem('yieldflow_active_role', newRole);
     setShowRoleUpgradeModal(false);
+    await updateProfile({ declared_profession: newRole });
   };
 
   // Handle Full All-Access / Enterprise Mode
   const handleActivateAllAccess = async () => {
-    await updateProfile({ declared_profession: 'enterprise' });
+    const currentProf = profile || { id: 'demo-id', auth_uid: user?.id || 'demo-uid', email: user?.email || 'demo@yieldflow.com', full_name: 'Enterprise Operator', phone_number: '08024757252', declared_profession: 'enterprise' as UserRole };
+    useAuthStore.setState({ profile: { ...currentProf, declared_profession: 'enterprise' } });
+    if (typeof window !== 'undefined') localStorage.setItem('yieldflow_active_role', 'enterprise');
     setShowRoleUpgradeModal(false);
+    await updateProfile({ declared_profession: 'enterprise' });
   };
 
   // --- UNCONDITIONAL HOOKS END HERE ---
@@ -196,7 +202,7 @@ export default function AuthProvider({
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     required
-                    className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                    className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-11 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                   />
                 </div>
               </div>

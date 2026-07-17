@@ -4,7 +4,7 @@
    Agri-Data Hub — Design System
    ============================================ */
 
-:root {
+:root, [data-theme="dark"] {
   /* Brand Colors */
   --agri-primary: #16a34a;
   --agri-primary-light: #22c55e;
@@ -12,7 +12,7 @@
   --agri-accent: #f59e0b;
   --agri-accent-light: #fbbf24;
 
-  /* Dark Theme (Default) */
+  /* Dark Theme */
   --background: #0b0f14;
   --background-secondary: #111827;
   --background-card: #1a2332;
@@ -43,6 +43,19 @@
   --radius-md: 10px;
   --radius-lg: 16px;
   --radius-xl: 24px;
+}
+
+[data-theme="light"] {
+  /* Light Theme (Clean, Crisp Commercial Aesthetic) */
+  --background: #f8fafc;
+  --background-secondary: #f1f5f9;
+  --background-card: #ffffff;
+  --background-elevated: #e2e8f0;
+  --foreground: #0f172a;
+  --foreground-muted: #475569;
+  --foreground-dim: #94a3b8;
+  --border: #cbd5e1;
+  --border-hover: #94a3b8;
 }
 
 @theme inline {

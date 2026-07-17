@@ -173,7 +173,38 @@ Following user feedback during live verification, we executed a rapid enhancemen
 - **Fuel & Cost Optimization**: Computes simulated fuel savings (`₦18,500 Fuel Saved`) from AI route bypass recommendations.
 
 ### D. Vibrant Glassmorphic Agricultural UI Overhaul
-- **Landing Page (`app/page.tsx`)**: Removed generic `Multi-Role Access` and `Offline-First PWA` badges as requested. Wrapped the hero section in rich agricultural imagery, glassmorphic overlays, and glowing emerald/amber accents.
 - **Portal Banners**: Upgraded all portal headers (`/dashboard/farmer`, `/dashboard/buyer`, `/dashboard/carrier`, `/dashboard/map`, `/dashboard/inputs`) with glowing multi-color gradients, agricultural iconography, and responsive micro-animations.
+
+---
+
+## 8. Commercial High-Fidelity Refinement (`Production Architecture Upgrade`)
+
+Following critical feedback to treat `YieldFlow` as a live commercial enterprise application rather than a demo MVP, the following structural upgrades were executed:
+
+### A. Removal of In-App Simulation Controls
+- **Production Architecture**: Removed artificial `Simulate GPS Corridor` (`app/dashboard/map/page.tsx`) and `Launch Route Simulation` (`RouteOptimizer.tsx`) buttons from internal dashboard views. 
+- **Telemetry Ingestion Readiness**: Prepared the architecture for high-throughput streaming ingestion via external tools like Grafana and Postman into `iot_telemetry_logs`, `vehicle_states`, and `trade_requests`.
+
+### B. User Choice: Light Mode & Dark Mode Switcher (`ThemeToggle.tsx`)
+- **Theme Choice**: Added a global **Sun/Moon Theme Toggle (`ThemeToggle.tsx`)** embedded directly inside the `NavigationShell.tsx` Utility Header Bar and `app/page.tsx` top navbar.
+- **Dynamic CSS Tokens (`globals.css`)**: Configured full support for both crisp commercial Light Mode (`bg-slate-50 text-slate-900 border-slate-200 card bg-white`) and sleek Dark Mode (`bg-slate-950 text-white border-white/10 card bg-slate-900`) without forcing users into pure dark mode.
+
+### C. Storytelling Interactive Landing Page (`app/page.tsx`)
+- **Wording Cleanup**: Removed all instances of "agricultural intelligence" at the header.
+- **Interactive Sticky/Sequential Workflow**: Rebuilt the landing page with interactive sequential tabs where users can click through and visually inspect each business capability:
+  1. **Layer 1: Producer & IoT Telemetry**: Real-time soil moisture monitoring and PWA camera verification before broadcasting crops.
+  2. **Layer 2: Off-Taker Procurement**: Enterprise buyers reviewing high-resolution audit photos, locking in contracts, and settling carrier freight directly (`Buyer Pays Logistics`).
+  3. **Layer 3: 3PL Haulage Fleet**: Multi-vehicle registration, load board matching, and turn-by-turn waypoint tracking.
+  4. **Layer 4: Enterprise Multi-Role Oversight**: Full operational governance across all capabilities from a unified account.
+
+### D. Zero-Latency Synchronous Auth & React Error #300 / #310 Elimination
+- **Instant Demo State (`app/login/page.tsx`)**: Upgraded `handleInstantDemoLogin` and `handleSubmit` to synchronously set local memory and `localStorage` session state before triggering navigation. This guarantees zero hydration crashes (`Minified React error #310 / #300`) during rapid clicks or slow remote network connections.
+- **Reliable Capability Switcher (`AuthProvider.tsx` & `NavigationShell.tsx`)**: Clicking `Activate Capability` or `Enable All-Access` now instantly updates Zustand store state and `localStorage`, closing the modal smoothly with zero stuck states.
+
+### E. Input Icon Overlap ("Ghost Writing") Fix across Forms
+- **Visual Ergonomics**: Audited form inputs (`app/login/page.tsx`, `AuthProvider.tsx`, etc.) and increased left padding from `pl-10` to `pl-11` (`44px`). This maintains at least `14px` clear spacing between left-aligned Lucide icons (`Search`, `Mail`, `Phone`, `User`) and the placeholder/text, preventing overlapping visual artifacts.
+
+### F. Multi-Vehicle Carrier Fleet Registry Restored (`CarrierDashboard`)
+- **Multi-Asset Registry (`VehicleRegistry.tsx`)**: Made **My Vehicles & Fleet Registry** (`activeTab = 'fleet'`) the primary default view on `/dashboard/carrier`. Independent fleet operators and enterprises can register unlimited transport assets (`Trucks`, `Refrigerated Vans`, `Flatbeds`) with PWA verification photos to accept and dispatch loads across Nigeria.
 
 

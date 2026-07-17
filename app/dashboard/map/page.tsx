@@ -317,21 +317,9 @@ export default function GeospatialMapPage() {
 
         <div className="flex items-center gap-2 self-start sm:self-center">
           <button
-            onClick={() => setSimGPS(!simGPS)}
-            className={`px-3.5 py-2 text-xs font-bold rounded-xl flex items-center gap-2 transition-all shadow-md ${
-              simGPS
-                ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-amber-500/30'
-                : 'bg-slate-800 text-slate-300 border border-white/10 hover:bg-slate-700'
-            }`}
-          >
-            <span className={`h-2 w-2 rounded-full ${simGPS ? 'bg-white animate-ping' : 'bg-slate-500'}`} />
-            <span>{simGPS ? `Tracking GPS: ${simProgress}%` : 'Simulate GPS Corridor'}</span>
-          </button>
-
-          <button
             onClick={() => fetchMapData()}
             disabled={dataLoading}
-            className="rounded-xl border border-white/10 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-300 flex items-center gap-2 hover:bg-slate-800 hover:text-white transition-all"
+            className="rounded-xl border border-white/10 bg-slate-800/80 px-4 py-2.5 text-xs font-semibold text-slate-300 flex items-center gap-2 hover:bg-slate-800 hover:text-white transition-all shadow-md"
           >
             <RefreshCw
               size={14}

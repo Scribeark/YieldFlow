@@ -66,24 +66,41 @@ export default function LoginPage() {
     }
   };
 
-  // Instant One-Click Demo Mode (So user never gets stuck testing)
+  // Instant One-Click Demo Mode (Synchronous & Zero Latency to prevent React Error #310)
   const handleInstantDemoLogin = async (demoRole: UserRole, targetUrl: string) => {
     setIsSubmitting(true);
     setError(null);
     setSuccess(`Instant ${demoRole.toUpperCase()} Demo Mode activated! Launching...`);
     
-    // Attempt standard test login, or synthetic instant state
-    const { error: signInErr } = await signIn('test@yieldflow.com', 'password123');
-    if (signInErr) {
-      // If no account exists yet, sign up our instant demo account
-      await signUp('test@yieldflow.com', 'password123', `Simulated ${demoRole.toUpperCase()} Account`, '08024757252', demoRole);
-    } else {
-      await updateProfile({ declared_profession: demoRole });
+    // 1. Immediately set synthetic session in Zustand state so UI hydrates cleanly
+    const demoProfile = {
+      id: `demo-${demoRole}-${Date.now()}`,
+      auth_uid: `demo-uid-${demoRole}`,
+      email: `${demoRole}@yieldflow.com`,
+      full_name: `${demoRole.charAt(0).toUpperCase() + demoRole.slice(1)} Demo Operator`,
+      phone_number: '08024757252',
+      declared_profession: demoRole,
+      created_at: new Date().toISOString(),
+    };
+
+    useAuthStore.setState({
+      initialized: true,
+      loading: false,
+      needsPhoneLinking: false,
+      user: { id: demoProfile.auth_uid, email: demoProfile.email } as any,
+      profile: demoProfile,
+    });
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('yieldflow_active_role', demoRole);
     }
+
+    // 2. Perform background sign-in attempt without blocking navigation
+    signIn(`${demoRole}@yieldflow.com`, 'password123').catch(() => {});
 
     setTimeout(() => {
       router.push(targetUrl);
-    }, 700);
+    }, 400);
   };
 
   const roles: { value: UserRole; label: string; description: string }[] = [
@@ -187,7 +204,7 @@ export default function LoginPage() {
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required={isSignUp}
-                      className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-11 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                     />
                   </div>
                 </div>
@@ -202,7 +219,7 @@ export default function LoginPage() {
                       value={phoneNumber}
                       onChange={(e) => setPhoneNumber(e.target.value)}
                       required={isSignUp}
-                      className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                      className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-11 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                     />
                   </div>
                 </div>
@@ -240,7 +257,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-11 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
             </div>
@@ -255,7 +272,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-10 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                  className="w-full rounded-xl border border-white/10 bg-slate-800/80 pl-11 pr-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400"
                 />
               </div>
             </div>
