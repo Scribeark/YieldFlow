@@ -24,9 +24,6 @@
 ```
 agri-data-hub/
 ├── app/
-│   ├── api/
-│   │   └── webhook/
-│   │       └── route.ts          # USSD webhook endpoint
 │   ├── dashboard/
 │   │   ├── admin/
 │   │   │   ├── analytics/
@@ -105,7 +102,7 @@ Copy the contents of `supabase/schema.sql` and run it in your **Supabase SQL Edi
 
 ### 3. Configure Environment
 
-The `.env.local` file is pre-configured. Update `WEBHOOK_API_SECRET` with your own secret for the USSD webhook.
+The `.env.local` file is pre-configured with Supabase API credentials and Google Maps tokens.
 
 ### 4. Start Development Server
 
@@ -133,16 +130,6 @@ Open [http://localhost:3000](http://localhost:3000)
 | **Farmer** | Own profile | Own records (CRUD) | View own harvest bookings | Own telemetry (CRUD) |
 | **Carrier** | Own profile | View pending + matched | Own bookings (CRUD) | — |
 | **Admin** | All users | All records | All bookings | All telemetry |
-
----
-
-## 🔗 API Endpoints
-
-### Webhook (USSD Gateway)
-- **POST** `/api/webhook`
-  - Headers: `x-api-secret: <WEBHOOK_API_SECRET>`
-  - Body: `{ "phone_number": "+234...", "crop_type": "Maize", "quantity": 500 }`
-  - Response: `{ "status": "success", "message": "Harvest logged via API" }`
 
 ---
 

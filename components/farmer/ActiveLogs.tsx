@@ -31,11 +31,10 @@ export default function ActiveLogs() {
   const fetchRequests = useCallback(async () => {
     if (!profile) return;
     try {
-      // Query both user_id and owner_id columns for maximum coverage
       const { data, error: fetchError } = await supabase
         .from('trade_requests')
         .select('*')
-        .or(`user_id.eq.${profile.id},owner_id.eq.${profile.id}`)
+        .eq('user_id', profile.id)
         .order('created_at', { ascending: false });
 
       if (fetchError) throw new Error(fetchError.message);
@@ -136,11 +135,11 @@ export default function ActiveLogs() {
                     )}
                   </td>
                   <td className="font-bold text-foreground">{req.commodity_variety}</td>
-                  <td className="font-semibold text-agri-primary-light">{Number(req.quantity).toLocaleString()}</td>
-                  <td className="text-foreground-muted text-xs">{req.address || 'Standard Farm Hub'}</td>
+                  <td className="font-semibold text-agri-primary-light">{Number((req as any).quantity_volume || req.quantity || 0).toLocaleString()}</td>
+                  <td className="text-foreground-muted text-xs">{(req as any).physical_address || req.address || 'Standard Farm Hub'}</td>
                   <td>
-                    <span className={statusBadgeClass[req.status || 'pending'] || 'badge badge-pending'}>
-                      {statusLabel[req.status || 'pending'] || (req.status || 'pending')}
+                    <span className={statusBadgeClass[(req as any).request_status || req.status || 'pending'] || 'badge badge-pending'}>
+                      {statusLabel[(req as any).request_status || req.status || 'pending'] || ((req as any).request_status || req.status || 'pending')}
                     </span>
                   </td>
                   <td className="text-foreground-dim text-xs">

@@ -80,22 +80,13 @@ export default function AuthProvider({
     setIsLinking(false);
   };
 
-  // Handle Role Upgrade / Activation
-  const handleActivateRole = async (newRole: UserRole) => {
-    const currentProf = profile || { id: 'demo-id', auth_uid: user?.id || 'demo-uid', email: user?.email || 'demo@yieldflow.com', full_name: 'Operator', phone_number: '08024757252', declared_profession: newRole };
-    useAuthStore.setState({ profile: { ...currentProf, declared_profession: newRole } });
-    if (typeof window !== 'undefined') localStorage.setItem('yieldflow_active_role', newRole);
-    setShowRoleUpgradeModal(false);
-    await updateProfile({ declared_profession: newRole });
-  };
-
-  // Handle Full All-Access / Enterprise Mode
-  const handleActivateAllAccess = async () => {
-    const currentProf = profile || { id: 'demo-id', auth_uid: user?.id || 'demo-uid', email: user?.email || 'demo@yieldflow.com', full_name: 'Enterprise Operator', phone_number: '08024757252', declared_profession: 'enterprise' as UserRole };
-    useAuthStore.setState({ profile: { ...currentProf, declared_profession: 'enterprise' } });
-    if (typeof window !== 'undefined') localStorage.setItem('yieldflow_active_role', 'enterprise');
-    setShowRoleUpgradeModal(false);
-    await updateProfile({ declared_profession: 'enterprise' });
+  // Helper to get correct home portal for user's fixed role
+  const getHomeRoute = () => {
+    const currentRole = profile?.declared_profession || profile?.role || 'farmer';
+    if (currentRole === 'carrier') return '/dashboard/carrier';
+    if (currentRole === 'buyer') return '/dashboard/buyer';
+    if (currentRole === 'admin' || currentRole === 'enterprise') return '/dashboard/admin';
+    return '/dashboard/farmer';
   };
 
   // --- UNCONDITIONAL HOOKS END HERE ---
@@ -114,50 +105,41 @@ export default function AuthProvider({
     );
   }
 
-  // Multi-Role Capability Upgrade / Access Expansion Modal (Never Blocks or Crashes!)
+  // Strict Route-Gating Screen (Blocks unauthorized role access per security policy)
   if (showRoleUpgradeModal && targetRouteRole) {
-    const isRestrictedAdmin = targetRouteRole === 'admin';
+    const currentRole = profile?.declared_profession || profile?.role || 'farmer';
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 p-4 text-white">
-        <div className="max-w-md w-full rounded-2xl border border-white/10 bg-slate-900/90 p-8 text-center backdrop-blur-2xl shadow-2xl animate-fade-in">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-400 shadow-lg shadow-emerald-500/30">
-            <Zap size={32} className="text-white animate-bounce" />
+        <div className="max-w-md w-full rounded-2xl border border-rose-500/30 bg-slate-900/95 p-8 text-center backdrop-blur-2xl shadow-2xl animate-fade-in">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/20 border border-rose-500/40 shadow-lg shadow-rose-500/20">
+            <AlertCircle size={32} className="text-rose-400" />
           </div>
           <h2 className="text-xl font-black tracking-tight text-white mb-2">
-            {isRestrictedAdmin ? 'Admin Governance Portal' : `Expand Your Multi-Role Access`}
+            Access Restricted
           </h2>
           <p className="text-sm text-slate-300 leading-relaxed font-light mb-6">
-            {isRestrictedAdmin
-              ? 'This governance dashboard requires administrator privileges or an enterprise-level account. You can enable full enterprise demo access below to explore.'
-              : `You initially registered as a "${profile?.declared_profession || 'farmer'}". You don't need a second account! Activate the "${targetRouteRole}" capability on your profile below to start trading and managing logistics immediately.`}
+            Your account role is permanently fixed as <strong className="text-rose-300 uppercase">{currentRole}</strong>. You do not have permission to access the <strong className="text-white uppercase">{targetRouteRole}</strong> portal. If you require access to a different portal, please sign up for a separate account.
           </p>
 
           <div className="space-y-3">
-            {!isRestrictedAdmin && (
-              <button
-                onClick={() => handleActivateRole(targetRouteRole)}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition-all"
-              >
-                <CheckCircle2 size={18} />
-                <span>Activate {targetRouteRole.toUpperCase()} Capability</span>
-              </button>
-            )}
-
             <button
-              onClick={handleActivateAllAccess}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-5 py-3.5 text-sm font-bold text-emerald-300 hover:bg-emerald-500/25 active:scale-95 transition-all"
+              onClick={() => {
+                setShowRoleUpgradeModal(false);
+                router.push(getHomeRoute());
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-emerald-500/25 hover:from-emerald-400 hover:to-teal-400 active:scale-95 transition-all"
             >
-              ⚡ Enable All-Access Multi-Role (Explore Everything)
+              <span>Return to Designated Portal ({currentRole.toUpperCase()})</span>
             </button>
 
             <button
               onClick={() => {
                 setShowRoleUpgradeModal(false);
-                router.push('/dashboard/farmer');
+                router.push('/login');
               }}
               className="w-full rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-semibold text-slate-400 hover:bg-white/10 hover:text-white transition-colors"
             >
-              Return to Farmer & Trader Portal
+              Sign Out & Register New Account
             </button>
           </div>
         </div>

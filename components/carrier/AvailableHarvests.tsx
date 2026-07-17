@@ -149,11 +149,11 @@ export default function AvailableHarvests() {
             <div className="mb-4 space-y-1.5 text-xs">
               <div className="flex items-center gap-2 text-agri-primary-light font-bold">
                 <Scale size={14} className="text-agri-primary" />
-                <span>{Number(req.quantity).toLocaleString()} kg / units</span>
+                <span>{Number((req as any).quantity_volume || req.quantity || 0).toLocaleString()} kg / units</span>
               </div>
               <div className="flex items-center gap-2 text-foreground-muted">
                 <MapPin size={14} className="text-foreground-dim shrink-0" />
-                <span className="truncate">{req.address || 'Standard Farm Hub'}</span>
+                <span className="truncate">{(req as any).physical_address || req.address || 'Standard Farm Hub'}</span>
               </div>
             </div>
           </div>

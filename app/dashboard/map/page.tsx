@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const GOOGLE_MAPS_API_KEY = 'AIzaSyCt45_kXs1MbaP6fDv3bcMkPk0uh9cnOhA';
+const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_MAPS_PLATFORM_API_KEY || '';
 
 const MAP_CENTER = { lat: 9.082, lng: 8.6753 };
 const MAP_ZOOM = 6;

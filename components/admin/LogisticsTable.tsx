@@ -58,9 +58,9 @@ export default function LogisticsTable() {
         const mapped: LogisticsRow[] = (rows || []).map((row: Record<string, unknown>) => ({
           id: String(row.id || ''),
           crop_type: String(row.commodity_variety || row.crop_type || 'Crop Variety'),
-          quantity_kg: Number(row.quantity || row.quantity_kg || 0),
-          farm_location: String(row.address || row.farm_location || 'Standard Hub'),
-          status: String(row.status || 'pending'),
+          quantity_kg: Number(row.quantity_volume || row.quantity || row.quantity_kg || 0),
+          farm_location: String(row.physical_address || row.address || row.farm_location || 'Standard Hub'),
+          status: String(row.request_status || row.status || 'pending'),
           created_at: String(row.created_at || new Date().toISOString()),
           users: row.users as { full_name: string } | null,
           logistics_bookings: (row.logistics_bookings || []) as { id: string; carrier_id: string; status: HarvestStatus; pickup_time: string | null; delivery_time: string | null }[],

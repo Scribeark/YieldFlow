@@ -25,7 +25,7 @@ export default function AdminDashboard() {
       const [farmers, carriers, harvests, bookings] = await Promise.all([
         supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'farmer'),
         supabase.from('users').select('id', { count: 'exact', head: true }).eq('role', 'carrier'),
-        supabase.from('harvest_logs').select('id', { count: 'exact', head: true }),
+        supabase.from('trade_requests').select('id', { count: 'exact', head: true }),
         supabase.from('logistics_bookings').select('id', { count: 'exact', head: true }),
       ]);
 

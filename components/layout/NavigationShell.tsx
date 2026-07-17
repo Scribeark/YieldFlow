@@ -105,14 +105,6 @@ export default function NavigationShell({
     });
   }, [userRole]);
 
-  const handleEnableAllAccess = async () => {
-    const currentProf = profile || { id: 'demo-id', auth_uid: user?.id || 'demo-uid', email: user?.email || 'demo@yieldflow.com', full_name: 'Enterprise Demo Operator', phone_number: '08024757252', declared_profession: 'enterprise' as UserRole };
-    useAuthStore.setState({ profile: { ...currentProf, declared_profession: 'enterprise' } });
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('yieldflow_active_role', 'enterprise');
-    }
-    await updateProfile({ declared_profession: 'enterprise' });
-  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-950 text-slate-100">
@@ -174,14 +166,6 @@ export default function NavigationShell({
           <p className="text-xs text-slate-300 leading-snug font-light">
             Multi-role active. You can browse and trade across all portals directly below.
           </p>
-          {userRole !== 'enterprise' && userRole !== 'admin' && (
-            <button
-              onClick={handleEnableAllAccess}
-              className="mt-2.5 w-full rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 py-1.5 text-center text-[11px] font-bold text-emerald-300 transition-all active:scale-95 shadow-sm"
-            >
-              ⚡ Enable All-Access Multi-Role
-            </button>
-          )}
         </div>
 
         {/* Navigation Links */}
@@ -301,15 +285,6 @@ export default function NavigationShell({
               </div>
 
               <div className="flex items-center gap-2.5">
-                {userRole !== 'enterprise' && userRole !== 'admin' && (
-                  <button
-                    onClick={handleEnableAllAccess}
-                    title="Unlock and test all portal features without switching accounts"
-                    className="rounded-xl border border-emerald-500/40 bg-gradient-to-r from-emerald-500/15 to-teal-500/15 px-3 py-1.5 text-[11px] font-extrabold text-agri-primary shadow-sm hover:from-emerald-500/25 hover:to-teal-500/25 active:scale-95 transition-all"
-                  >
-                    ⚡ Enable All-Access
-                  </button>
-                )}
                 <ThemeToggle />
               </div>
             </div>

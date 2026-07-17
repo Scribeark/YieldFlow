@@ -23,13 +23,10 @@ interface BookingWithTrade {
 
   trade_requests?: {
     commodity_variety: string;
-    quantity: number;
-    address: string;
-  } | null;
-  harvest_logs?: {
-    crop_type: string;
-    quantity_kg: number;
-    farm_location: string;
+    quantity_volume?: number;
+    quantity?: number;
+    physical_address?: string;
+    address?: string;
   } | null;
 }
 
@@ -71,7 +68,7 @@ export default function FleetBookings() {
     try {
       const { data, error: fetchError } = await supabase
         .from('logistics_bookings')
-        .select('*, trade_requests(commodity_variety, quantity, address), harvest_logs(crop_type, quantity_kg, farm_location)')
+        .select('*, trade_requests(commodity_variety, quantity_volume, physical_address)')
         .eq('carrier_id', carrierId)
         .order('created_at', { ascending: false });
 
@@ -103,11 +100,7 @@ export default function FleetBookings() {
 
       const reqId = booking.trade_request_id || booking.harvest_id;
       if (reqId) {
-        if (booking.trade_request_id || !booking.harvest_id) {
-          await supabase.from('trade_requests').update({ status: nextSt }).eq('id', reqId);
-        } else {
-          await supabase.from('harvest_logs').update({ status: nextSt }).eq('id', reqId);
-        }
+        await supabase.from('trade_requests').update({ status: nextSt }).eq('id', reqId);
       }
 
       await fetchBookings();
@@ -174,9 +167,9 @@ export default function FleetBookings() {
           </thead>
           <tbody>
             {bookings.map((booking) => {
-              const commodity = booking.trade_requests?.commodity_variety || booking.harvest_logs?.crop_type || 'Assorted Harvest';
-              const qty = booking.trade_requests?.quantity || booking.harvest_logs?.quantity_kg || 0;
-              const location = booking.trade_requests?.address || booking.harvest_logs?.farm_location || 'Standard Hub';
+              const commodity = booking.trade_requests?.commodity_variety || 'Assorted Harvest';
+              const qty = (booking.trade_requests as any)?.quantity_volume || booking.trade_requests?.quantity || 0;
+              const location = (booking.trade_requests as any)?.physical_address || booking.trade_requests?.address || 'Standard Hub';
               const nextSt = nextStatusMap[booking.status || 'matched'];
               const estCost = booking.estimated_cost_ngn || (qty * 45);
 

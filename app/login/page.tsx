@@ -9,6 +9,7 @@ import { Sprout, Mail, Lock, User, Phone, ArrowRight, Loader2, Zap, Wheat, Truck
 export default function LoginPage() {
   const router = useRouter();
   const { signIn, signUp, updateProfile } = useAuthStore();
+  const isLiveProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production';
 
   const [isSignUp, setIsSignUp] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -144,39 +145,41 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Quick Instant Demo Launchers (So testing NEVER gets blocked or errors out!) */}
-        <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-950/40 p-4 backdrop-blur-xl shadow-lg">
-          <div className="flex items-center gap-2 mb-2.5 text-emerald-300">
-            <Zap size={16} className="text-emerald-400 animate-bounce" />
-            <span className="text-xs font-bold uppercase tracking-wider">Instant 1-Click Test Access</span>
+        {/* Quick Instant Demo Launchers (Gated outside production per security policy) */}
+        {!isLiveProduction && (
+          <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-emerald-950/40 p-4 backdrop-blur-xl shadow-lg">
+            <div className="flex items-center gap-2 mb-2.5 text-emerald-300">
+              <Zap size={16} className="text-emerald-400 animate-bounce" />
+              <span className="text-xs font-bold uppercase tracking-wider">Instant 1-Click Test Access</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => handleInstantDemoLogin('farmer', '/dashboard/farmer')}
+                type="button"
+                className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-slate-900/80 hover:bg-emerald-500/20 p-2.5 text-center transition-all active:scale-95"
+              >
+                <Wheat size={18} className="text-amber-400 mb-1" />
+                <span className="text-[11px] font-bold text-white">Farmer Portal</span>
+              </button>
+              <button
+                onClick={() => handleInstantDemoLogin('carrier', '/dashboard/carrier')}
+                type="button"
+                className="flex flex-col items-center justify-center rounded-xl border border-blue-500/30 bg-slate-900/80 hover:bg-blue-500/20 p-2.5 text-center transition-all active:scale-95"
+              >
+                <Truck size={18} className="text-blue-400 mb-1" />
+                <span className="text-[11px] font-bold text-white">Carrier Fleet</span>
+              </button>
+              <button
+                onClick={() => handleInstantDemoLogin('buyer', '/dashboard/buyer')}
+                type="button"
+                className="flex flex-col items-center justify-center rounded-xl border border-teal-500/30 bg-slate-900/80 hover:bg-teal-500/20 p-2.5 text-center transition-all active:scale-95"
+              >
+                <ShoppingCart size={18} className="text-teal-400 mb-1" />
+                <span className="text-[11px] font-bold text-white">Enterprise Buyer</span>
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              onClick={() => handleInstantDemoLogin('farmer', '/dashboard/farmer')}
-              type="button"
-              className="flex flex-col items-center justify-center rounded-xl border border-emerald-500/30 bg-slate-900/80 hover:bg-emerald-500/20 p-2.5 text-center transition-all active:scale-95"
-            >
-              <Wheat size={18} className="text-amber-400 mb-1" />
-              <span className="text-[11px] font-bold text-white">Farmer Portal</span>
-            </button>
-            <button
-              onClick={() => handleInstantDemoLogin('carrier', '/dashboard/carrier')}
-              type="button"
-              className="flex flex-col items-center justify-center rounded-xl border border-blue-500/30 bg-slate-900/80 hover:bg-blue-500/20 p-2.5 text-center transition-all active:scale-95"
-            >
-              <Truck size={18} className="text-blue-400 mb-1" />
-              <span className="text-[11px] font-bold text-white">Carrier Fleet</span>
-            </button>
-            <button
-              onClick={() => handleInstantDemoLogin('buyer', '/dashboard/buyer')}
-              type="button"
-              className="flex flex-col items-center justify-center rounded-xl border border-teal-500/30 bg-slate-900/80 hover:bg-teal-500/20 p-2.5 text-center transition-all active:scale-95"
-            >
-              <ShoppingCart size={18} className="text-teal-400 mb-1" />
-              <span className="text-[11px] font-bold text-white">Enterprise Buyer</span>
-            </button>
-          </div>
-        </div>
+        )}
 
         {/* Form Card */}
         <div className="rounded-2xl border border-white/10 bg-slate-900/85 p-6 backdrop-blur-2xl shadow-2xl">

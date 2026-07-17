@@ -78,12 +78,11 @@ export default function HarvestForm({ onSubmitted }: { onSubmitted?: () => void 
     try {
       const { error: insertError } = await supabase.from('trade_requests').insert({
         user_id: profile.id,
-        owner_id: profile.id,
         commodity_variety: commodity,
-        quantity: parseFloat(quantity),
-        address: address || profile.macro_region || 'Ibadan Central Farm',
+        quantity_volume: parseFloat(quantity),
+        physical_address: address || profile.macro_region || 'Ibadan Central Farm',
         harvest_photo_url: photoUrl || null,
-        status: 'pending',
+        request_status: 'pending',
       });
 
       if (insertError) throw new Error(insertError.message);

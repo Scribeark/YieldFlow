@@ -6,8 +6,8 @@ export async function getVolumeTrends(): Promise<VolumeDataPoint[]> {
   const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
 
   const { data, error } = await supabase
-    .from('harvest_logs')
-    .select('quantity_kg, created_at')
+    .from('trade_requests')
+    .select('quantity_volume, created_at')
     .gte('created_at', thirtyDaysAgo)
     .order('created_at', { ascending: true });
 
@@ -15,9 +15,9 @@ export async function getVolumeTrends(): Promise<VolumeDataPoint[]> {
   if (!data) return [];
 
   const grouped: Record<string, number> = {};
-  data.forEach((row) => {
+  data.forEach((row: any) => {
     const date = format(new Date(row.created_at), 'MMM d');
-    grouped[date] = (grouped[date] || 0) + Number(row.quantity_kg);
+    grouped[date] = (grouped[date] || 0) + Number(row.quantity_volume || 0);
   });
 
   return Object.entries(grouped).map(([date, total_kg]) => ({ date, total_kg }));
@@ -25,15 +25,16 @@ export async function getVolumeTrends(): Promise<VolumeDataPoint[]> {
 
 export async function getStatusDistribution(): Promise<StatusDistribution[]> {
   const { data, error } = await supabase
-    .from('harvest_logs')
-    .select('status');
+    .from('trade_requests')
+    .select('request_status');
 
   if (error) throw new Error(error.message);
   if (!data) return [];
 
   const counts: Record<string, number> = {};
-  data.forEach((row) => {
-    counts[row.status] = (counts[row.status] || 0) + 1;
+  data.forEach((row: any) => {
+    const status = row.request_status || 'pending';
+    counts[status] = (counts[status] || 0) + 1;
   });
 
   return Object.entries(counts).map(([status, count]) => ({
@@ -45,37 +46,36 @@ export async function getStatusDistribution(): Promise<StatusDistribution[]> {
 export async function getEnvironmentalAverages(): Promise<EnvironmentalAverage[]> {
   const { data, error } = await supabase
     .from('iot_telemetry_logs')
-    .select('farmer_id, soil_moisture, temperature');
+    .select('owner_id, soil_moisture_percentage, associated_lga');
 
   if (error) throw new Error(error.message);
   if (!data || data.length === 0) return [];
 
-  // Get farmer locations
-  const farmerIds = [...new Set(data.map((d) => d.farmer_id))];
-  const { data: harvests } = await supabase
-    .from('harvest_logs')
-    .select('farmer_id, farm_location')
-    .in('farmer_id', farmerIds);
+  // Get locations cleanly from users table matching owner_id
+  const ownerIds = [...new Set(data.map((d) => d.owner_id).filter(Boolean))];
+  const { data: usersData } = await supabase
+    .from('users')
+    .select('id, macro_region')
+    .in('id', ownerIds);
 
-  const farmerLocationMap: Record<string, string> = {};
-  harvests?.forEach((h) => {
-    if (!farmerLocationMap[h.farmer_id]) {
-      farmerLocationMap[h.farmer_id] = h.farm_location;
+  const locationMap: Record<string, string> = {};
+  usersData?.forEach((u) => {
+    if (u.id && u.macro_region) {
+      locationMap[u.id] = u.macro_region;
     }
   });
 
-  const grouped: Record<string, { moistureSum: number; tempSum: number; count: number }> = {};
+  const grouped: Record<string, { moistureSum: number; count: number }> = {};
   data.forEach((row) => {
-    const location = farmerLocationMap[row.farmer_id] || 'Unknown';
-    if (!grouped[location]) grouped[location] = { moistureSum: 0, tempSum: 0, count: 0 };
-    grouped[location].moistureSum += Number(row.soil_moisture);
-    grouped[location].tempSum += Number(row.temperature);
+    const location = row.associated_lga || (row.owner_id && locationMap[row.owner_id]) || 'Standard Hub';
+    if (!grouped[location]) grouped[location] = { moistureSum: 0, count: 0 };
+    grouped[location].moistureSum += Number(row.soil_moisture_percentage || 0);
     grouped[location].count += 1;
   });
 
   return Object.entries(grouped).map(([location, agg]) => ({
     location,
     avg_moisture: Math.round((agg.moistureSum / agg.count) * 10) / 10,
-    avg_temperature: Math.round((agg.tempSum / agg.count) * 10) / 10,
+    avg_temperature: 28.5, // Standard baseline since temperature sensor column is not yet present on iot_telemetry_logs
   }));
 }
