@@ -26,9 +26,9 @@ export default function AuthProvider({
     initialize();
   }, [initialize]);
 
-  // 2. Redirect unauthenticated users away from private dashboard routes
+  // 2. Redirect unauthenticated users away from private dashboard routes (except /dashboard/map which is public)
   useEffect(() => {
-    if (initialized && !loading && !user && pathname.startsWith('/dashboard')) {
+    if (initialized && !loading && !user && pathname.startsWith('/dashboard') && !pathname.startsWith('/dashboard/map')) {
       router.push('/login');
     }
   }, [initialized, loading, user, pathname, router]);

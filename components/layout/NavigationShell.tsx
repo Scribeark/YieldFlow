@@ -221,32 +221,41 @@ export default function NavigationShell({
 
         {/* Profile / Footer */}
         <div className="border-t border-white/10 bg-slate-950/60 p-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-sm font-black text-white shadow-md">
-              {profile?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-bold text-white">
-                {profile?.full_name || 'Agri User'}
-              </p>
-              <p className="truncate text-xs font-light text-slate-400">
-                {user?.email || profile?.phone_number || 'Connected'}
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                await signOut();
-                if (typeof window !== 'undefined') {
-                  localStorage.removeItem('yieldflow_active_role');
-                  window.location.href = '/login';
-                }
-              }}
-              title="Sign Out"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"
+          {!user && !profile ? (
+            <Link
+              href="/login"
+              className="flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg hover:from-emerald-400 hover:to-teal-500 transition-all"
             >
-              <LogOut size={16} />
-            </button>
-          </div>
+              <span>Log In to Workspace</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-sm font-black text-white shadow-md">
+                {profile?.full_name?.charAt(0) || user?.email?.charAt(0) || 'U'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-bold text-white">
+                  {profile?.full_name || 'Agri User'}
+                </p>
+                <p className="truncate text-xs font-light text-slate-400">
+                  {user?.email || profile?.phone_number || 'Connected'}
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  await signOut();
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('yieldflow_active_role');
+                    window.location.href = '/login';
+                  }
+                }}
+                title="Sign Out"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"
+              >
+                <LogOut size={16} />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
