@@ -92,7 +92,14 @@ export default function NavigationShell({
     setSidebarOpen(false);
   }, [pathname]);
 
-  const userRole: UserRole = profile?.declared_profession || profile?.role || 'farmer';
+  const rawProf = profile?.declared_profession || profile?.role || 'farmer';
+  const lowerProf = rawProf.toLowerCase();
+  let userRole: UserRole = 'farmer';
+  if (lowerProf.includes('carrier') || lowerProf.includes('logistics')) userRole = 'carrier';
+  else if (lowerProf.includes('buyer') || lowerProf.includes('enterprise buyer')) userRole = 'buyer';
+  else if (lowerProf.includes('trader')) userRole = 'trader';
+  else if (lowerProf === 'admin') userRole = 'admin';
+  else if (lowerProf === 'enterprise') userRole = 'enterprise';
 
   // Filter items: show all core portals to every user; only restrict Admin/BI if user is not admin/enterprise
   const navItems = useMemo(() => {

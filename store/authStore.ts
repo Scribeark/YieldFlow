@@ -87,18 +87,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (data.user) {
-        // Insert directly into public.users with auth_uid matching auth.uid()
+        const roleToProfession: Record<string, string> = {
+          farmer: 'Smallholder Farmer',
+          trader: 'Commodity Trader',
+          carrier: 'Logistics Carrier',
+          buyer: 'Enterprise Buyer',
+          enterprise: 'Enterprise Buyer',
+          admin: 'admin',
+        };
+        const profession = roleToProfession[role || 'farmer'] || 'Smallholder Farmer';
+
         const { error: insertErr } = await supabase.from('users').insert({
           auth_uid: data.user.id,
           full_name: fullName,
           phone_number: normalizedPhone,
-          declared_profession: role || 'farmer',
+          declared_profession: profession,
+          age: 30,
+          gender: 'Male',
+          macro_region: 'National Hub',
           has_registered_device: false,
-          verification_status: 'verified',
+          verification_status: 'fully_verified',
         });
 
         if (insertErr) {
-          console.warn('Profile insert note:', insertErr.message);
+          console.error('Profile insert error during sign up:', insertErr.message);
+          return { error: `Failed to create profile: ${insertErr.message}` };
         }
 
         await get().fetchProfile(data.user.id);

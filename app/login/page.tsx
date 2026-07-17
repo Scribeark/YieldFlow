@@ -41,7 +41,13 @@ export default function LoginPage() {
         } else {
           setSuccess('Account created! Redirecting to your portal...');
           setTimeout(() => {
-            router.push('/dashboard/farmer');
+            const currentProfile = useAuthStore.getState().profile;
+            const rawProf = currentProfile?.declared_profession || role || 'farmer';
+            const lower = rawProf.toLowerCase();
+            if (lower.includes('carrier') || lower.includes('logistics')) router.push('/dashboard/carrier');
+            else if (lower.includes('buyer') || lower.includes('enterprise')) router.push('/dashboard/buyer');
+            else if (lower === 'admin') router.push('/dashboard/admin');
+            else router.push('/dashboard/farmer');
           }, 600);
         }
       } else {
@@ -53,10 +59,11 @@ export default function LoginPage() {
           setSuccess('Login successful! Launching YieldFlow workspace...');
           setTimeout(() => {
             const currentProfile = useAuthStore.getState().profile;
-            const prof = currentProfile?.declared_profession || 'farmer';
-            if (prof === 'carrier') router.push('/dashboard/carrier');
-            else if (prof === 'buyer') router.push('/dashboard/buyer');
-            else if (prof === 'admin') router.push('/dashboard/admin');
+            const rawProf = currentProfile?.declared_profession || 'farmer';
+            const lower = rawProf.toLowerCase();
+            if (lower.includes('carrier') || lower.includes('logistics')) router.push('/dashboard/carrier');
+            else if (lower.includes('buyer') || lower.includes('enterprise')) router.push('/dashboard/buyer');
+            else if (lower === 'admin') router.push('/dashboard/admin');
             else router.push('/dashboard/farmer');
           }, 600);
         }

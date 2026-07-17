@@ -36,7 +36,14 @@ export default function AuthProvider({
   // 3. Multi-role non-blocking access expansion logic
   useEffect(() => {
     if (initialized && !loading && user && profile && pathname.startsWith('/dashboard')) {
-      const currentRole = profile.declared_profession || profile.role || 'farmer';
+      const rawProf = profile.declared_profession || profile.role || 'farmer';
+      const lower = rawProf.toLowerCase();
+      let currentRole: UserRole = 'farmer';
+      if (lower.includes('carrier') || lower.includes('logistics')) currentRole = 'carrier';
+      else if (lower.includes('buyer') || lower.includes('enterprise buyer')) currentRole = 'buyer';
+      else if (lower.includes('trader')) currentRole = 'trader';
+      else if (lower === 'admin') currentRole = 'admin';
+      else if (lower === 'enterprise') currentRole = 'enterprise';
       
       // Admin governance check (strict check only for /dashboard/admin)
       if (pathname.startsWith('/dashboard/admin') && currentRole !== 'admin' && currentRole !== 'enterprise') {
