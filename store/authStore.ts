@@ -126,11 +126,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       if (data.user) {
-        // Run fetchProfile with a 3-second timeout so it never blocks the login button indefinitely
-        await Promise.race([
-          get().fetchProfile(data.user.id),
-          new Promise((resolve) => setTimeout(resolve, 3000)),
-        ]);
+        await get().fetchProfile(data.user.id);
       }
 
       set({ loading: false });
@@ -205,14 +201,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signOut: async () => {
     set({ loading: true });
-    await supabase.auth.signOut();
-    set({
-      session: null,
-      user: null,
-      profile: null,
-      needsPhoneLinking: false,
-      loading: false,
-    });
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('yieldflow_active_role');
+      }
+      await supabase.auth.signOut();
+    } finally {
+      set({
+        session: null,
+        user: null,
+        profile: null,
+        needsPhoneLinking: false,
+        loading: false,
+      });
+    }
   },
 
   fetchProfile: async (userId: string) => {

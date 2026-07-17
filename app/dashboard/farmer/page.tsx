@@ -35,7 +35,7 @@ export default function FarmerDashboard() {
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white drop-shadow">
-                Welcome, {profile?.full_name || 'Alhaji Musa (Simulated Farmer)'}
+                Welcome, {profile?.full_name || 'Farmer Operator'}
               </h1>
               <p className="text-xs sm:text-sm text-slate-300 font-light mt-0.5">
                 Monitor real-time soil telemetry, log verified harvest inspections with PWA rear camera, and connect with direct off-takers.

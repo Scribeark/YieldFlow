@@ -249,7 +249,7 @@ export default function HomePage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <span className="text-xs font-bold text-foreground">Verified Premium White Cassava (14.2 Tons)</span>
-                      <p className="text-[11px] text-foreground-muted">Seller: Alhaji Musa Farm Enterprise • Oyo State</p>
+                      <p className="text-[11px] text-foreground-muted">Seller: Green Valley Farm Hub • Oyo State</p>
                     </div>
                     <span className="text-lg font-black text-emerald-600">₦180,000 / ton</span>
                   </div>

@@ -203,7 +203,7 @@ export default function LoginPage() {
                     <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder="Alhaji Musa / Chinedu Fleet"
+                      placeholder="Enter full name or enterprise"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required={isSignUp}

@@ -92,9 +92,6 @@ export default function NavigationShell({
     setSidebarOpen(false);
   }, [pathname]);
 
-  const isAuthPage = pathname === '/login' || pathname === '/';
-  if (isAuthPage) return <>{children}</>;
-
   const userRole: UserRole = profile?.declared_profession || profile?.role || 'farmer';
 
   // Filter items: show all core portals to every user; only restrict Admin/BI if user is not admin/enterprise
@@ -104,6 +101,9 @@ export default function NavigationShell({
       return item.roles.includes(userRole) || userRole === 'admin' || userRole === 'enterprise';
     });
   }, [userRole]);
+
+  const isAuthPage = pathname === '/login' || pathname === '/';
+  if (isAuthPage) return <>{children}</>;
 
 
   return (
@@ -227,7 +227,13 @@ export default function NavigationShell({
               </p>
             </div>
             <button
-              onClick={() => signOut()}
+              onClick={async () => {
+                await signOut();
+                if (typeof window !== 'undefined') {
+                  localStorage.removeItem('yieldflow_active_role');
+                  window.location.href = '/login';
+                }
+              }}
               title="Sign Out"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-slate-400 hover:bg-rose-500/20 hover:text-rose-400 hover:border-rose-500/30 transition-all"
             >
