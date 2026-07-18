@@ -10,6 +10,7 @@ interface AuthState {
   needsPhoneLinking: boolean;
   loading: boolean;
   initialized: boolean;
+  fetchProfileRequestId: number;
 
   // Actions
   initialize: () => Promise<void>;
@@ -37,6 +38,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   needsPhoneLinking: false,
   loading: true,
   initialized: false,
+  fetchProfileRequestId: 0,
 
   initialize: async () => {
     try {
@@ -231,6 +233,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   fetchProfile: async (userId: string) => {
+    // 1. Increment and capture the request ID to protect against race conditions
+    const currentRequestId = get().fetchProfileRequestId + 1;
+    set({ fetchProfileRequestId: currentRequestId });
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -256,6 +262,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error = fallback.error;
       }
 
+      // SEQUENCE GUARD: If a newer fetchProfile call has started since this one, silently discard these results
+      if (get().fetchProfileRequestId !== currentRequestId) {
+        console.warn(`[AuthStore] Discarding stale fetchProfile(${currentRequestId}) response. Newer request is active.`);
+        return;
+      }
+
       if (!data) {
         set({ profile: null, needsPhoneLinking: true });
         return;
@@ -263,6 +275,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ profile: data as UserProfile, needsPhoneLinking: false });
     } catch (err) {
+      if (get().fetchProfileRequestId !== currentRequestId) {
+        return; // Silently discard errors from stale requests
+      }
       console.error('Error fetching profile:', err);
       set({ profile: null, needsPhoneLinking: true });
     }
