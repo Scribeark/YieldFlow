@@ -41,6 +41,7 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>
+        Relationships: []
       }
       trade_requests: {
         Row: {
@@ -76,6 +77,7 @@ export interface Database {
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['trade_requests']['Insert']>
+        Relationships: []
       }
       vehicle_states: {
         Row: {
@@ -105,6 +107,7 @@ export interface Database {
           updated_at?: string
         }
         Update: Partial<Database['public']['Tables']['vehicle_states']['Insert']>
+        Relationships: []
       }
       logistics_bookings: {
         Row: {
@@ -128,6 +131,7 @@ export interface Database {
           dispatched_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['logistics_bookings']['Insert']>
+        Relationships: []
       }
       iot_telemetry_logs: {
         Row: {
@@ -153,6 +157,7 @@ export interface Database {
           ingested_at?: string
         }
         Update: Partial<Database['public']['Tables']['iot_telemetry_logs']['Insert']>
+        Relationships: []
       }
     }
     Views: {
@@ -164,5 +169,9 @@ export interface Database {
     Enums: {
       [_ in never]: never
     }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
