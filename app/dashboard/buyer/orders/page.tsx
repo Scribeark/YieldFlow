@@ -347,6 +347,19 @@ export default function BuyerOrdersPage() {
             </div>
           )}
 
+          {activeTab === 'ongoing' && ongoingOrders.length === 0 && (
+            <div className="text-center py-16">
+              <Truck className="mx-auto h-12 w-12 text-foreground-muted mb-4 opacity-30" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Ongoing Trades</h3>
+              <p className="text-foreground-muted text-sm max-w-sm mx-auto">
+                Once a seller has a confirmed order and a logistics carrier has been assigned, your trade will appear here with live handover controls.
+              </p>
+              <p className="text-foreground-muted text-xs mt-4 opacity-60">
+                Expected statuses: SEARCHING_LOGISTICS · ALLOCATED · DISPATCHED
+              </p>
+            </div>
+          )}
+
           {activeTab === 'ongoing' && ongoingOrders.length > 0 && (
             <div>
               <h2 className="text-2xl font-bold text-foreground mb-4">Ongoing Trades</h2>
@@ -509,6 +522,14 @@ export default function BuyerOrdersPage() {
             </div>
           )}
 
+          {activeTab === 'completed' && fulfilledOrders.length === 0 && (
+            <div className="text-center py-16">
+              <CheckCircle className="mx-auto h-12 w-12 text-emerald-400 mb-4 opacity-30" />
+              <h3 className="text-lg font-semibold text-foreground mb-2">No Completed Orders</h3>
+              <p className="text-foreground-muted text-sm">Your fulfilled orders will appear here once a trade reaches FULFILLED status.</p>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -528,6 +549,13 @@ export default function BuyerOrdersPage() {
               </Card>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeTab === 'cancelled' && cancelledOrders.length === 0 && (
+        <div className="text-center py-16">
+          <h3 className="text-lg font-semibold text-foreground mb-2">No Cancelled Orders</h3>
+          <p className="text-foreground-muted text-sm">Cancelled orders will appear here.</p>
         </div>
       )}
     </PageContainer>
