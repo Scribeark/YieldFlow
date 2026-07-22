@@ -74,9 +74,13 @@ export function OngoingTradeTimeline({
                 <CheckCircle className={`w-4 h-4 ${sellerConfirmedPickup ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={sellerConfirmedPickup ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Seller handed over goods</span>
               </div>
-              {role === 'seller' && !sellerConfirmedPickup && isAllocated && onConfirmSellerPickup && (
-                <button onClick={onConfirmSellerPickup} disabled={isConfirming} className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50 transition-colors">
-                  {isConfirming ? 'Confirming...' : 'Confirm Handover'}
+              {role === 'seller' && (isAllocated || isDispatched || isFulfilled || sellerConfirmedPickup) && (
+                <button 
+                  onClick={onConfirmSellerPickup} 
+                  disabled={isConfirming || sellerConfirmedPickup} 
+                  className={`px-3 py-1 text-xs rounded transition-colors ${sellerConfirmedPickup ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50'}`}
+                >
+                  {sellerConfirmedPickup ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Handed Over'}
                 </button>
               )}
             </div>
@@ -87,9 +91,13 @@ export function OngoingTradeTimeline({
                 <CheckCircle className={`w-4 h-4 ${carrierConfirmedPickup ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={carrierConfirmedPickup ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Carrier received goods</span>
               </div>
-              {role === 'carrier' && !carrierConfirmedPickup && isAllocated && onConfirmCarrierPickup && (
-                <button onClick={onConfirmCarrierPickup} disabled={isConfirming} className="px-3 py-1 bg-purple-600 text-white text-xs rounded hover:bg-purple-700 disabled:opacity-50 transition-colors">
-                  {isConfirming ? 'Confirming...' : 'Confirm Receipt'}
+              {role === 'carrier' && (isAllocated || isDispatched || isFulfilled || carrierConfirmedPickup) && (
+                <button 
+                  onClick={onConfirmCarrierPickup} 
+                  disabled={isConfirming || carrierConfirmedPickup} 
+                  className={`px-3 py-1 text-xs rounded transition-colors ${carrierConfirmedPickup ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50'}`}
+                >
+                  {carrierConfirmedPickup ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Received From Seller'}
                 </button>
               )}
             </div>
@@ -110,9 +118,13 @@ export function OngoingTradeTimeline({
                 <CheckCircle className={`w-4 h-4 ${carrierConfirmedDelivery ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={carrierConfirmedDelivery ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Carrier delivered goods</span>
               </div>
-              {role === 'carrier' && !carrierConfirmedDelivery && isDispatched && onConfirmCarrierDelivery && (
-                <button onClick={onConfirmCarrierDelivery} disabled={isConfirming} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                  {isConfirming ? 'Confirming...' : 'Confirm Delivery'}
+              {role === 'carrier' && (isDispatched || isFulfilled || carrierConfirmedDelivery) && (
+                <button 
+                  onClick={onConfirmCarrierDelivery} 
+                  disabled={isConfirming || carrierConfirmedDelivery} 
+                  className={`px-3 py-1 text-xs rounded transition-colors ${carrierConfirmedDelivery ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}
+                >
+                  {carrierConfirmedDelivery ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Delivered'}
                 </button>
               )}
             </div>
@@ -123,9 +135,13 @@ export function OngoingTradeTimeline({
                 <CheckCircle className={`w-4 h-4 ${buyerConfirmedDelivery ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={buyerConfirmedDelivery ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Buyer received goods</span>
               </div>
-              {role === 'buyer' && !buyerConfirmedDelivery && isDispatched && onConfirmBuyerDelivery && (
-                <button onClick={onConfirmBuyerDelivery} disabled={isConfirming} className="px-3 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                  {isConfirming ? 'Confirming...' : 'Confirm Receipt'}
+              {role === 'buyer' && (isDispatched || isFulfilled || buyerConfirmedDelivery) && (
+                <button 
+                  onClick={onConfirmBuyerDelivery} 
+                  disabled={isConfirming || buyerConfirmedDelivery} 
+                  className={`px-3 py-1 text-xs rounded transition-colors ${buyerConfirmedDelivery ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}
+                >
+                  {buyerConfirmedDelivery ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Received'}
                 </button>
               )}
             </div>
