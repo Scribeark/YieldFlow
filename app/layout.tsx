@@ -23,18 +23,20 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className="h-full antialiased font-sans"
-    >
-      <body className="min-h-full bg-gray-50 text-gray-900">
-        <NavigationShell>{children}</NavigationShell>
+    <html lang="en" suppressHydrationWarning className="h-full antialiased font-sans">
+      <body className="min-h-full">
+        <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem>
+          <div className="gradient-mesh"></div>
+          <NavigationShell>{children}</NavigationShell>
+        </ThemeProvider>
       </body>
     </html>
   );

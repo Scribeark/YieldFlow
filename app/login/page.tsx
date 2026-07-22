@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '../../lib/supabase/client';
 import { useAuthStore } from '../../store/authStore';
 import { ROLE_ROUTES } from '../../lib/constants';
+import { Card } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Label } from '@/components/ui/Label';
+import { Button } from '@/components/ui/Button';
+import { Alert } from '@/components/ui/Alert';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -68,35 +73,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-6 sm:p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Log In</h1>
+    <div className="flex min-h-[80vh] items-center justify-center p-4 animate-scale-in">
+      <Card className="w-full max-w-md">
+        <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--foreground)' }}>Log In</h1>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          <Alert variant="error" className="mb-4">
             {error}
-          </div>
+          </Alert>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded text-gray-900 bg-white" />
+            <Label>Email</Label>
+            <Input required type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="Enter your email" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input required type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full p-2 border border-gray-300 rounded text-gray-900 bg-white" />
+            <Label>Password</Label>
+            <Input required type="password" name="password" value={formData.password} onChange={handleInputChange} placeholder="Enter your password" />
           </div>
           
-          <button 
+          <Button 
             type="submit" 
-            disabled={isLoading}
-            className="w-full bg-green-700 text-white font-bold py-2 px-4 rounded hover:bg-green-800 transition disabled:opacity-50"
+            isLoading={isLoading}
+            className="w-full mt-4"
           >
-            {isLoading ? 'Logging In...' : 'Log In'}
-          </button>
+            Log In
+          </Button>
         </form>
-      </div>
+      </Card>
     </div>
   );
 }

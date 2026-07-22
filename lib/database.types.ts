@@ -58,6 +58,17 @@ export interface Database {
           payment_reference: string
           payment_gateway: string
           request_status: string
+          submission_channel: string
+          evidence_status: string
+          interested_buyer_id: string | null
+          evidence_requested_at: string | null
+          buyer_demand_id: string | null
+          evidence_exemption_reason: string | null
+          evidence_exempted_at: string | null
+          cancelled_by: string | null
+          cancellation_reason: string | null
+          cancellation_note: string | null
+          cancelled_at: string | null
           created_at: string
         }
         Insert: {
@@ -74,9 +85,46 @@ export interface Database {
           payment_reference: string
           payment_gateway?: string
           request_status?: string
+          submission_channel?: string
+          evidence_status?: string
+          interested_buyer_id?: string | null
+          evidence_requested_at?: string | null
+          buyer_demand_id?: string | null
+          evidence_exemption_reason?: string | null
+          evidence_exempted_at?: string | null
+          cancelled_by?: string | null
+          cancellation_reason?: string | null
+          cancellation_note?: string | null
+          cancelled_at?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['trade_requests']['Insert']>
+        Relationships: []
+      }
+      buyer_demands: {
+        Row: {
+          id: string
+          buyer_id: string
+          commodity_variety: string
+          quantity_volume: number
+          delivery_address: string
+          computed_latitude: number | null
+          computed_longitude: number | null
+          demand_status: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          buyer_id: string
+          commodity_variety: string
+          quantity_volume: number
+          delivery_address: string
+          computed_latitude?: number | null
+          computed_longitude?: number | null
+          demand_status?: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['buyer_demands']['Insert']>
         Relationships: []
       }
       vehicle_states: {
@@ -91,7 +139,13 @@ export interface Database {
           plate_number: string
           vehicle_nickname: string
           vehicle_photo_url: string
+          vehicle_document_url: string | null
+          vehicle_license_expires_at: string | null
+          vehicle_verification_status: string
+          vehicle_verified_at: string | null
+          vehicle_rejection_reason: string | null
           updated_at: string
+          is_active: boolean
         }
         Insert: {
           id?: string
@@ -104,7 +158,13 @@ export interface Database {
           plate_number: string
           vehicle_nickname: string
           vehicle_photo_url: string
+          vehicle_document_url?: string | null
+          vehicle_license_expires_at?: string | null
+          vehicle_verification_status?: string
+          vehicle_verified_at?: string | null
+          vehicle_rejection_reason?: string | null
           updated_at?: string
+          is_active?: boolean
         }
         Update: Partial<Database['public']['Tables']['vehicle_states']['Insert']>
         Relationships: []
@@ -119,6 +179,12 @@ export interface Database {
           proximity_distance_km: number
           escrow_status: string
           dispatched_at: string | null
+          status: 'active' | 'released' | 'cancelled' | 'completed'
+          vehicle_state_id: string | null
+          seller_pickup_confirmed_at: string | null
+          carrier_pickup_confirmed_at: string | null
+          carrier_delivery_confirmed_at: string | null
+          buyer_delivery_confirmed_at: string | null
         }
         Insert: {
           id?: string
@@ -129,6 +195,12 @@ export interface Database {
           proximity_distance_km: number
           escrow_status?: string
           dispatched_at?: string | null
+          status?: 'active' | 'released' | 'cancelled' | 'completed'
+          vehicle_state_id?: string | null
+          seller_pickup_confirmed_at?: string | null
+          carrier_pickup_confirmed_at?: string | null
+          carrier_delivery_confirmed_at?: string | null
+          buyer_delivery_confirmed_at?: string | null
         }
         Update: Partial<Database['public']['Tables']['logistics_bookings']['Insert']>
         Relationships: []
@@ -164,7 +236,66 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      rpc_request_evidence: {
+        Args: { req_id: string }
+        Returns: void
+      }
+      rpc_confirm_order: {
+        Args: { req_id: string }
+        Returns: void
+      }
+      rpc_upload_evidence: {
+        Args: { req_id: string, photo_url: string }
+        Returns: void
+      }
+      rpc_claim_logistics_job: {
+        Args: {
+          p_trade_request_id: string
+          p_vehicle_state_id: string
+          p_proximity_distance_km: number
+        }
+        Returns: void
+      }
+      rpc_release_logistics_booking: {
+        Args: { p_trade_request_id: string }
+        Returns: void
+      }
+      rpc_cancel_buyer_claim: {
+        Args: { p_trade_request_id: string }
+        Returns: void
+      }
+      rpc_cancel_seller_trade_request: {
+        Args: { 
+          p_trade_request_id: string
+          p_cancellation_reason: string
+          p_cancellation_note: string | null
+        }
+        Returns: void
+      }
+      rpc_cancel_buyer_demand: {
+        Args: { p_demand_id: string }
+        Returns: void
+      }
+      rpc_deactivate_vehicle: {
+        Args: { p_vehicle_state_id: string }
+        Returns: void
+      }
+      rpc_confirm_seller_pickup_handover: {
+        Args: { p_trade_request_id: string }
+        Returns: void
+      }
+      rpc_confirm_carrier_pickup_handover: {
+        Args: { p_trade_request_id: string }
+        Returns: void
+      }
+      rpc_confirm_carrier_delivery: {
+        Args: { p_trade_request_id: string }
+        Returns: void
+      }
+      rpc_confirm_buyer_delivery: {
+        Args: { p_trade_request_id: string }
+        Returns: void
+      }
     }
     Enums: {
       [_ in never]: never
