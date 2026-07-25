@@ -81,8 +81,7 @@ export default function ActiveBookings() {
           current_latitude: pos.coords.latitude,
           current_longitude: pos.coords.longitude,
           location_updated_at: new Date().toISOString(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any).eq('id', vehicleStateId);
+        }).eq('id', vehicleStateId);
         if (error) alert('Failed to update location: ' + error.message);
         else { await fetchBookings(); }
         setUpdatingLocation(false);

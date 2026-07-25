@@ -161,8 +161,7 @@ export default function CarrierTrackingPage() {
           current_latitude: pos.coords.latitude,
           current_longitude: pos.coords.longitude,
           location_updated_at: new Date().toISOString(),
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any).eq('id', activeBooking.vehicle_states!.id);
+        }).eq('id', activeBooking.vehicle_states!.id);
         if (error) setActionStatus({ type: 'error', message: 'Failed to update location.' });
         else { setActionStatus({ type: 'success', message: 'Location updated successfully.' }); await fetchData(); }
         setUpdatingLocation(false);

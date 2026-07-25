@@ -53,6 +53,9 @@ export interface Database {
           physical_address: string
           computed_latitude: number
           computed_longitude: number
+          delivery_address: string | null
+          delivery_latitude: number | null
+          delivery_longitude: number | null
           harvest_photo_url: string | null
           payment_status: string
           payment_reference: string
@@ -80,6 +83,9 @@ export interface Database {
           physical_address: string
           computed_latitude: number
           computed_longitude: number
+          delivery_address?: string | null
+          delivery_latitude?: number | null
+          delivery_longitude?: number | null
           harvest_photo_url?: string | null
           payment_status?: string
           payment_reference: string
@@ -139,6 +145,7 @@ export interface Database {
           plate_number: string
           vehicle_nickname: string
           vehicle_photo_url: string
+          location_updated_at: string | null
           vehicle_document_url: string | null
           vehicle_license_expires_at: string | null
           vehicle_verification_status: string
@@ -158,6 +165,7 @@ export interface Database {
           plate_number: string
           vehicle_nickname: string
           vehicle_photo_url: string
+          location_updated_at?: string | null
           vehicle_document_url?: string | null
           vehicle_license_expires_at?: string | null
           vehicle_verification_status?: string
@@ -241,7 +249,13 @@ export interface Database {
         Returns: void
       }
       rpc_confirm_order: {
-        Args: { req_id: string }
+        Args: {
+          req_id: string
+          p_delivery_address: string
+          p_delivery_latitude: number
+          p_delivery_longitude: number
+          p_confirm_ussd_exemption: boolean
+        }
         Returns: void
       }
       rpc_upload_evidence: {
