@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
-import { RefreshCw, Truck, CheckCircle, Package } from 'lucide-react';
+import { RefreshCw, Truck, CheckCircle, Package, Navigation } from 'lucide-react';
 import { OngoingTradeTimeline } from '@/components/shared/OngoingTradeTimeline';
 
 const toArray = <T,>(value: T | T[] | null | undefined): T[] => {
@@ -29,8 +29,19 @@ interface Booking {
     commodity_variety: string;
     quantity_volume: number;
     physical_address: string;
+    computed_latitude: number | null;
+    computed_longitude: number | null;
+    delivery_address: string | null;
+    delivery_latitude: number | null;
+    delivery_longitude: number | null;
     request_status: string;
   };
+  vehicle_states?: {
+    id: string;
+    current_latitude: number | null;
+    current_longitude: number | null;
+    location_updated_at: string | null;
+  } | null;
 }
 
 export default function ActiveBookings() {
@@ -39,37 +50,52 @@ export default function ActiveBookings() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchBookings = async () => {
+  const fetchBookings = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
-    // Fetch logistics bookings joined with trade requests
-    // We want active bookings OR completed ones (for history)
     const { data } = await supabase
       .from('logistics_bookings')
       .select(`
         *,
         trade_requests (
-          commodity_variety,
-          quantity_volume,
-          physical_address,
-          request_status
-        )
+          commodity_variety, quantity_volume, physical_address, request_status,
+          computed_latitude, computed_longitude,
+          delivery_address, delivery_latitude, delivery_longitude
+        ),
+        vehicle_states ( id, current_latitude, current_longitude, location_updated_at )
       `)
       .eq('carrier_id', profile.id)
       .in('status', ['active', 'completed'])
-      .order('id', { ascending: false }); // simple order by id DESC as proxy for newest
-      
-    if (data) {
-      setBookings(data as unknown as Booking[]);
-    }
+      .order('id', { ascending: false });
+    if (data) setBookings(data as unknown as Booking[]);
     setLoading(false);
+  }, [profile, supabase]);
+
+  const [updatingLocation, setUpdatingLocation] = useState(false);
+
+  const handleUpdateLocation = async (vehicleStateId: string) => {
+    setUpdatingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { error } = await supabase.from('vehicle_states').update({
+          current_latitude: pos.coords.latitude,
+          current_longitude: pos.coords.longitude,
+          location_updated_at: new Date().toISOString(),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any).eq('id', vehicleStateId);
+        if (error) alert('Failed to update location: ' + error.message);
+        else { await fetchBookings(); }
+        setUpdatingLocation(false);
+      },
+      () => { alert('Could not get GPS location. Please enable browser location access.'); setUpdatingLocation(false); },
+      { timeout: 10000 }
+    );
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBookings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile, supabase]);
+  }, [fetchBookings]);
 
   const handleReleaseJob = async (tradeRequestId: string) => {
     if (!window.confirm("Are you sure? This action will remove this item from active availability. The job will be returned to the pool.")) {
@@ -188,9 +214,33 @@ export default function ActiveBookings() {
                         role="carrier"
                         onConfirmCarrierPickup={() => handleCarrierPickupConfirm(booking.trade_request_id)}
                         onConfirmCarrierDelivery={() => handleCarrierDeliveryConfirm(booking.trade_request_id)}
-                        // To improve UX we could add loading states to timeline component, but currently it handles it via UI
+                        pickupAddress={(toArray(booking.trade_requests)[0])?.physical_address}
+                        pickupLat={(toArray(booking.trade_requests)[0])?.computed_latitude}
+                        pickupLng={(toArray(booking.trade_requests)[0])?.computed_longitude}
+                        deliveryAddress={(toArray(booking.trade_requests)[0])?.delivery_address}
+                        deliveryLat={(toArray(booking.trade_requests)[0])?.delivery_latitude}
+                        deliveryLng={(toArray(booking.trade_requests)[0])?.delivery_longitude}
+                        carrierLat={booking.vehicle_states?.current_latitude}
+                        carrierLng={booking.vehicle_states?.current_longitude}
+                        locationUpdatedAt={booking.vehicle_states?.location_updated_at}
                       />
                     </div>
+                    {/* Update My Location button — only for active bookings with a vehicle */}
+                    {booking.vehicle_states?.id && (
+                      <div className="mt-3">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleUpdateLocation(booking.vehicle_states!.id)}
+                          disabled={updatingLocation}
+                          isLoading={updatingLocation}
+                          className="flex items-center gap-1.5 text-orange-600 border border-orange-200 hover:bg-orange-50"
+                        >
+                          <Navigation className="w-3.5 h-3.5" />
+                          Update My Location
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="md:text-right flex flex-col justify-between h-full min-w-[200px] border-t md:border-t-0 pt-4 md:pt-0">

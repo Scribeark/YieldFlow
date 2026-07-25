@@ -1,5 +1,9 @@
+'use client';
+
 import React from 'react';
-import { CheckCircle, Clock, Truck } from 'lucide-react';
+import { CheckCircle, Clock, Truck, Map } from 'lucide-react';
+import { TripMap } from '@/components/shared/TripMap';
+import { useMapsKey } from '@/components/providers/MapsProvider';
 
 interface TimelineProps {
   requestStatus: string;
@@ -13,6 +17,17 @@ interface TimelineProps {
   onConfirmCarrierDelivery?: () => void;
   onConfirmBuyerDelivery?: () => void;
   isConfirming?: boolean;
+
+  // Location fields
+  pickupAddress?: string | null;
+  pickupLat?: number | null;
+  pickupLng?: number | null;
+  deliveryAddress?: string | null;
+  deliveryLat?: number | null;
+  deliveryLng?: number | null;
+  carrierLat?: number | null;
+  carrierLng?: number | null;
+  locationUpdatedAt?: string | null;
 }
 
 export function OngoingTradeTimeline({
@@ -26,18 +41,31 @@ export function OngoingTradeTimeline({
   onConfirmCarrierPickup,
   onConfirmCarrierDelivery,
   onConfirmBuyerDelivery,
-  isConfirming = false
+  isConfirming = false,
+  pickupAddress,
+  pickupLat,
+  pickupLng,
+  deliveryAddress,
+  deliveryLat,
+  deliveryLng,
+  carrierLat,
+  carrierLng,
+  locationUpdatedAt,
 }: TimelineProps) {
-  
-  const isAllocated = requestStatus === 'ALLOCATED';
-  const isDispatched = requestStatus === 'DISPATCHED';
-  const isFulfilled = requestStatus === 'FULFILLED';
-  const isSearching = requestStatus === 'SEARCHING_LOGISTICS';
+  const apiKey = useMapsKey();
 
-  const sellerConfirmedPickup = sellerPickupConfirmedAt !== null;
+  const isAllocated  = requestStatus === 'ALLOCATED';
+  const isDispatched = requestStatus === 'DISPATCHED';
+  const isFulfilled  = requestStatus === 'FULFILLED';
+  const isSearching  = requestStatus === 'SEARCHING_LOGISTICS';
+
+  const sellerConfirmedPickup  = sellerPickupConfirmedAt  !== null;
   const carrierConfirmedPickup = carrierPickupConfirmedAt !== null;
   const carrierConfirmedDelivery = carrierDeliveryConfirmedAt !== null;
-  const buyerConfirmedDelivery = buyerDeliveryConfirmedAt !== null;
+  const buyerConfirmedDelivery   = buyerDeliveryConfirmedAt   !== null;
+
+  // Show map when there are at least pickup coordinates
+  const showMap = Boolean(pickupLat && pickupLng);
 
   return (
     <div className="w-full border rounded-lg bg-[var(--card-bg)] p-4 shadow-sm mt-4">
@@ -45,13 +73,46 @@ export function OngoingTradeTimeline({
         <Truck className="w-5 h-5 text-indigo-500" />
         Ongoing Trip Status
       </h4>
-      
+
+      {/* ─── Map panel ─────────────────────────────────────────────────────── */}
+      {showMap && (
+        <div className="mb-4">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">
+            <Map className="w-3.5 h-3.5" />
+            {isSearching   ? 'Pickup & Delivery Points'
+            : isAllocated  ? 'Carrier En Route to Pickup'
+            : isDispatched ? 'Carrier Delivering Goods'
+            : isFulfilled  ? 'Completed Route'
+            : 'Trip Map'}
+          </div>
+          <TripMap
+            apiKey={apiKey}
+            requestStatus={requestStatus}
+            pickupAddress={pickupAddress}
+            pickupLat={pickupLat}
+            pickupLng={pickupLng}
+            deliveryAddress={deliveryAddress}
+            deliveryLat={deliveryLat}
+            deliveryLng={deliveryLng}
+            carrierLat={carrierLat}
+            carrierLng={carrierLng}
+            locationUpdatedAt={locationUpdatedAt}
+            role={role}
+            compact
+          />
+        </div>
+      )}
+
       <div className="space-y-4">
         {/* Phase 1: Carrier Assignment */}
         <div className={`p-3 rounded-md border ${isSearching ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'} dark:bg-black/20 dark:border-gray-800`}>
           <div className="font-semibold text-sm flex items-center justify-between">
             <span>Phase 1: Carrier Assignment</span>
-            {isSearching ? <span className="text-blue-600 text-xs flex items-center gap-1"><Clock className="w-3 h-3"/> Waiting for carrier</span> : <CheckCircle className="w-4 h-4 text-emerald-500" />}
+            {isSearching ? (
+              <span className="text-blue-600 text-xs flex items-center gap-1"><Clock className="w-3 h-3"/> Waiting for carrier</span>
+            ) : (
+              <CheckCircle className="w-4 h-4 text-emerald-500" />
+            )}
           </div>
           {(isAllocated || isDispatched || isFulfilled) && (
             <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
@@ -66,18 +127,18 @@ export function OngoingTradeTimeline({
             <span>Phase 2: Pickup Handover</span>
             {(isDispatched || isFulfilled) ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
           </div>
-          
+
           <div className="space-y-2 text-sm">
-            {/* Seller confirmation UI */}
+            {/* Seller confirmation */}
             <div className="flex items-center justify-between p-2 bg-white dark:bg-black/40 rounded border border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
                 <CheckCircle className={`w-4 h-4 ${sellerConfirmedPickup ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={sellerConfirmedPickup ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Seller handed over goods</span>
               </div>
               {role === 'seller' && (isAllocated || isDispatched || isFulfilled || sellerConfirmedPickup) && (
-                <button 
-                  onClick={onConfirmSellerPickup} 
-                  disabled={isConfirming || sellerConfirmedPickup} 
+                <button
+                  onClick={onConfirmSellerPickup}
+                  disabled={isConfirming || sellerConfirmedPickup}
                   className={`px-3 py-1 text-xs rounded transition-colors ${sellerConfirmedPickup ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50'}`}
                 >
                   {sellerConfirmedPickup ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Handed Over'}
@@ -85,16 +146,16 @@ export function OngoingTradeTimeline({
               )}
             </div>
 
-            {/* Carrier confirmation UI */}
+            {/* Carrier confirmation */}
             <div className="flex items-center justify-between p-2 bg-white dark:bg-black/40 rounded border border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
                 <CheckCircle className={`w-4 h-4 ${carrierConfirmedPickup ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={carrierConfirmedPickup ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Carrier received goods</span>
               </div>
               {role === 'carrier' && (isAllocated || isDispatched || isFulfilled || carrierConfirmedPickup) && (
-                <button 
-                  onClick={onConfirmCarrierPickup} 
-                  disabled={isConfirming || carrierConfirmedPickup} 
+                <button
+                  onClick={onConfirmCarrierPickup}
+                  disabled={isConfirming || carrierConfirmedPickup}
                   className={`px-3 py-1 text-xs rounded transition-colors ${carrierConfirmedPickup ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50'}`}
                 >
                   {carrierConfirmedPickup ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Received From Seller'}
@@ -110,18 +171,18 @@ export function OngoingTradeTimeline({
             <span>Phase 3: Delivery Handover</span>
             {isFulfilled ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
           </div>
-          
+
           <div className="space-y-2 text-sm">
-            {/* Carrier confirmation UI */}
+            {/* Carrier delivery */}
             <div className="flex items-center justify-between p-2 bg-white dark:bg-black/40 rounded border border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
                 <CheckCircle className={`w-4 h-4 ${carrierConfirmedDelivery ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={carrierConfirmedDelivery ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Carrier delivered goods</span>
               </div>
               {role === 'carrier' && (isDispatched || isFulfilled || carrierConfirmedDelivery) && (
-                <button 
-                  onClick={onConfirmCarrierDelivery} 
-                  disabled={isConfirming || carrierConfirmedDelivery} 
+                <button
+                  onClick={onConfirmCarrierDelivery}
+                  disabled={isConfirming || carrierConfirmedDelivery}
                   className={`px-3 py-1 text-xs rounded transition-colors ${carrierConfirmedDelivery ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}
                 >
                   {carrierConfirmedDelivery ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Delivered'}
@@ -129,16 +190,16 @@ export function OngoingTradeTimeline({
               )}
             </div>
 
-            {/* Buyer confirmation UI */}
+            {/* Buyer delivery */}
             <div className="flex items-center justify-between p-2 bg-white dark:bg-black/40 rounded border border-gray-100 dark:border-gray-800">
               <div className="flex items-center gap-2">
                 <CheckCircle className={`w-4 h-4 ${buyerConfirmedDelivery ? 'text-emerald-500' : 'text-gray-300'}`} />
                 <span className={buyerConfirmedDelivery ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-500'}>Buyer received goods</span>
               </div>
               {role === 'buyer' && (isDispatched || isFulfilled || buyerConfirmedDelivery) && (
-                <button 
-                  onClick={onConfirmBuyerDelivery} 
-                  disabled={isConfirming || buyerConfirmedDelivery} 
+                <button
+                  onClick={onConfirmBuyerDelivery}
+                  disabled={isConfirming || buyerConfirmedDelivery}
                   className={`px-3 py-1 text-xs rounded transition-colors ${buyerConfirmedDelivery ? 'bg-gray-100 text-gray-500 border border-gray-200 dark:bg-gray-800 dark:border-gray-700' : 'bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50'}`}
                 >
                   {buyerConfirmedDelivery ? 'Confirmed' : isConfirming ? 'Confirming...' : 'Confirm Goods Received'}
@@ -150,7 +211,7 @@ export function OngoingTradeTimeline({
 
         {/* Phase 4: Completion */}
         <div className={`p-3 rounded-md border ${isFulfilled ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'} dark:bg-black/20 dark:border-gray-800`}>
-           <div className="font-semibold text-sm flex items-center justify-between">
+          <div className="font-semibold text-sm flex items-center justify-between">
             <span>Phase 4: Completion</span>
             {isFulfilled ? <CheckCircle className="w-4 h-4 text-emerald-500" /> : <Clock className="w-4 h-4 text-gray-400" />}
           </div>
@@ -160,7 +221,6 @@ export function OngoingTradeTimeline({
             </div>
           )}
         </div>
-
       </div>
     </div>
   );

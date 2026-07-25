@@ -258,7 +258,7 @@ export default function AvailableJobs() {
         </div>
       )}
 
-      {/* Refresh + header */}
+    // Refresh + header
       <div className="flex justify-between items-center">
         <p className="text-sm opacity-70">
           {jobs.length === 0
@@ -280,33 +280,92 @@ export default function AvailableJobs() {
         <div className="grid gap-4">
           {jobs.map(job => {
             const canAccept = eligibleVehicles.length > 0;
+            const isUssd = job.evidence_status === 'exempted';
+            const hasPhoto = Boolean(job.harvest_photo_url);
+            const jobWithSeller = job as unknown as Job & { users?: { full_name: string; phone_number: string } | null; delivery_address?: string | null };
             return (
               <div
                 key={job.id}
-                className="p-5 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl overflow-hidden"
               >
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg">{job.commodity_variety}</h3>
-                  <p className="text-sm opacity-80">Quantity: {job.quantity_volume} units</p>
-                  <p className="text-sm opacity-80">Pickup: {job.physical_address}</p>
-                  <div className="mt-2 text-xs font-semibold inline-block px-2 py-1 bg-green-500/20 text-green-600 dark:text-green-400 rounded">
-                    {job.evidence_status === 'exempted' ? 'USSD Exempted' : 'Photo Provided'}
+                <div className="flex flex-col md:flex-row">
+                  {/* Evidence / Photo panel */}
+                  <div className="md:w-36 w-full h-32 md:h-auto bg-black/5 dark:bg-white/5 flex items-center justify-center shrink-0 relative border-b md:border-b-0 md:border-r border-[var(--border-color)]">
+                    {isUssd ? (
+                      <div className="text-center p-3">
+                        <AlertTriangle className="mx-auto w-7 h-7 text-amber-500 mb-1" />
+                        <p className="text-[10px] text-amber-600 font-bold">USSD</p>
+                        <p className="text-[10px] text-amber-500">No harvest photo</p>
+                      </div>
+                    ) : hasPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={job.harvest_photo_url!} alt="Harvest" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="text-center p-3 text-gray-400">
+                        <Truck className="mx-auto w-7 h-7 mb-1 opacity-30" />
+                        <p className="text-[10px]">No photo</p>
+                      </div>
+                    )}
+                    {/* Evidence badge */}
+                    <span className={`absolute top-1.5 left-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase ${isUssd ? 'bg-amber-500 text-white' : 'bg-green-500 text-white'}`}>
+                      {isUssd ? 'Exempted' : 'Evidenced'}
+                    </span>
                   </div>
-                </div>
 
-                <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
-                  <Button
-                    onClick={() => canAccept && handleClaimJob(job)}
-                    disabled={!canAccept || processingId === job.id}
-                    className={!canAccept ? 'opacity-50 cursor-not-allowed' : ''}
-                  >
-                    {processingId === job.id ? 'Claiming...' : 'Accept Load'}
-                  </Button>
-                  {!canAccept && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 max-w-[200px] text-right">
-                      {busyVehicles.length > 0 ? 'Vehicle busy — complete current job first' : 'No eligible vehicle'}
-                    </p>
-                  )}
+                  {/* Job details */}
+                  <div className="flex-1 p-4 flex flex-col md:flex-row gap-4 justify-between">
+                    <div className="flex-1 space-y-1.5">
+                      <h3 className="font-bold text-lg">{job.commodity_variety}</h3>
+                      <p className="text-sm opacity-80">Quantity: {job.quantity_volume} kg/tons</p>
+
+                      {/* Pickup */}
+                      <p className="text-sm text-gray-500 flex items-start gap-1">
+                        <span className="mt-0.5 shrink-0 w-2 h-2 rounded-full bg-green-500 inline-block mt-1.5" />
+                        Pickup: {job.physical_address}
+                      </p>
+
+                      {/* Delivery */}
+                      {jobWithSeller.delivery_address ? (
+                        <p className="text-sm text-gray-500 flex items-start gap-1">
+                          <span className="mt-0.5 shrink-0 w-2 h-2 rounded-full bg-blue-500 inline-block mt-1.5" />
+                          Delivery: {jobWithSeller.delivery_address}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-400 italic">Delivery address not yet confirmed</p>
+                      )}
+
+                      {/* Seller contact */}
+                      {jobWithSeller.users && (
+                        <p className="text-xs text-gray-400">
+                          Seller: {jobWithSeller.users.full_name} · {jobWithSeller.users.phone_number}
+                        </p>
+                      )}
+
+                      {/* USSD notice */}
+                      {isUssd && (
+                        <div className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded px-2 py-1 mt-1">
+                          USSD listing — no harvest photo provided. Buyer has accepted evidence exemption.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Action */}
+                    <div className="flex flex-col items-start md:items-end gap-2 shrink-0 justify-center">
+                      <Button
+                        onClick={() => canAccept && handleClaimJob(job)}
+                        disabled={!canAccept || processingId === job.id}
+                        isLoading={processingId === job.id}
+                        className={!canAccept ? 'opacity-50 cursor-not-allowed' : ''}
+                      >
+                        {processingId === job.id ? 'Claiming...' : 'Accept Load'}
+                      </Button>
+                      {!canAccept && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 max-w-[200px] text-right">
+                          {busyVehicles.length > 0 ? 'Vehicle busy — complete current job first' : 'No eligible vehicle'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             );

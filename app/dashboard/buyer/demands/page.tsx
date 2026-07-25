@@ -60,7 +60,16 @@ export default function MyDemandsPage() {
     setClaimingId(requestId);
 
     const { confirmOrder } = await import('@/lib/api/buyer');
-    const { error } = await confirmOrder(supabase, requestId);
+    // For demand-led trades, delivery coordinates are copied from buyer_demands
+    // by rpc_confirm_order on the server. We still must supply fallback values.
+    // p_confirm_ussd_exemption is not needed here (demands are web-only).
+    const { error } = await confirmOrder(supabase, {
+      requestId,
+      deliveryAddress: '',   // server will override from buyer_demands
+      deliveryLatitude: 0,
+      deliveryLongitude: 0,
+      confirmUssdExemption: false,
+    });
 
     if (error) {
       setError(`Failed to confirm response: ${error.message}`);

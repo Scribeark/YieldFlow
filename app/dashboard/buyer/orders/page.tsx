@@ -81,7 +81,15 @@ export default function BuyerOrdersPage() {
     if (!profile) return;
     setClaimingId(requestId);
 
-    const { error } = await confirmOrder(supabase, requestId);
+    // For demand-led trades, delivery coordinates are copied from buyer_demands
+    // by rpc_confirm_order. Supply zero-value fallbacks; server overrides them.
+    const { error } = await confirmOrder(supabase, {
+      requestId,
+      deliveryAddress: '',
+      deliveryLatitude: 0,
+      deliveryLongitude: 0,
+      confirmUssdExemption: false,
+    });
 
     if (error) {
       setError(`Failed to confirm response: ${error.message}`);

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import NavigationShell from "@/components/layout/NavigationShell";
+import { MapsProvider } from "@/components/providers/MapsProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -30,12 +31,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Read the Maps API key server-side. The key is passed to the MapsProvider
+  // Client Component, making it available to the browser via context.
+  // It will be visible in the browser (required by Maps JavaScript).
+  // Restrict this key in Google Cloud Console with HTTP referrer restrictions.
+  const mapsApiKey = process.env.Maps_Platform_API_Key ?? '';
+
   return (
     <html lang="en" suppressHydrationWarning className="h-full antialiased font-sans">
       <body className="min-h-full">
         <ThemeProvider attribute="data-theme" defaultTheme="system" enableSystem>
-          <div className="gradient-mesh"></div>
-          <NavigationShell>{children}</NavigationShell>
+          <MapsProvider apiKey={mapsApiKey}>
+            <div className="gradient-mesh"></div>
+            <NavigationShell>{children}</NavigationShell>
+          </MapsProvider>
         </ThemeProvider>
       </body>
     </html>

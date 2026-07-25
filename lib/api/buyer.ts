@@ -31,12 +31,26 @@ export async function getAvailableTradeRequests(
   }
 }
 
+export interface ConfirmOrderParams {
+  requestId: string;
+  deliveryAddress: string;
+  deliveryLatitude: number;
+  deliveryLongitude: number;
+  confirmUssdExemption?: boolean;
+}
+
 export async function confirmOrder(
   supabase: SupabaseClient<Database>,
-  requestId: string
+  params: ConfirmOrderParams
 ): Promise<{ error: Error | null }> {
   try {
-    const { error } = await supabase.rpc('rpc_confirm_order', { req_id: requestId });
+    const { error } = await supabase.rpc('rpc_confirm_order', {
+      req_id: params.requestId,
+      p_delivery_address: params.deliveryAddress,
+      p_delivery_latitude: params.deliveryLatitude,
+      p_delivery_longitude: params.deliveryLongitude,
+      p_confirm_ussd_exemption: params.confirmUssdExemption ?? false,
+    });
 
     if (error) {
       console.error('Error confirming order:', error);
