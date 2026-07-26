@@ -208,7 +208,7 @@ export default function ActiveBookings() {
                       <p className="text-xs text-gray-500">Booking ID: {booking.id.split('-')[0]}</p>
                     </div>
                     {isAllocated && !booking.seller_pickup_confirmed_at && (
-                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleReleaseJob(booking.trade_request_id)}>
+                      <Button variant="ghost" size="sm" className="text-red-600 border border-red-200 hover:bg-red-50" onClick={() => handleReleaseJob(booking.trade_request_id)}>
                         Release Job
                       </Button>
                     )}
@@ -217,9 +217,21 @@ export default function ActiveBookings() {
                   {/* Body */}
                   <div className="p-4 flex-1">
                     <OngoingTradeTimeline
-                      tradeStatus={trade.request_status}
-                      booking={booking}
-                      isCarrier={true}
+                      requestStatus={trade.request_status}
+                      role="carrier"
+                      sellerPickupConfirmedAt={booking.seller_pickup_confirmed_at}
+                      carrierPickupConfirmedAt={booking.carrier_pickup_confirmed_at}
+                      carrierDeliveryConfirmedAt={booking.carrier_delivery_confirmed_at}
+                      buyerDeliveryConfirmedAt={booking.buyer_delivery_confirmed_at}
+                      pickupAddress={trade.physical_address}
+                      pickupLat={trade.computed_latitude}
+                      pickupLng={trade.computed_longitude}
+                      deliveryAddress={trade.delivery_address}
+                      deliveryLat={trade.delivery_latitude}
+                      deliveryLng={trade.delivery_longitude}
+                      carrierLat={vehicleState?.current_latitude}
+                      carrierLng={vehicleState?.current_longitude}
+                      locationUpdatedAt={vehicleState?.location_updated_at}
                     />
 
                     {/* Carrier Actions */}
@@ -229,8 +241,8 @@ export default function ActiveBookings() {
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button 
                           onClick={() => handleUpdateLocation(booking.vehicle_state_id || vehicleState?.id || '')} 
-                          variant="outline" 
-                          className="flex-1"
+                          variant="ghost" 
+                          className="flex-1 border border-gray-200"
                           disabled={updatingLocation || (!booking.vehicle_state_id && !vehicleState?.id)}
                         >
                           <Navigation className={`w-4 h-4 mr-2 ${updatingLocation ? 'animate-bounce' : ''}`} />

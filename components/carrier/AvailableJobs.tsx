@@ -104,7 +104,7 @@ export default function AvailableJobs() {
         if (!job.computed_latitude || !job.computed_longitude) return false;
         return true;
       });
-      setJobs(validJobs as Job[]);
+      setJobs(validJobs as unknown as Job[]);
     }
 
     setLoading(false);

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { MapPin, Navigation, Truck, X } from 'lucide-react';
 import { geocodeAddress } from '@/lib/maps/googleMaps';
+import { useMapsKey } from '@/components/providers/MapsProvider';
 
 interface Vehicle {
   id: string;
@@ -32,6 +33,7 @@ export default function CarrierLocationModal({
   eligibleVehicles,
   onConfirm,
 }: CarrierLocationModalProps) {
+  const apiKey = useMapsKey();
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>('');
   const [locationMode, setLocationMode] = useState<'gps' | 'manual' | 'saved' | null>(null);
   const [manualAddress, setManualAddress] = useState('');
@@ -89,7 +91,7 @@ export default function CarrierLocationModal({
           setProcessing(false);
           return;
         }
-        const coords = await geocodeAddress(manualAddress);
+        const coords = await geocodeAddress(manualAddress, apiKey);
         if (!coords) {
           setError('Could not find that address. Please be more specific.');
           setProcessing(false);
@@ -241,8 +243,8 @@ export default function CarrierLocationModal({
           )}
         </div>
 
-        <div className="p-4 border-t bg-gray-50 flex justify-end space-x-3">
-          <Button variant="outline" onClick={onClose} disabled={processing}>
+        <div className="p-4 border-t bg-gray-50 flex justify-end gap-3">
+          <Button variant="ghost" className="border border-gray-200" onClick={onClose} disabled={processing}>
             Cancel
           </Button>
           <Button onClick={handleConfirm} disabled={processing || (!hasFreshLocation && !locationMode)}>
