@@ -122,6 +122,7 @@ export default function AvailableJobs() {
 
     try {
       if (locationData) {
+        // Carrier location must only update vehicle_states. Do not write to trade_requests.delivery_*.
         const { error: vError } = await supabase.from('vehicle_states').update({
           current_latitude: locationData.latitude,
           current_longitude: locationData.longitude,

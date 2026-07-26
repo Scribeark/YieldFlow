@@ -2,7 +2,9 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import { Database } from '../database.types';
 
 export type TradeRequestRow = Database['public']['Tables']['trade_requests']['Row'] & {
-  logistics_bookings?: Database['public']['Tables']['logistics_bookings']['Row'][];
+  logistics_bookings?: (Database['public']['Tables']['logistics_bookings']['Row'] & {
+    vehicle_states?: Database['public']['Tables']['vehicle_states']['Row'];
+  })[];
 };
 
 export async function getAvailableTradeRequests(
@@ -92,7 +94,7 @@ export async function getBuyerOrders(
     // Fetch both confirmed orders and pending evidence requests
     const { data, error } = await supabase
       .from('trade_requests')
-      .select('*, logistics_bookings(*)')
+      .select('*, logistics_bookings(*, vehicle_states(*))')
       .or(`buyer_id.eq.${buyerId},interested_buyer_id.eq.${buyerId}`)
       .order('created_at', { ascending: false })
       .limit(limit);

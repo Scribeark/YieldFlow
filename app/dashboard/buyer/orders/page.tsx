@@ -430,6 +430,15 @@ export default function BuyerOrdersPage() {
                               role="buyer"
                               onConfirmBuyerDelivery={() => handleConfirmDelivery(order.id)}
                               isConfirming={deliveryConfirmingId === order.id}
+                              pickupAddress={order.physical_address}
+                              pickupLat={order.computed_latitude}
+                              pickupLng={order.computed_longitude}
+                              deliveryAddress={order.delivery_address}
+                              deliveryLat={order.delivery_latitude}
+                              deliveryLng={order.delivery_longitude}
+                              carrierLat={activeBooking?.vehicle_states?.current_latitude}
+                              carrierLng={activeBooking?.vehicle_states?.current_longitude}
+                              locationUpdatedAt={activeBooking?.vehicle_states?.location_updated_at}
                             />
 
                             {(() => {

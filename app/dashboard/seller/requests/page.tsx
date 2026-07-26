@@ -262,6 +262,15 @@ export default function MyRequestsPage() {
                 role="seller"
                 onConfirmSellerPickup={() => handleConfirmPickup(request.id)}
                 isConfirming={pickupConfirmingId === request.id}
+                pickupAddress={request.physical_address}
+                pickupLat={request.computed_latitude}
+                pickupLng={request.computed_longitude}
+                deliveryAddress={request.delivery_address}
+                deliveryLat={request.delivery_latitude}
+                deliveryLng={request.delivery_longitude}
+                carrierLat={activeBooking?.vehicle_states?.current_latitude}
+                carrierLng={activeBooking?.vehicle_states?.current_longitude}
+                locationUpdatedAt={activeBooking?.vehicle_states?.location_updated_at}
               />
             )}
           </div>

@@ -3,7 +3,9 @@ import { Database } from '../database.types';
 
 export type TradeRequestInsert = Database['public']['Tables']['trade_requests']['Insert'];
 export type TradeRequestRow = Database['public']['Tables']['trade_requests']['Row'] & {
-  logistics_bookings?: Database['public']['Tables']['logistics_bookings']['Row'][];
+  logistics_bookings?: (Database['public']['Tables']['logistics_bookings']['Row'] & {
+    vehicle_states?: Database['public']['Tables']['vehicle_states']['Row'];
+  })[];
 };
 
 export async function createTradeRequest(
@@ -46,7 +48,7 @@ export async function getSellerTradeRequests(
   try {
     const { data, error } = await supabase
       .from('trade_requests')
-      .select('*, logistics_bookings(*)')
+      .select('*, logistics_bookings(*, vehicle_states(*))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(limit);

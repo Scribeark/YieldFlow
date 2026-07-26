@@ -97,6 +97,7 @@ export default function CarrierLocationModal({
           setProcessing(false);
           return;
         }
+        // Carrier location must only update vehicle_states. Do not write to trade_requests.delivery_*.
         onConfirm(selectedVehicle.id, {
           latitude: coords.lat,
           longitude: coords.lng,
@@ -108,6 +109,7 @@ export default function CarrierLocationModal({
           setProcessing(false);
           return;
         }
+        // Carrier location must only update vehicle_states. Do not write to trade_requests.delivery_*.
         onConfirm(selectedVehicle.id, {
           latitude: selectedVehicle.current_latitude,
           longitude: selectedVehicle.current_longitude,
@@ -129,7 +131,7 @@ export default function CarrierLocationModal({
         <div className="p-4 border-b flex items-center justify-between bg-gray-50">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
             <Truck className="w-5 h-5 mr-2 text-green-600" />
-            Accept Logistics Job
+            Confirm your current carrier/vehicle location
           </h2>
           <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200">
             <X className="w-5 h-5" />
@@ -172,6 +174,7 @@ export default function CarrierLocationModal({
           {!hasFreshLocation ? (
             <div className="space-y-4">
               <div className="bg-amber-50 text-amber-800 p-3 rounded-lg text-sm mb-4">
+                <p className="font-semibold mb-1">This is your starting/current logistics location. It is not the buyer delivery address.</p>
                 This vehicle's location is missing or stale. You must update your location to calculate distance and accept this job.
               </div>
 
@@ -184,7 +187,7 @@ export default function CarrierLocationModal({
                 >
                   <Navigation className={`w-5 h-5 mr-3 ${locationMode === 'gps' ? 'text-green-600' : 'text-gray-400'}`} />
                   <div>
-                    <div className={`font-medium ${locationMode === 'gps' ? 'text-green-800' : 'text-gray-900'}`}>Use GPS Location</div>
+                    <div className={`font-medium ${locationMode === 'gps' ? 'text-green-800' : 'text-gray-900'}`}>Use my current GPS location</div>
                     <div className="text-xs text-gray-500">Auto-detect your current position</div>
                   </div>
                 </button>
@@ -197,7 +200,7 @@ export default function CarrierLocationModal({
                 >
                   <MapPin className={`w-5 h-5 mr-3 ${locationMode === 'manual' ? 'text-green-600' : 'text-gray-400'}`} />
                   <div>
-                    <div className={`font-medium ${locationMode === 'manual' ? 'text-green-800' : 'text-gray-900'}`}>Enter Manual Address</div>
+                    <div className={`font-medium ${locationMode === 'manual' ? 'text-green-800' : 'text-gray-900'}`}>Enter my current vehicle address manually</div>
                     <div className="text-xs text-gray-500">Type your current street address</div>
                   </div>
                 </button>
@@ -223,7 +226,7 @@ export default function CarrierLocationModal({
                   >
                     <Truck className={`w-5 h-5 mr-3 ${locationMode === 'saved' ? 'text-green-600' : 'text-gray-400'}`} />
                     <div>
-                      <div className={`font-medium ${locationMode === 'saved' ? 'text-green-800' : 'text-gray-900'}`}>Use Saved Location</div>
+                      <div className={`font-medium ${locationMode === 'saved' ? 'text-green-800' : 'text-gray-900'}`}>Use saved vehicle location</div>
                       <div className="text-xs text-gray-500">
                         {selectedVehicle.current_address || 'Last known coordinates'}
                       </div>
