@@ -6,6 +6,7 @@
 ALTER TABLE public.vehicle_states ADD COLUMN IF NOT EXISTS current_address TEXT;
 
 -- 2. Robust Release/Re-Pool RPC
+DROP FUNCTION IF EXISTS public.rpc_release_logistics_booking(uuid);
 CREATE OR REPLACE FUNCTION public.rpc_release_logistics_booking(
   p_trade_request_id uuid
 ) RETURNS json
