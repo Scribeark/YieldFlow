@@ -140,6 +140,7 @@ export interface Database {
           payload_capacity_baskets: number
           current_latitude: number
           current_longitude: number
+          current_address: string | null
           carrier_status: 'available' | 'busy' | 'offline'
           vehicle_type: 'Motorcycle' | 'Tricycle' | 'Van' | 'Pickup Truck' | 'Truck'
           plate_number: string
@@ -160,6 +161,7 @@ export interface Database {
           payload_capacity_baskets: number
           current_latitude: number
           current_longitude: number
+          current_address?: string | null
           carrier_status?: 'available' | 'busy' | 'offline'
           vehicle_type: 'Motorcycle' | 'Tricycle' | 'Van' | 'Pickup Truck' | 'Truck'
           plate_number: string
@@ -272,7 +274,7 @@ export interface Database {
       }
       rpc_release_logistics_booking: {
         Args: { p_trade_request_id: string }
-        Returns: void
+        Returns: Json
       }
       rpc_cancel_buyer_claim: {
         Args: { p_trade_request_id: string }

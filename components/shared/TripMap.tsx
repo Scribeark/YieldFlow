@@ -108,8 +108,8 @@ function TripMapInner({
       origin = { lat: carrierLat!, lng: carrierLng! };
       dest   = { lat: pickupLat!, lng: pickupLng! };
     } else if ((requestStatus === 'DISPATCHED' || requestStatus === 'FULFILLED') && hasDelivery) {
-      // Pickup → Delivery
-      origin = { lat: pickupLat!, lng: pickupLng! };
+      // Carrier/Pickup → Delivery
+      origin = hasCarrier ? { lat: carrierLat!, lng: carrierLng! } : { lat: pickupLat!, lng: pickupLng! };
       dest   = { lat: deliveryLat!, lng: deliveryLng! };
     }
 

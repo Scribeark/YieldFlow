@@ -2,18 +2,6 @@
 
 /**
  * app/dashboard/carrier/tracking/page.tsx
- *
- * Logistics Provider Map — two-layer map:
- *
- * Layer A: Market Preview
- *   Shows supply (seller listings) and demand (buyer demands) markers.
- *   Informational only. No accept action from this layer.
- *
- * Layer B: Available Jobs (actionable)
- *   Shows SEARCHING_LOGISTICS trades with full pickup/delivery coordinates.
- *   Carrier can accept a job from this layer via rpc_claim_logistics_job.
- *
- * Also includes the carrier's active trip map (if they have an active booking).
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
@@ -31,8 +19,21 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { PageContainer } from '@/components/ui/PageContainer';
-import { MapPin, Navigation, Package, RefreshCw, Truck, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Navigation, Package, RefreshCw, Truck, AlertTriangle } from 'lucide-react';
 import { getRouteBetweenPoints } from '@/lib/maps/googleMaps';
+import CarrierLocationModal from '@/components/shared/CarrierLocationModal';
+
+function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
 
 const MAP_STYLE  = { width: '100%', height: '65vh', borderRadius: '0.75rem' };
 const NIGERIA_CENTER = { lat: 9.082, lng: 8.6753 };
@@ -60,9 +61,9 @@ interface ActiveBooking {
     users?: { full_name: string; phone_number: string } | null;
     buyer?: { full_name: string; phone_number: string } | null;
   } | null;
-  vehicle_states?: { id: string; current_latitude: number; current_longitude: number; location_updated_at: string | null } | null;
+  vehicle_states?: { id: string; current_latitude: number; current_longitude: number; current_address?: string | null; location_updated_at: string | null; carrier_status?: string; vehicle_license_expires_at?: string | null; plate_number?: string; vehicle_nickname?: string; } | null;
 }
-interface Vehicle { id: string; carrier_status: string; }
+interface Vehicle { id: string; carrier_status: string; vehicle_license_expires_at?: string | null; current_latitude?: number | null; current_longitude?: number | null; current_address?: string | null; location_updated_at?: string | null; plate_number?: string; vehicle_nickname?: string; vehicle_verification_status?: string; }
 
 export default function CarrierTrackingPage() {
   const router    = useRouter();
@@ -78,16 +79,17 @@ export default function CarrierTrackingPage() {
   const [jobs, setJobs]             = useState<AvailableJob[]>([]);
   const [activeBooking, setActiveBooking] = useState<ActiveBooking | null>(null);
   const [vehicles, setVehicles]     = useState<Vehicle[]>([]);
+  const [eligibleVehicles, setEligibleVehicles] = useState<Vehicle[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [actionStatus, setActionStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const [accepting, setAccepting]   = useState(false);
   const [updatingLocation, setUpdatingLocation] = useState(false);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const lastLocationUpdate = useRef<number>(0);
 
-  const eligibleVehicle = vehicles.find(v => v.carrier_status === 'available');
+  const [jobToAccept, setJobToAccept] = useState<AvailableJob | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!profile) return;
@@ -95,20 +97,30 @@ export default function CarrierTrackingPage() {
     setError(null);
 
     const [vRes, supplyRes, demandRes, jobsRes, bookingRes] = await Promise.all([
-      supabase.from('vehicle_states').select('id, carrier_status').eq('carrier_id', profile.id),
+      supabase.from('vehicle_states').select('*').eq('carrier_id', profile.id),
       supabase.from('trade_requests').select('id, commodity_variety, quantity_volume, physical_address, computed_latitude, computed_longitude, submission_channel, evidence_status, harvest_photo_url, delivery_address, delivery_latitude, delivery_longitude').in('request_status', ['AWAITING_BUYER', 'EVIDENCE_PENDING']).not('computed_latitude', 'is', null).limit(80),
       supabase.from('buyer_demands').select('id, commodity_variety, quantity_volume, delivery_address, computed_latitude, computed_longitude').in('demand_status', ['AWAITING_SELLER']).not('computed_latitude', 'is', null).limit(60),
       supabase.from('trade_requests').select('id, commodity_variety, quantity_volume, physical_address, computed_latitude, computed_longitude, delivery_address, delivery_latitude, delivery_longitude, submission_channel, evidence_status, harvest_photo_url, users!trade_requests_user_id_fkey(full_name, phone_number)').eq('request_status', 'SEARCHING_LOGISTICS').not('buyer_id', 'is', null).not('computed_latitude', 'is', null).not('delivery_latitude', 'is', null).or('evidence_status.eq.provided,evidence_status.eq.exempted').limit(50),
       supabase.from('logistics_bookings').select('id, trade_request_id, carrier_name, carrier_phone, vehicle_states(id, current_latitude, current_longitude, location_updated_at), trade_request:trade_requests(commodity_variety, quantity_volume, physical_address, computed_latitude, computed_longitude, delivery_address, delivery_latitude, delivery_longitude, request_status, users!trade_requests_user_id_fkey(full_name, phone_number), buyer:users!trade_requests_buyer_id_fkey(full_name, phone_number))').eq('carrier_id', profile.id).eq('status', 'active').maybeSingle(),
     ]);
 
-    if (vRes.data)    setVehicles(vRes.data as Vehicle[]);
+    if (vRes.data) {
+      const vs = vRes.data as Vehicle[];
+      setVehicles(vs);
+      const eligible = vs.filter(v => {
+        if (v.carrier_status !== 'available') return false;
+        if (!v.vehicle_license_expires_at) return false;
+        if (new Date(v.vehicle_license_expires_at) < new Date()) return false;
+        if (v.vehicle_verification_status !== 'pending' && v.vehicle_verification_status !== 'verified') return false;
+        return true;
+      });
+      setEligibleVehicles(eligible);
+    }
+    
     if (supplyRes.data) setSupply(supplyRes.data as unknown as SupplyPoint[]);
     if (demandRes.data) setDemands(demandRes.data as unknown as DemandPoint[]);
-    if (jobsRes.data) {
-      // Filter: exclude jobs that already have an active booking
-      setJobs(jobsRes.data as unknown as AvailableJob[]);
-    }
+    if (jobsRes.data) setJobs(jobsRes.data as unknown as AvailableJob[]);
+    
     if (bookingRes.data) {
       setActiveBooking(bookingRes.data as unknown as ActiveBooking);
       setLayer('active');
@@ -124,33 +136,46 @@ export default function CarrierTrackingPage() {
     if (!isLoaded || !activeBooking?.trade_request || layer !== 'active') return;
     const tr = activeBooking.trade_request;
     const vs = activeBooking.vehicle_states;
-    if (!vs || !tr.computed_latitude || !tr.delivery_latitude) return;
+    if (!tr.computed_latitude || !tr.delivery_latitude) return;
     const status = tr.request_status;
     let origin = null as { lat: number; lng: number } | null;
     let dest   = null as { lat: number; lng: number } | null;
-    if (status === 'ALLOCATED' && vs) { origin = { lat: vs.current_latitude, lng: vs.current_longitude }; dest = { lat: tr.computed_latitude, lng: tr.computed_longitude }; }
-    else if (status === 'DISPATCHED') { origin = { lat: tr.computed_latitude, lng: tr.computed_longitude }; dest = { lat: tr.delivery_latitude!, lng: tr.delivery_longitude! }; }
+    
+    if (status === 'ALLOCATED' && vs?.current_latitude && vs?.current_longitude) { 
+      origin = { lat: vs.current_latitude, lng: vs.current_longitude }; 
+      dest = { lat: tr.computed_latitude, lng: tr.computed_longitude }; 
+    }
+    else if (status === 'DISPATCHED' || status === 'FULFILLED') { 
+      origin = (vs && vs.current_latitude && vs.current_longitude) 
+        ? { lat: vs.current_latitude, lng: vs.current_longitude } 
+        : { lat: tr.computed_latitude, lng: tr.computed_longitude };
+      dest = { lat: tr.delivery_latitude!, lng: tr.delivery_longitude! }; 
+    }
     if (origin && dest) getRouteBetweenPoints(origin, dest, window.google).then(r => setDirections(r));
   }, [isLoaded, activeBooking, layer]);
 
-  const handleAcceptJob = async (jobId: string) => {
-    if (!eligibleVehicle) return;
-    setAccepting(true);
-    setActionStatus(null);
-    const { error } = await supabase.rpc('rpc_claim_logistics_job', {
-      p_trade_request_id: jobId,
-      p_vehicle_state_id: eligibleVehicle.id,
-      p_proximity_distance_km: 0,
-    });
-    if (error) {
-      setActionStatus({ type: 'error', message: error.message });
-    } else {
-      setActionStatus({ type: 'success', message: 'Job accepted! You are now assigned to this delivery.' });
-      await fetchData();
-    }
-    setAccepting(false);
-    setSelectedId(null);
-  };
+  // Foreground Watch Position for Active Trip
+  useEffect(() => {
+    if (layer !== 'active' || !activeBooking || !activeBooking.vehicle_states?.id) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const now = Date.now();
+        if (now - lastLocationUpdate.current < 30000) return;
+        lastLocationUpdate.current = now;
+        
+        await supabase.from('vehicle_states').update({
+          current_latitude: pos.coords.latitude,
+          current_longitude: pos.coords.longitude,
+          location_updated_at: new Date().toISOString(),
+        }).eq('id', activeBooking.vehicle_states!.id);
+      },
+      (err) => console.warn('watchPosition error:', err),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [activeBooking, layer, supabase]);
 
   const handleUpdateLocation = async () => {
     if (!activeBooking?.vehicle_states?.id) return;
@@ -169,6 +194,47 @@ export default function CarrierTrackingPage() {
       () => { setActionStatus({ type: 'error', message: 'Could not get GPS location.' }); setUpdatingLocation(false); },
       { timeout: 10000 }
     );
+  };
+
+  const handleConfirmLocationAndClaim = async (vehicleId: string, locationData?: { latitude: number, longitude: number, address: string | null }) => {
+    if (!jobToAccept) return;
+    setActionStatus(null);
+    try {
+      if (locationData) {
+        const { error: vError } = await supabase.from('vehicle_states').update({
+          current_latitude: locationData.latitude,
+          current_longitude: locationData.longitude,
+          current_address: locationData.address,
+          location_updated_at: new Date().toISOString()
+        }).eq('id', vehicleId);
+        if (vError) throw new Error('Failed to update vehicle location.');
+      }
+
+      const vehicle = vehicles.find(v => v.id === vehicleId);
+      const finalLat = locationData?.latitude ?? vehicle?.current_latitude;
+      const finalLng = locationData?.longitude ?? vehicle?.current_longitude;
+      
+      let distance = 0;
+      if (finalLat && finalLng && jobToAccept.computed_latitude && jobToAccept.computed_longitude) {
+        distance = calculateHaversineDistance(finalLat, finalLng, jobToAccept.computed_latitude, jobToAccept.computed_longitude);
+      }
+
+      const { error: rpcError } = await supabase.rpc('rpc_claim_logistics_job', {
+        p_trade_request_id: jobToAccept.id,
+        p_vehicle_state_id: vehicleId,
+        p_proximity_distance_km: distance
+      });
+
+      if (rpcError) throw new Error(rpcError.message || 'Unable to claim this logistics job.');
+
+      setActionStatus({ type: 'success', message: 'Job accepted! You are now assigned to this delivery.' });
+      setLayer('active');
+      await fetchData();
+    } catch(err: any) {
+      setActionStatus({ type: 'error', message: err.message || 'An unexpected error occurred.' });
+    } finally {
+      setJobToAccept(null);
+    }
   };
 
   const selectedJob = selectedId ? jobs.find(j => j.id === selectedId) : null;
@@ -279,12 +345,13 @@ export default function CarrierTrackingPage() {
                       <p className="flex items-start gap-1"><MapPin className="w-3 h-3 shrink-0 mt-0.5 text-green-500" /> Pickup: {selectedJob.physical_address}</p>
                       {selectedJob.delivery_address && <p className="flex items-start gap-1"><MapPin className="w-3 h-3 shrink-0 mt-0.5 text-blue-500" /> Delivery: {selectedJob.delivery_address}</p>}
                     </div>
-                    {!eligibleVehicle && (
-                      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded p-1.5">No available vehicle. Check your fleet status.</p>
+                    {eligibleVehicles.length === 0 ? (
+                      <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded p-1.5">No eligible vehicle. Check your fleet status.</p>
+                    ) : (
+                      <Button className="w-full" onClick={() => setJobToAccept(selectedJob)}>
+                        Accept This Job
+                      </Button>
                     )}
-                    <Button className="w-full" onClick={() => handleAcceptJob(selectedJob.id)} disabled={!eligibleVehicle || accepting} isLoading={accepting}>
-                      {accepting ? 'Accepting…' : 'Accept This Job'}
-                    </Button>
                   </div>
                 </InfoWindow>
               )}
@@ -303,7 +370,7 @@ export default function CarrierTrackingPage() {
             })()}
           </GoogleMap>
 
-          {/* Layer A legend */}
+          {/* Legends */}
           {layer === 'preview' && (
             <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-xs shadow-md space-y-1">
               <p className="font-semibold mb-1 text-gray-700 dark:text-gray-200">Market Preview</p>
@@ -335,8 +402,17 @@ export default function CarrierTrackingPage() {
           <p><span className="text-gray-500 text-sm">Commodity:</span> <span className="font-medium">{activeBooking.trade_request.commodity_variety} — {activeBooking.trade_request.quantity_volume} kg/tons</span></p>
           <p><span className="text-gray-500 text-sm">Pickup:</span> <span className="font-medium">{activeBooking.trade_request.physical_address}</span></p>
           {activeBooking.trade_request.delivery_address && <p><span className="text-gray-500 text-sm">Delivery:</span> <span className="font-medium">{activeBooking.trade_request.delivery_address}</span></p>}
-          {activeBooking.trade_request.users && <p><span className="text-gray-500 text-sm">Seller:</span> <span className="font-medium">{activeBooking.trade_request.users.full_name} · {activeBooking.trade_request.users.phone_number}</span></p>}
+          {activeBooking.trade_request.users && <p><span className="text-gray-500 text-sm">Seller:</span> <span className="font-medium">{activeBooking.trade_request.users.full_name}</span></p>}
         </div>
+      )}
+
+      {jobToAccept && (
+        <CarrierLocationModal
+          isOpen={!!jobToAccept}
+          onClose={() => setJobToAccept(null)}
+          eligibleVehicles={eligibleVehicles}
+          onConfirm={handleConfirmLocationAndClaim}
+        />
       )}
     </PageContainer>
   );

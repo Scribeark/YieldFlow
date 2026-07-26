@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
@@ -25,6 +26,7 @@ interface Booking {
   carrier_pickup_confirmed_at: string | null;
   carrier_delivery_confirmed_at: string | null;
   buyer_delivery_confirmed_at: string | null;
+  vehicle_state_id: string | null;
   trade_requests?: {
     commodity_variety: string;
     quantity_volume: number;
@@ -47,6 +49,7 @@ interface Booking {
 export default function ActiveBookings() {
   const { profile } = useAuthStore();
   const supabase = createClient();
+  const router = useRouter();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,6 +75,7 @@ export default function ActiveBookings() {
   }, [profile, supabase]);
 
   const [updatingLocation, setUpdatingLocation] = useState(false);
+  const lastLocationUpdate = useRef<number>(0);
 
   const handleUpdateLocation = async (vehicleStateId: string) => {
     setUpdatingLocation(true);
@@ -93,8 +97,36 @@ export default function ActiveBookings() {
 
   useEffect(() => {
     fetchBookings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchBookings]);
+
+  // Foreground Watch Position for Active Trip
+  useEffect(() => {
+    if (!profile) return;
+    const activeBooking = bookings.find(b => b.status === 'active');
+    if (!activeBooking || !activeBooking.vehicle_state_id) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const now = Date.now();
+        // Throttle to 30 seconds
+        if (now - lastLocationUpdate.current < 30000) return;
+        
+        lastLocationUpdate.current = now;
+        
+        await supabase.from('vehicle_states').update({
+          current_latitude: pos.coords.latitude,
+          current_longitude: pos.coords.longitude,
+          location_updated_at: new Date().toISOString(),
+        }).eq('id', activeBooking.vehicle_state_id!);
+      },
+      (err) => console.warn('watchPosition error:', err),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+    };
+  }, [bookings, profile, supabase]);
 
   const handleReleaseJob = async (tradeRequestId: string) => {
     if (!window.confirm("Are you sure? This action will remove this item from active availability. The job will be returned to the pool.")) {
@@ -102,12 +134,13 @@ export default function ActiveBookings() {
     }
     
     try {
-      const { error } = await supabase.rpc('rpc_release_logistics_booking', { p_trade_request_id: tradeRequestId });
+      const { data, error } = await supabase.rpc('rpc_release_logistics_booking', { p_trade_request_id: tradeRequestId });
       if (error) {
         alert(error.message || 'Failed to release job.');
       } else {
-        await fetchBookings();
         alert('Job released successfully.');
+        router.refresh(); // force next cache invalidation
+        await fetchBookings();
       }
     } catch (err) {
       console.error(err);
@@ -148,126 +181,80 @@ export default function ActiveBookings() {
           <h2 className="text-xl font-bold">Current Jobs</h2>
           <Button variant="ghost" size="sm" onClick={fetchBookings} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
           </Button>
         </div>
-
+        
         {activeBookings.length === 0 ? (
-          <div className="p-6 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg text-center opacity-80">
-            You have no active logistics bookings. Go to Available Jobs to claim a load.
+          <div className="p-8 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg text-center opacity-70">
+            <Package className="mx-auto w-10 h-10 mb-3 opacity-30" />
+            <p>You have no active jobs.</p>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-6">
             {activeBookings.map(booking => {
-              const isAllocated = (toArray(booking.trade_requests)[0])?.request_status === 'ALLOCATED';
-              const isDispatched = (toArray(booking.trade_requests)[0])?.request_status === 'DISPATCHED';
-              const handoverStarted = booking.seller_pickup_confirmed_at !== null || booking.carrier_pickup_confirmed_at !== null;
-              const isReleasable = isAllocated && !handoverStarted;
+              const trade = booking.trade_requests;
+              if (!trade) return null;
+              const vehicleState = booking.vehicle_states;
+              
+              const isAllocated = trade.request_status === 'ALLOCATED';
+              const isDispatched = trade.request_status === 'DISPATCHED';
 
               return (
-                <div key={booking.id} className="p-6 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg flex flex-col md:flex-row justify-between items-start gap-6">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-start justify-between">
-                      <h3 className="font-bold text-xl text-[var(--agri-primary-light)]">
-                        {(toArray(booking.trade_requests)[0])?.commodity_variety || 'Unknown Commodity'}
-                      </h3>
-                      <div className="md:hidden">
-                        <span className="px-3 py-1 bg-[var(--agri-primary-dark)] text-white rounded text-xs font-semibold uppercase">
-                          {(toArray(booking.trade_requests)[0])?.request_status || 'ALLOCATED'}
-                        </span>
-                      </div>
+                <div key={booking.id} className="bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl overflow-hidden shadow-sm flex flex-col">
+                  {/* Header */}
+                  <div className="p-4 border-b border-[var(--border-color)] bg-black/5 dark:bg-white/5 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-lg">{trade.commodity_variety} <span className="text-sm font-normal text-gray-500">({trade.quantity_volume} kg)</span></h3>
+                      <p className="text-xs text-gray-500">Booking ID: {booking.id.split('-')[0]}</p>
                     </div>
-                    
-                    <p className="font-medium">{(toArray(booking.trade_requests)[0])?.quantity_volume || 'N/A'} units</p>
-                    <p className="text-sm opacity-80 flex items-center">
-                      <span className="mr-2">📍 Pickup:</span> 
-                      {(toArray(booking.trade_requests)[0])?.physical_address || 'N/A'}
-                    </p>
-                    <p className="text-sm opacity-80">Distance: {booking.proximity_distance_km ? booking.proximity_distance_km.toFixed(2) : 0} km</p>
-                    
-                    {isAllocated && !isDispatched && (
-                      <div className="mt-4 p-3 bg-purple-500/10 border border-purple-400/30 rounded flex flex-col gap-3 text-sm text-purple-700 dark:text-purple-400">
-                        <div className="flex items-center gap-2">
-                          <Truck className="w-4 h-4 shrink-0" />
-                          <span>Proceed to seller location. Both you and the seller must confirm pickup handover.</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {isDispatched && (
-                      <div className="mt-4 p-3 bg-indigo-500/10 border border-indigo-400/30 rounded flex flex-col gap-3 text-sm text-indigo-700 dark:text-indigo-400">
-                        <div className="flex items-center gap-2">
-                          <Truck className="w-4 h-4 shrink-0" />
-                          <span>Transport goods to buyer. Both you and the buyer must confirm delivery.</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="mt-4">
-                      <OngoingTradeTimeline
-                        requestStatus={(toArray(booking.trade_requests)[0])?.request_status || 'ALLOCATED'}
-                        sellerPickupConfirmedAt={booking.seller_pickup_confirmed_at}
-                        carrierPickupConfirmedAt={booking.carrier_pickup_confirmed_at}
-                        carrierDeliveryConfirmedAt={booking.carrier_delivery_confirmed_at}
-                        buyerDeliveryConfirmedAt={booking.buyer_delivery_confirmed_at}
-                        role="carrier"
-                        onConfirmCarrierPickup={() => handleCarrierPickupConfirm(booking.trade_request_id)}
-                        onConfirmCarrierDelivery={() => handleCarrierDeliveryConfirm(booking.trade_request_id)}
-                        pickupAddress={(toArray(booking.trade_requests)[0])?.physical_address}
-                        pickupLat={(toArray(booking.trade_requests)[0])?.computed_latitude}
-                        pickupLng={(toArray(booking.trade_requests)[0])?.computed_longitude}
-                        deliveryAddress={(toArray(booking.trade_requests)[0])?.delivery_address}
-                        deliveryLat={(toArray(booking.trade_requests)[0])?.delivery_latitude}
-                        deliveryLng={(toArray(booking.trade_requests)[0])?.delivery_longitude}
-                        carrierLat={booking.vehicle_states?.current_latitude}
-                        carrierLng={booking.vehicle_states?.current_longitude}
-                        locationUpdatedAt={booking.vehicle_states?.location_updated_at}
-                      />
-                    </div>
-                    {/* Update My Location button — only for active bookings with a vehicle */}
-                    {booking.vehicle_states?.id && (
-                      <div className="mt-3">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleUpdateLocation(booking.vehicle_states!.id)}
-                          disabled={updatingLocation}
-                          isLoading={updatingLocation}
-                          className="flex items-center gap-1.5 text-orange-600 border border-orange-200 hover:bg-orange-50"
-                        >
-                          <Navigation className="w-3.5 h-3.5" />
-                          Update My Location
-                        </Button>
-                      </div>
+                    {isAllocated && !booking.seller_pickup_confirmed_at && (
+                      <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50" onClick={() => handleReleaseJob(booking.trade_request_id)}>
+                        Release Job
+                      </Button>
                     )}
                   </div>
 
-                  <div className="md:text-right flex flex-col justify-between h-full min-w-[200px] border-t md:border-t-0 pt-4 md:pt-0">
-                    <div className="hidden md:block mb-4">
-                      <span className="inline-block px-3 py-1 bg-[var(--agri-primary-dark)] text-white rounded text-sm font-semibold uppercase">
-                        {(toArray(booking.trade_requests)[0])?.request_status || 'ALLOCATED'}
-                      </span>
-                      {booking.escrow_status && (
-                        <p className="text-xs mt-2 opacity-70">Escrow: {booking.escrow_status}</p>
-                      )}
-                    </div>
-                    
-                    <div className="mt-auto group relative inline-block md:text-right">
-                      <Button
-                        variant="danger"
-                        onClick={() => isReleasable && handleReleaseJob(booking.trade_request_id)}
-                        className={`px-4 py-2 border w-full md:w-auto ${isReleasable ? 'border-red-200 bg-transparent text-red-600 hover:bg-red-50' : 'border-red-200 bg-transparent text-red-600 opacity-50 cursor-not-allowed'}`}
-                        disabled={!isReleasable}
-                      >
-                        Release Job
-                      </Button>
-                      {!isReleasable && (
-                        <div className="absolute bottom-full right-0 mb-2 w-64 p-2 bg-black/90 text-white text-xs rounded opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 text-center">
-                          {handoverStarted && isAllocated 
-                            ? 'Handover is in progress. Job cannot be released.' 
-                            : 'This job is already in transit and cannot be released here.'}
-                        </div>
-                      )}
+                  {/* Body */}
+                  <div className="p-4 flex-1">
+                    <OngoingTradeTimeline
+                      tradeStatus={trade.request_status}
+                      booking={booking}
+                      isCarrier={true}
+                    />
+
+                    {/* Carrier Actions */}
+                    <div className="mt-8 border-t border-[var(--border-color)] pt-6">
+                      <h4 className="font-semibold text-sm mb-4">Carrier Actions</h4>
+                      
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <Button 
+                          onClick={() => handleUpdateLocation(booking.vehicle_state_id || vehicleState?.id || '')} 
+                          variant="outline" 
+                          className="flex-1"
+                          disabled={updatingLocation || (!booking.vehicle_state_id && !vehicleState?.id)}
+                        >
+                          <Navigation className={`w-4 h-4 mr-2 ${updatingLocation ? 'animate-bounce' : ''}`} />
+                          Update My Location
+                        </Button>
+
+                        {/* Handover states */}
+                        {isAllocated && booking.seller_pickup_confirmed_at && !booking.carrier_pickup_confirmed_at && (
+                          <Button onClick={() => handleCarrierPickupConfirm(booking.trade_request_id)} className="flex-1 bg-green-600 hover:bg-green-700">
+                            Confirm Received from Seller
+                          </Button>
+                        )}
+                        {isDispatched && !booking.carrier_delivery_confirmed_at && (
+                          <Button onClick={() => handleCarrierDeliveryConfirm(booking.trade_request_id)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                            Confirm Delivered to Buyer
+                          </Button>
+                        )}
+                      </div>
+                      
+                      <p className="text-xs text-center mt-3 text-gray-400">
+                        {vehicleState?.location_updated_at 
+                          ? `Location last updated: ${new Date(vehicleState.location_updated_at).toLocaleTimeString()}`
+                          : 'Location not updated yet'}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -277,41 +264,23 @@ export default function ActiveBookings() {
         )}
       </div>
 
-      {/* History section */}
+      {/* Completed section */}
       {completedBookings.length > 0 && (
-        <div className="space-y-4 pt-6 border-t border-[var(--border-color)]">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Package className="w-5 h-5 text-emerald-500" /> Delivery History
-          </h2>
+        <div className="space-y-4">
+          <h2 className="text-xl font-bold">Completed Jobs</h2>
           <div className="grid gap-4">
-            {completedBookings.map(booking => (
-              <div key={booking.id} className="p-5 bg-[var(--card-bg)] border-l-4 border-emerald-500 rounded-lg flex flex-col md:flex-row justify-between items-start gap-4">
-                <div className="space-y-1">
-                  <h3 className="font-bold text-lg">
-                    {(toArray(booking.trade_requests)[0])?.commodity_variety || 'Unknown Commodity'}
-                  </h3>
-                  <p className="text-sm opacity-80">
-                    {(toArray(booking.trade_requests)[0])?.quantity_volume || 'N/A'} units
-                  </p>
-                  <p className="text-sm opacity-80">
-                    Pickup: {(toArray(booking.trade_requests)[0])?.physical_address || 'N/A'}
-                  </p>
-                  <p className="text-xs opacity-60 mt-1">Vehicle used: {booking.carrier_name}</p>
-                </div>
-                <div className="md:text-right">
-                  <span className="inline-block px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded text-xs font-bold uppercase mb-3">
-                    COMPLETED
-                  </span>
-                  <div className="p-3 bg-emerald-500/10 border border-emerald-400/30 rounded text-xs text-emerald-600 dark:text-emerald-400 max-w-xs md:ml-auto">
-                    <div className="flex items-center gap-2 mb-1">
-                      <CheckCircle className="w-3 h-3 shrink-0" />
-                      <strong className="font-semibold">Logistics settlement pending</strong>
-                    </div>
-                    Delivery confirmed. Logistics payment will be processed to your account.
+            {completedBookings.map(booking => {
+              const trade = booking.trade_requests;
+              return (
+                <div key={booking.id} className="p-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg flex justify-between items-center opacity-70">
+                  <div>
+                    <h3 className="font-semibold">{trade?.commodity_variety}</h3>
+                    <p className="text-sm">Delivered to: {trade?.delivery_address}</p>
                   </div>
+                  <CheckCircle className="w-6 h-6 text-green-500" />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
