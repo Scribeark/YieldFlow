@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
+import { useMapsKey } from '@/components/providers/MapsProvider';
 import { createBuyerDemand } from '@/lib/api/buyer';
 
 const COMMODITIES = [
@@ -44,8 +45,10 @@ export default function NewDemandPage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const mapsApiKey = useMapsKey();
+
   const getApiKey = () => {
-    return process.env.NEXT_PUBLIC_MAPS_PLATFORM_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    return mapsApiKey;
   };
 
   const geocodeAddress = () => {

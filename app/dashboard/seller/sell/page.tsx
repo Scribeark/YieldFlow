@@ -14,6 +14,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { createTradeRequest } from '@/lib/api/seller';
 import { uploadHarvestPhoto } from '@/lib/supabase/storage';
+import { useMapsKey } from '@/components/providers/MapsProvider';
 
 const COMMODITIES = [
   'Maize', 'Rice', 'Cassava', 'Yam', 'Sorghum', 'Millet', 
@@ -76,8 +77,10 @@ export default function SellHarvestPage() {
     setFile(null);
   };
 
+  const mapsApiKey = useMapsKey();
+
   const getApiKey = () => {
-    return process.env.NEXT_PUBLIC_MAPS_PLATFORM_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+    return mapsApiKey;
   };
 
   const requestLocation = () => {
