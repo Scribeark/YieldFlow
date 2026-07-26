@@ -141,15 +141,22 @@ export default function CarrierTrackingPage() {
     let origin = null as { lat: number; lng: number } | null;
     let dest   = null as { lat: number; lng: number } | null;
     
-    if (status === 'ALLOCATED' && vs?.current_latitude && vs?.current_longitude) { 
-      origin = { lat: vs.current_latitude, lng: vs.current_longitude }; 
-      dest = { lat: tr.computed_latitude, lng: tr.computed_longitude }; 
-    }
-    else if (status === 'DISPATCHED' || status === 'FULFILLED') { 
-      origin = (vs && vs.current_latitude && vs.current_longitude) 
-        ? { lat: vs.current_latitude, lng: vs.current_longitude } 
-        : { lat: tr.computed_latitude, lng: tr.computed_longitude };
-      dest = { lat: tr.delivery_latitude!, lng: tr.delivery_longitude! }; 
+    if (status === 'ALLOCATED') {
+      if (vs?.current_latitude && vs?.current_longitude) {
+        origin = { lat: vs.current_latitude, lng: vs.current_longitude };
+        dest = { lat: tr.computed_latitude, lng: tr.computed_longitude };
+      } else {
+        origin = { lat: tr.computed_latitude, lng: tr.computed_longitude };
+        dest = { lat: tr.delivery_latitude!, lng: tr.delivery_longitude! };
+      }
+    } else if (status === 'DISPATCHED' || status === 'FULFILLED') { 
+      if (vs?.current_latitude && vs?.current_longitude) {
+        origin = { lat: vs.current_latitude, lng: vs.current_longitude };
+        dest = { lat: tr.delivery_latitude!, lng: tr.delivery_longitude! };
+      } else {
+        origin = { lat: tr.computed_latitude, lng: tr.computed_longitude };
+        dest = { lat: tr.delivery_latitude!, lng: tr.delivery_longitude! };
+      }
     }
     if (origin && dest) getRouteBetweenPoints(origin, dest, window.google).then(r => setDirections(r));
   }, [isLoaded, activeBooking, layer]);
@@ -399,6 +406,12 @@ export default function CarrierTrackingPage() {
       {layer === 'active' && activeBooking?.trade_request && (
         <div className="mt-4 p-4 rounded-xl border bg-[var(--card-bg)] space-y-2">
           <h3 className="font-bold flex items-center gap-2"><Truck className="w-5 h-5 text-indigo-500" /> Active Trip Details</h3>
+          {!activeBooking.vehicle_states?.current_latitude && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-700 p-3 rounded-lg text-sm flex items-start gap-2 my-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <p>Your live location is currently unavailable. Please click <strong>Update My Location</strong> so the buyer and seller can track your progress.</p>
+            </div>
+          )}
           <p><span className="text-gray-500 text-sm">Commodity:</span> <span className="font-medium">{activeBooking.trade_request.commodity_variety} — {activeBooking.trade_request.quantity_volume} kg/tons</span></p>
           <p><span className="text-gray-500 text-sm">Pickup:</span> <span className="font-medium">{activeBooking.trade_request.physical_address}</span></p>
           {activeBooking.trade_request.delivery_address && <p><span className="text-gray-500 text-sm">Delivery:</span> <span className="font-medium">{activeBooking.trade_request.delivery_address}</span></p>}

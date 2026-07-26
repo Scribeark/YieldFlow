@@ -92,7 +92,8 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         {profile.declared_profession === ROLES.CARRIER ? (
           <>
             <Link href="/dashboard/carrier" className="hover:opacity-80 transition block py-2 md:py-0">Dashboard</Link>
-            <Link href="/dashboard/carrier/fleet" className="hover:opacity-80 transition block py-2 md:py-0">Fleet / Vehicles</Link>
+            <Link href="/dashboard/carrier/fleet" className="hover:opacity-80 transition block py-2 md:py-0">Fleet</Link>
+            <Link href="/dashboard/carrier/tracking" className="hover:opacity-80 transition block py-2 md:py-0">Logistics Map</Link>
             <Link href="/dashboard/carrier/jobs" className="hover:opacity-80 transition block py-2 md:py-0">Available Jobs</Link>
             <Link href="/dashboard/carrier/active-bookings" className="hover:opacity-80 transition block py-2 md:py-0">Active Bookings</Link>
           </>

@@ -284,12 +284,33 @@ export default function ActiveBookings() {
             {completedBookings.map(booking => {
               const trade = booking.trade_requests;
               return (
-                <div key={booking.id} className="p-4 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-lg flex justify-between items-center opacity-70">
-                  <div>
-                    <h3 className="font-semibold">{trade?.commodity_variety}</h3>
-                    <p className="text-sm">Delivered to: {trade?.delivery_address}</p>
+                <div key={booking.id} className="p-5 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 opacity-80 hover:opacity-100 transition-opacity">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-3">
+                      <h3 className="font-bold text-lg">{trade?.commodity_variety}</h3>
+                      <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full flex items-center">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Fulfilled
+                      </span>
+                    </div>
+                    
+                    <p className="text-sm text-gray-600 flex items-start gap-1.5">
+                      <span className="mt-1 shrink-0 w-2 h-2 rounded-full bg-green-500 inline-block" />
+                      Pickup: {trade?.physical_address}
+                    </p>
+                    <p className="text-sm text-gray-600 flex items-start gap-1.5">
+                      <span className="mt-1 shrink-0 w-2 h-2 rounded-full bg-blue-500 inline-block" />
+                      Delivery: {trade?.delivery_address}
+                    </p>
+                    
+                    <div className="pt-2 text-xs text-gray-500">
+                      Completed: {booking.buyer_delivery_confirmed_at ? new Date(booking.buyer_delivery_confirmed_at).toLocaleString() : 'Recently'}
+                    </div>
                   </div>
-                  <CheckCircle className="w-6 h-6 text-green-500" />
+                  <div className="shrink-0 text-sm text-gray-500 bg-gray-50 dark:bg-white/5 p-3 rounded-lg border border-gray-100 dark:border-white/10 w-full sm:w-auto">
+                    <p><strong>Carrier:</strong> {booking.carrier_name}</p>
+                    {trade?.quantity_volume && <p><strong>Volume:</strong> {trade.quantity_volume} kg/tons</p>}
+                  </div>
                 </div>
               );
             })}

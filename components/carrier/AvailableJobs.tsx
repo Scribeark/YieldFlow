@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/Button';
-import { RefreshCw, Truck, AlertTriangle } from 'lucide-react';
+import { MapPin, RefreshCw, Truck, AlertTriangle } from 'lucide-react';
 import CarrierLocationModal from '../shared/CarrierLocationModal';
 
 function calculateHaversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -325,17 +325,36 @@ export default function AvailableJobs() {
 
                     {/* Action */}
                     <div className="flex flex-col items-start md:items-end gap-2 shrink-0 justify-center">
-                      <Button
-                        onClick={() => {
-                          setError(null);
-                          setSelectedJob(job);
-                        }}
-                        disabled={!canAccept || processingId === job.id}
-                        isLoading={processingId === job.id}
-                        className={!canAccept ? 'opacity-50 cursor-not-allowed' : ''}
-                      >
-                        Accept Load
-                      </Button>
+                      {isPrimaryLocationFresh ? (
+                        <Button
+                          onClick={() => {
+                            setError(null);
+                            setSelectedJob(job);
+                          }}
+                          disabled={!canAccept || processingId === job.id}
+                          isLoading={processingId === job.id}
+                          className={!canAccept ? 'opacity-50 cursor-not-allowed' : ''}
+                        >
+                          Accept Load
+                        </Button>
+                      ) : (
+                        <div className="flex flex-col items-end gap-1">
+                          <p className="text-xs text-amber-600 max-w-[150px] text-right">
+                            Update location to calculate distance and accept jobs.
+                          </p>
+                          <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={() => {
+                              setError(null);
+                              setSelectedJob(job);
+                            }}
+                          >
+                            <MapPin className="w-4 h-4 mr-2" />
+                            Update Location
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
