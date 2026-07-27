@@ -23,6 +23,7 @@ export interface Database {
           verification_status: string
           business_latitude: number | null
           business_longitude: number | null
+          app_role: string | null
           created_at: string
         }
         Insert: {
@@ -38,6 +39,7 @@ export interface Database {
           verification_status?: string
           business_latitude?: number | null
           business_longitude?: number | null
+          app_role?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['users']['Insert']>

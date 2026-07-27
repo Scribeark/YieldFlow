@@ -37,7 +37,10 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     } else if (profile) {
       const correctDashboard = ROLE_ROUTES[profile.declared_profession];
       
-      if (pathname.startsWith('/dashboard/') && !pathname.startsWith(correctDashboard)) {
+      const isAdminRoute = pathname.startsWith('/dashboard/dev/') || pathname.startsWith('/dashboard/admin/');
+      const isAuthorizedAdmin = profile.app_role === 'admin' && isAdminRoute;
+
+      if (pathname.startsWith('/dashboard/') && !pathname.startsWith(correctDashboard) && !isAuthorizedAdmin) {
         router.push('/unauthorized');
       } else if (pathname === '/' || pathname === '/login' || pathname === '/signup') {
         router.push(correctDashboard);
@@ -99,10 +102,11 @@ export default function NavigationShell({ children }: { children: React.ReactNod
           </>
         ) : null}
 
-        {/* DEV ONLY LINK FOR TESTING */}
-        <Link href="/dashboard/dev/iot-simulator" className="text-yellow-300 hover:text-yellow-100 font-bold transition block py-2 md:py-0 md:ml-4 md:border-l md:pl-4 border-white/20">
-          ⚙️ IoT Simulator
-        </Link>
+        {profile.app_role === 'admin' && (
+          <Link href="/dashboard/dev/iot-simulator" className="text-yellow-300 hover:text-yellow-100 font-bold transition block py-2 md:py-0 md:ml-4 md:border-l md:pl-4 border-white/20">
+            ⚙️ IoT Simulator
+          </Link>
+        )}
       </>
     );
   };
