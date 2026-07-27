@@ -98,6 +98,11 @@ export default function NavigationShell({ children }: { children: React.ReactNod
             <Link href="/dashboard/carrier/active-bookings" className="hover:opacity-80 transition block py-2 md:py-0">Active Bookings</Link>
           </>
         ) : null}
+
+        {/* DEV ONLY LINK FOR TESTING */}
+        <Link href="/dashboard/dev/iot-simulator" className="text-yellow-300 hover:text-yellow-100 font-bold transition block py-2 md:py-0 md:ml-4 md:border-l md:pl-4 border-white/20">
+          ⚙️ IoT Simulator
+        </Link>
       </>
     );
   };
