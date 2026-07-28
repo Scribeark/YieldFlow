@@ -193,7 +193,7 @@ export default function SellerDeviceReadingsPage() {
                       <Cpu size={16} className="mr-2" /> Connect Hardware
                     </Button>
                   ) : (
-                    <Button variant="outline" onClick={() => loadReadings(selectedFarm.iot_devices[0].id)}>
+                    <Button variant="secondary" onClick={() => loadReadings(selectedFarm.iot_devices[0].id)}>
                       <RefreshCw size={16} className="mr-2" /> Refresh Data
                     </Button>
                   )}

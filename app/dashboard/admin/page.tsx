@@ -25,21 +25,21 @@ export default function AdminDashboardPage() {
           <Users size={32} className="text-blue-400 mb-4" />
           <h2 className="text-xl font-bold mb-2">User Management</h2>
           <p className="opacity-70 text-sm mb-4">View platform users, verify roles, and manage administrator access.</p>
-          <Button variant="outline" className="w-full">Manage Users</Button>
+          <Button variant="secondary" className="w-full">Manage Users</Button>
         </Card>
 
         <Card className="hover:border-white/30 transition-all cursor-pointer" onClick={() => router.push('/dashboard/dev/iot-simulator')}>
           <Activity size={32} className="text-green-400 mb-4" />
           <h2 className="text-xl font-bold mb-2">IoT Simulator</h2>
           <p className="opacity-70 text-sm mb-4">Generate test farm data and telemetry for system validation.</p>
-          <Button variant="outline" className="w-full">Open Simulator</Button>
+          <Button variant="secondary" className="w-full">Open Simulator</Button>
         </Card>
 
         <Card className="opacity-50">
           <Settings size={32} className="text-gray-400 mb-4" />
           <h2 className="text-xl font-bold mb-2">Platform Settings</h2>
           <p className="opacity-70 text-sm mb-4">Configure global variables and readiness engine thresholds.</p>
-          <Button variant="outline" className="w-full" disabled>Coming Soon</Button>
+          <Button variant="secondary" className="w-full" disabled>Coming Soon</Button>
         </Card>
       </div>
     </PageContainer>

@@ -92,7 +92,10 @@ export async function bootstrapFirstAdmin(data: any) {
     phone_number: phoneNumber,
     declared_profession: 'Enterprise Buyer', // Default base role
     app_role: 'admin',
-    verification_status: 'approved'
+    verification_status: 'approved',
+    age: 30,
+    gender: 'Male',
+    macro_region: 'North'
   });
 
   if (dbError) {
