@@ -139,7 +139,7 @@ export async function adminSignup(data: any) {
     app_role: 'admin',
     verification_status: 'approved',
     age: 30, // Safe default
-    gender: 'Other', // Safe default
+    gender: 'Male', // Valid default satisfying users_gender_check
     macro_region: 'Central' // Safe default
   });
 

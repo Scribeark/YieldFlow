@@ -199,7 +199,6 @@ export default function SignupPage() {
                   <Select required name="gender" value={formData.gender} onChange={handleInputChange}>
                     <option value="Male">Male</option>
                     <option value="Female">Female</option>
-                    <option value="Other">Other</option>
                   </Select>
                 </div>
               </div>
