@@ -17,7 +17,7 @@ import { Store, Layers, Loader2, CheckCircle, ArrowRight, MapPin, Info } from 'l
 
 type ListingMode = 'standard' | 'bulk';
 
-const UNITS = ['kg', 'tons', 'bags', 'baskets', 'crates', 'litres'];
+const UNITS = ['kg', 'tons', 'bags', 'baskets', 'crates', 'litres', 'units'];
 
 const COMMODITY_OPTIONS = [
   'Maize', 'Rice', 'Cassava', 'Yam', 'Sorghum', 'Millet', 'Groundnut',
@@ -26,7 +26,6 @@ const COMMODITY_OPTIONS = [
 
 export default function SellerSellPage() {
   const { user, profile } = useAuthStore();
-
   const supabase = createClient();
 
   const [mode, setMode] = useState<ListingMode>('standard');
@@ -39,15 +38,18 @@ export default function SellerSellPage() {
 
   // ── Standard Sale fields ──────────────────────────────────────────────────
   const [stdFarmId, setStdFarmId] = useState('');
-  const [stdCommodity, setStdCommodity] = useState('Maize');
+  const [stdCommoditySelect, setStdCommoditySelect] = useState('Maize');
+  const [stdCommodityCustom, setStdCommodityCustom] = useState('');
   const [stdQuantity, setStdQuantity] = useState('');
+  const [stdUnit, setStdUnit] = useState('kg');
   const [stdAddress, setStdAddress] = useState('');
   const [stdLat, setStdLat] = useState(8.1333);
   const [stdLng, setStdLng] = useState(4.2667);
 
   // ── Bulk Bidding fields ───────────────────────────────────────────────────
   const [bulkFarmId, setBulkFarmId] = useState('');
-  const [bulkCommodity, setBulkCommodity] = useState('Maize');
+  const [bulkCommoditySelect, setBulkCommoditySelect] = useState('Maize');
+  const [bulkCommodityCustom, setBulkCommodityCustom] = useState('');
   const [bulkQuantity, setBulkQuantity] = useState('');
   const [bulkUnit, setBulkUnit] = useState('kg');
   const [bulkMinPrice, setBulkMinPrice] = useState('');
@@ -71,11 +73,18 @@ export default function SellerSellPage() {
     setLoading(false);
   };
 
+  const getCommodityValue = (cropType: string) => {
+    if (COMMODITY_OPTIONS.includes(cropType)) return cropType;
+    return 'Other';
+  };
+
   const selectFarmForStandard = (fId: string, source = farms) => {
     setStdFarmId(fId);
     const farm = source.find((f) => f.id === fId);
     if (farm) {
-      setStdCommodity(farm.crop_type || 'Maize');
+      const crop = farm.crop_type || 'Maize';
+      setStdCommoditySelect(getCommodityValue(crop));
+      if (getCommodityValue(crop) === 'Other') setStdCommodityCustom(crop);
       setStdAddress(farm.physical_address || '');
       setStdLat(farm.latitude || 8.1333);
       setStdLng(farm.longitude || 4.2667);
@@ -86,7 +95,9 @@ export default function SellerSellPage() {
     setBulkFarmId(fId);
     const farm = source.find((f) => f.id === fId);
     if (farm) {
-      setBulkCommodity(farm.crop_type || 'Maize');
+      const crop = farm.crop_type || 'Maize';
+      setBulkCommoditySelect(getCommodityValue(crop));
+      if (getCommodityValue(crop) === 'Other') setBulkCommodityCustom(crop);
       setBulkAddress(farm.physical_address || '');
       setBulkLat(farm.latitude || 8.1333);
       setBulkLng(farm.longitude || 4.2667);
@@ -97,13 +108,17 @@ export default function SellerSellPage() {
     e.preventDefault();
     setError(''); setSuccess('');
     if (!profile) { setError('Profile not loaded.'); return; }
+    
+    const finalCommodity = stdCommoditySelect === 'Other' ? stdCommodityCustom.trim() : stdCommoditySelect;
+    if (!finalCommodity) { setError('Commodity type is required.'); return; }
     if (!stdAddress.trim()) { setError('Pickup address is required.'); return; }
 
     setSubmitting(true);
     const { data, error: apiError } = await createTradeRequest(supabase, {
       user_id: profile.id,
-      commodity_variety: stdCommodity,
+      commodity_variety: finalCommodity,
       quantity_volume: parseInt(stdQuantity),
+      quantity_unit: stdUnit,
       physical_address: stdAddress,
       computed_latitude: stdLat,
       computed_longitude: stdLng,
@@ -122,13 +137,37 @@ export default function SellerSellPage() {
   const handleBulkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setSuccess('');
-    if (!bulkFarmId) { setError('Please select a farm.'); return; }
+    if (!profile) { setError('Profile not loaded.'); return; }
+    
+    const finalCommodity = bulkCommoditySelect === 'Other' ? bulkCommodityCustom.trim() : bulkCommoditySelect;
+    if (!finalCommodity) { setError('Commodity type is required.'); return; }
     if (!bulkAddress.trim()) { setError('Pickup address is required.'); return; }
 
     setSubmitting(true);
-    const { data, error: apiError } = await createManualBiddingSale(supabase, {
-      farmId: bulkFarmId,
-      cropType: bulkCommodity,
+    let finalFarmId = bulkFarmId;
+
+    // If no farm was selected, we create one inline to satisfy the schema/RPC
+    if (!finalFarmId) {
+      const { data: newFarm, error: farmError } = await (supabase as any).from('farms').insert({
+        user_id: profile.id,
+        name: `Farm - ${bulkAddress.split(',')[0]}`,
+        crop_type: finalCommodity,
+        physical_address: bulkAddress,
+        latitude: bulkLat,
+        longitude: bulkLng
+      }).select('id').single();
+
+      if (farmError) {
+        setError('Failed to create internal farm record: ' + farmError.message);
+        setSubmitting(false);
+        return;
+      }
+      finalFarmId = newFarm.id;
+    }
+
+    const { error: apiError } = await createManualBiddingSale(supabase, {
+      farmId: finalFarmId,
+      cropType: finalCommodity,
       totalQuantity: parseInt(bulkQuantity),
       quantityUnit: bulkUnit,
       minPricePerUnit: parseFloat(bulkMinPrice),
@@ -145,6 +184,7 @@ export default function SellerSellPage() {
       setSuccessId('');
       setBulkQuantity('');
       setBulkMinPrice('');
+      if (!bulkFarmId) loadFarms(); // reload if we created one inline
     }
   };
 
@@ -215,7 +255,7 @@ export default function SellerSellPage() {
                   <div className="space-y-2">
                     <Label>Source Farm (optional — auto-fills location)</Label>
                     <select className={selectStyle} value={stdFarmId} onChange={(e) => selectFarmForStandard(e.target.value)}>
-                      <option value="" className="bg-[#1a1f2e]">— Enter address manually —</option>
+                      <option value="" className="bg-[#1a1f2e]">— Enter location manually —</option>
                       {farms.map((f) => (
                         <option key={f.id} value={f.id} className="bg-[#1a1f2e]">{f.name} ({f.crop_type})</option>
                       ))}
@@ -226,19 +266,26 @@ export default function SellerSellPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label>Commodity / Crop Type</Label>
-                    <select className={selectStyle} value={stdCommodity} onChange={(e) => setStdCommodity(e.target.value)}>
+                    <select className={selectStyle} value={stdCommoditySelect} onChange={(e) => setStdCommoditySelect(e.target.value)}>
                       {COMMODITY_OPTIONS.map((c) => <option key={c} value={c} className="bg-[#1a1f2e]">{c}</option>)}
                     </select>
+                    {stdCommoditySelect === 'Other' && (
+                      <Input required className="mt-2" value={stdCommodityCustom} onChange={(e) => setStdCommodityCustom(e.target.value)} placeholder="Enter custom commodity" />
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Quantity (units / volume)</Label>
-                    <Input required type="number" min="1" value={stdQuantity} onChange={(e) => setStdQuantity(e.target.value)} placeholder="e.g. 500" />
-                    <p className="text-xs opacity-50">Standard listings do not carry a unit — buyers confirm the total volume.</p>
+                    <Label>Quantity</Label>
+                    <div className="flex space-x-2">
+                      <Input required type="number" min="1" className="flex-1" value={stdQuantity} onChange={(e) => setStdQuantity(e.target.value)} placeholder="e.g. 500" />
+                      <select className="w-28 bg-black/20 border border-white/20 rounded-md p-2 text-white outline-none focus:border-[var(--agri-primary)] transition-colors" value={stdUnit} onChange={(e) => setStdUnit(e.target.value)}>
+                        {UNITS.map((u) => <option key={u} value={u} className="bg-[#1a1f2e]">{u}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-2 border-t border-white/10 pt-5">
-                  <Label className="flex items-center"><MapPin size={14} className="mr-1" /> Pickup Address</Label>
+                  <Label className="flex items-center"><MapPin size={14} className="mr-1" /> Pickup / Farm Location</Label>
                   <Input required value={stdAddress} onChange={(e) => setStdAddress(e.target.value)} placeholder="e.g. 12 Farm Road, Ogbomosho" />
                 </div>
 
@@ -257,67 +304,65 @@ export default function SellerSellPage() {
               <h2 className="text-xl font-bold mb-6 flex items-center border-b border-white/10 pb-4">
                 <Layers className="mr-2 text-[var(--agri-primary)]" /> Bulk Bidding Sale Details
               </h2>
-
-              {farms.length === 0 ? (
-                <Alert variant="info">
-                  You need a farm registered before creating a bulk bidding sale.
-                  <Link href="/dashboard/seller/device-readings">
-                    <Button size="sm" className="mt-3">Register a Farm</Button>
-                  </Link>
-                </Alert>
-              ) : (
-                <form onSubmit={handleBulkSubmit} className="space-y-5">
+              <form onSubmit={handleBulkSubmit} className="space-y-5">
+                {farms.length > 0 && (
                   <div className="space-y-2">
-                    <Label>Source Farm</Label>
-                    <select required className={selectStyle} value={bulkFarmId} onChange={(e) => selectFarmForBulk(e.target.value)}>
+                    <Label>Source Farm (optional — auto-fills location)</Label>
+                    <select className={selectStyle} value={bulkFarmId} onChange={(e) => selectFarmForBulk(e.target.value)}>
+                      <option value="" className="bg-[#1a1f2e]">— Enter location manually —</option>
                       {farms.map((f) => (
                         <option key={f.id} value={f.id} className="bg-[#1a1f2e]">{f.name} ({f.crop_type})</option>
                       ))}
                     </select>
                   </div>
+                )}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label>Commodity / Crop Type</Label>
-                      <Input required value={bulkCommodity} onChange={(e) => setBulkCommodity(e.target.value)} placeholder="e.g. Maize" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Total Available Quantity</Label>
-                      <div className="flex space-x-2">
-                        <Input required type="number" min="1" className="flex-1" value={bulkQuantity} onChange={(e) => setBulkQuantity(e.target.value)} placeholder="e.g. 500" />
-                        <select className="w-28 bg-black/20 border border-white/20 rounded-md p-2 text-white outline-none focus:border-[var(--agri-primary)] transition-colors" value={bulkUnit} onChange={(e) => setBulkUnit(e.target.value)}>
-                          {UNITS.map((u) => <option key={u} value={u} className="bg-[#1a1f2e]">{u}</option>)}
-                        </select>
-                      </div>
-                      <p className="text-xs opacity-50 flex items-center"><Info size={11} className="mr-1" />All buyers will bid in <strong className="mx-1">{bulkUnit}</strong>. This unit cannot be changed after publishing.</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Minimum Price per {bulkUnit} (₦)</Label>
-                      <Input required type="number" min="1" step="0.01" value={bulkMinPrice} onChange={(e) => setBulkMinPrice(e.target.value)} placeholder="e.g. 2500" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center"><MapPin size={14} className="mr-1" /> Pickup Address</Label>
-                      <Input required value={bulkAddress} onChange={(e) => setBulkAddress(e.target.value)} placeholder="e.g. 12 Farm Road, Ogbomosho" />
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label>Commodity / Crop Type</Label>
+                    <select className={selectStyle} value={bulkCommoditySelect} onChange={(e) => setBulkCommoditySelect(e.target.value)}>
+                      {COMMODITY_OPTIONS.map((c) => <option key={c} value={c} className="bg-[#1a1f2e]">{c}</option>)}
+                    </select>
+                    {bulkCommoditySelect === 'Other' && (
+                      <Input required className="mt-2" value={bulkCommodityCustom} onChange={(e) => setBulkCommodityCustom(e.target.value)} placeholder="Enter custom commodity" />
+                    )}
                   </div>
+                  <div className="space-y-2">
+                    <Label>Total Available Quantity</Label>
+                    <div className="flex space-x-2">
+                      <Input required type="number" min="1" className="flex-1" value={bulkQuantity} onChange={(e) => setBulkQuantity(e.target.value)} placeholder="e.g. 500" />
+                      <select className="w-28 bg-black/20 border border-white/20 rounded-md p-2 text-white outline-none focus:border-[var(--agri-primary)] transition-colors" value={bulkUnit} onChange={(e) => setBulkUnit(e.target.value)}>
+                        {UNITS.map((u) => <option key={u} value={u} className="bg-[#1a1f2e]">{u}</option>)}
+                      </select>
+                    </div>
+                    <p className="text-xs opacity-50 flex items-center"><Info size={11} className="mr-1" />All buyers will bid in <strong className="mx-1">{bulkUnit}</strong>.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Minimum Price per {bulkUnit} (₦)</Label>
+                    <Input required type="number" min="1" step="0.01" value={bulkMinPrice} onChange={(e) => setBulkMinPrice(e.target.value)} placeholder="e.g. 2500" />
+                  </div>
+                </div>
 
-                  <div className="bg-black/20 p-4 rounded-lg text-sm opacity-80 border border-white/10">
-                    <strong>How bulk bidding works:</strong>
-                    <ol className="list-decimal list-inside mt-2 space-y-1">
-                      <li>Buyers bid for portions of your {bulkQuantity || '—'} {bulkUnit} at or above ₦{bulkMinPrice || '—'}/{bulkUnit}.</li>
-                      <li>You review bids in Bid Management and accept or reject each one.</li>
-                      <li>When ready, confirm the harvest and convert accepted bids into trade requests.</li>
-                      <li>Each accepted buyer proceeds through the standard evidence → logistics flow.</li>
-                    </ol>
-                  </div>
+                <div className="space-y-2 border-t border-white/10 pt-5">
+                  <Label className="flex items-center"><MapPin size={14} className="mr-1" /> Pickup / Farm Location</Label>
+                  <Input required value={bulkAddress} onChange={(e) => setBulkAddress(e.target.value)} placeholder="e.g. 12 Farm Road, Ogbomosho" />
+                </div>
 
-                  <div className="flex justify-end pt-2">
-                    <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full md:w-auto">
-                      {submitting ? <><Loader2 className="animate-spin mr-2" size={18} />Publishing...</> : <>Publish Bulk Bidding Opportunity <ArrowRight size={16} className="ml-2" /></>}
-                    </Button>
-                  </div>
-                </form>
-              )}
+                <div className="bg-black/20 p-4 rounded-lg text-sm opacity-80 border border-white/10">
+                  <strong>How bulk bidding works:</strong>
+                  <ol className="list-decimal list-inside mt-2 space-y-1">
+                    <li>Buyers bid for portions of your {bulkQuantity || '—'} {bulkUnit} at or above ₦{bulkMinPrice || '—'}/{bulkUnit}.</li>
+                    <li>You review bids in Bid Management and accept or reject each one.</li>
+                    <li>When ready, confirm the harvest and convert accepted bids into trade requests.</li>
+                  </ol>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full md:w-auto">
+                    {submitting ? <><Loader2 className="animate-spin mr-2" size={18} />Publishing...</> : <>Publish Bulk Bidding Opportunity <ArrowRight size={16} className="ml-2" /></>}
+                  </Button>
+                </div>
+              </form>
             </Card>
           )}
         </div>

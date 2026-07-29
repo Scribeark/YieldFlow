@@ -61,8 +61,8 @@ export function HarvestBidModal({ isOpen, onClose, onSuccess, opportunity }: Har
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-md">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-2">Place Bid</h2>
         <p className="text-sm opacity-80 mb-6 border-b border-white/10 pb-4">
           Bidding on {opportunity.farms?.crop_type} from {opportunity.bidding_origin === 'IOT' ? 'IoT Prediction' : 'Manual Listing'}

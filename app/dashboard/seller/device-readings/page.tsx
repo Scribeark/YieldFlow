@@ -441,8 +441,8 @@ export default function SellerDeviceReadingsPage() {
 
       {/* CREATE FARM MODAL */}
       {showCreateFarm && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Register New Farm</h2>
             <form onSubmit={handleCreateFarm} className="space-y-4">
               <div>
@@ -476,8 +476,8 @@ export default function SellerDeviceReadingsPage() {
 
       {/* REGISTER DEVICE MODAL */}
       {showRegisterDevice && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Connect Hardware</h2>
             <p className="text-sm opacity-80 mb-4">Register an IoT gateway to {selectedFarm?.name}</p>
             <form onSubmit={handleRegisterDevice} className="space-y-4">
@@ -500,8 +500,8 @@ export default function SellerDeviceReadingsPage() {
 
       {/* CONFIRM HARVEST MODAL */}
       {showConfirmHarvest && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
+          <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-2">Confirm Harvest Ready</h2>
             <p className="text-sm opacity-80 mb-4">Set the final harvest quantity and pickup details. Buyers with accepted bids can then be converted to trade requests.</p>
             <form onSubmit={async (e) => {

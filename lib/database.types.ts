@@ -52,6 +52,7 @@ export interface Database {
           buyer_id: string | null
           commodity_variety: string
           quantity_volume: number
+          quantity_unit: string | null
           physical_address: string
           computed_latitude: number
           computed_longitude: number
@@ -82,6 +83,7 @@ export interface Database {
           buyer_id?: string | null
           commodity_variety: string
           quantity_volume: number
+          quantity_unit?: string
           physical_address: string
           computed_latitude: number
           computed_longitude: number
