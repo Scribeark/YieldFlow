@@ -107,6 +107,51 @@ export async function bootstrapFirstAdmin(data: any) {
   return { success: true };
 }
 
+export async function adminSignup(data: any) {
+  const { email, password, fullName, setupCode } = data;
+
+  if (!process.env.ADMIN_SETUP_CODE) {
+    return { error: 'Server configuration error: ADMIN_SETUP_CODE not set.' };
+  }
+  if (setupCode !== process.env.ADMIN_SETUP_CODE) {
+    return { error: 'Invalid admin invite key.' };
+  }
+
+  const supabaseAdmin = getAdminSupabase();
+
+  // Create the user in Auth
+  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true
+  });
+
+  if (authError || !authData.user) {
+    return { error: authError?.message || 'Failed to create auth user.' };
+  }
+
+  // Insert into public.users with app_role = 'admin'
+  const { error: dbError } = await supabaseAdmin.from('users').insert({
+    auth_uid: authData.user.id,
+    full_name: fullName,
+    phone_number: '0000000000', // Safe default
+    declared_profession: 'Enterprise Buyer', // Safe placeholder
+    app_role: 'admin',
+    verification_status: 'approved',
+    age: 30, // Safe default
+    gender: 'Other', // Safe default
+    macro_region: 'Central' // Safe default
+  });
+
+  if (dbError) {
+    // Attempt rollback of auth user
+    await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+    return { error: `Profile creation failed: ${dbError.message}` };
+  }
+
+  return { success: true };
+}
+
 export async function checkHasAdmin() {
   const supabaseAdmin = getAdminSupabase();
   const { data, error } = await supabaseAdmin
