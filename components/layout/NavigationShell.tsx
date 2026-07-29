@@ -73,13 +73,14 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     return (
       <>
         {profile.declared_profession === ROLES.FARMER || profile.declared_profession === ROLES.TRADER ? (
-          <>
+        <>
             <Link href="/dashboard/seller" className="hover:opacity-80 transition block py-2 md:py-0">Dashboard</Link>
             <Link href="/dashboard/seller/sell" className="hover:opacity-80 transition block py-2 md:py-0">Sell</Link>
             <Link href="/dashboard/seller/requests" className="hover:opacity-80 transition block py-2 md:py-0">My Requests</Link>
+            <Link href="/dashboard/seller/bids" className="hover:opacity-80 transition block py-2 md:py-0">Bid Management</Link>
             <Link href="/dashboard/seller/buyer-demands" className="hover:opacity-80 transition block py-2 md:py-0">Buyer Demands</Link>
             <Link href="/dashboard/seller/buyers-map" className="hover:opacity-80 transition block py-2 md:py-0">Buyers Map</Link>
-            <Link href="/dashboard/seller/device-readings" className="hover:opacity-80 transition block py-2 md:py-0">Device Readings</Link>
+            <Link href="/dashboard/seller/device-readings" className="hover:opacity-80 transition block py-2 md:py-0">Farm & Devices</Link>
           </>
         ) : null}
 

@@ -69,7 +69,7 @@ export async function confirmOrder(
 export async function getMyBids(supabase: SupabaseClient<any>, userId: string) {
   const { data, error } = await supabase
     .from('harvest_bids')
-    .select('*, harvest_predictions(*, farms(*))')
+    .select('*, harvest_predictions(*, farms(name, crop_type, physical_address))')
     .eq('buyer_id', userId)
     .order('created_at', { ascending: false });
   return { data, error };
@@ -81,12 +81,30 @@ export async function placeHarvestBid(
     predictionId: string;
     quantity: number;
     pricePerUnit: number;
+    buyerMessage?: string;
   }
 ) {
+  // Parameter names must match the RPC signature exactly:
+  // rpc_place_harvest_bid(p_prediction_id, p_desired_quantity, p_offered_price_per_unit, p_buyer_message)
   const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
-    p_harvest_prediction_id: params.predictionId,
-    p_bid_quantity: params.quantity,
-    p_bid_price_per_unit: params.pricePerUnit
+    p_prediction_id: params.predictionId,
+    p_desired_quantity: params.quantity,
+    p_offered_price_per_unit: params.pricePerUnit,
+    p_buyer_message: params.buyerMessage ?? null
+  });
+  return { data, error };
+}
+
+export async function withdrawHarvestBid(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_withdraw_harvest_bid', {
+    p_bid_id: bidId
+  });
+  return { data, error };
+}
+
+export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_cancel_accepted_harvest_bid', {
+    p_bid_id: bidId
   });
   return { data, error };
 }
@@ -94,7 +112,7 @@ export async function placeHarvestBid(
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
   const { data, error } = await supabase
     .from('harvest_predictions')
-    .select('*, farms(*)')
+    .select('*, farms(name, crop_type, physical_address, latitude, longitude)')
     .eq('bidding_status', 'OPEN')
     .order('created_at', { ascending: false });
   return { data, error };

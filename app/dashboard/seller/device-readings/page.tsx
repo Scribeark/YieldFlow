@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -9,18 +11,33 @@ import { Label } from '@/components/ui/Label';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, createSellerFarm, registerSellerDevice, getDeviceReadings } from '@/lib/api/farms';
-import { Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, RefreshCw, BarChart2, CheckCircle, AlertTriangle } from 'lucide-react';
+import { getSellerFarms, createSellerFarm, registerSellerDevice, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades } from '@/lib/api/farms';
+import { Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight } from 'lucide-react';
 
 export default function SellerDeviceReadingsPage() {
   const { user } = useAuthStore();
+
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [farms, setFarms] = useState<any[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<any | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<any | null>(null);
   const [deviceReadings, setDeviceReadings] = useState<any[]>([]);
-  
+
+  // Action feedback
+  const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [convertingPredId, setConvertingPredId] = useState<string | null>(null);
+
+  // Confirm Harvest modal state
+  const [showConfirmHarvest, setShowConfirmHarvest] = useState(false);
+  const [confirmPredId, setConfirmPredId] = useState('');
+  const [confirmQty, setConfirmQty] = useState('');
+  const [confirmAddress, setConfirmAddress] = useState('');
+  const [confirmLat, setConfirmLat] = useState('8.1333');
+  const [confirmLng, setConfirmLng] = useState('4.2667');
+  const [confirmSubmitting, setConfirmSubmitting] = useState(false);
+
   // Modals state
   const [showCreateFarm, setShowCreateFarm] = useState(false);
   const [showRegisterDevice, setShowRegisterDevice] = useState(false);
@@ -344,18 +361,70 @@ export default function SellerDeviceReadingsPage() {
                 </Card>
               )}
 
+              {/* Action feedback */}
+              {actionError && <Alert variant="error" className="mb-2">{actionError}</Alert>}
+              {actionSuccess && <Alert variant="success" className="mb-2">{actionSuccess}</Alert>}
+
               {/* Seller Harvest Actions */}
               <Card className="border-t-4 border-t-[var(--agri-primary)]">
                 <h3 className="font-bold flex items-center mb-4">
                   <CheckCircle className="mr-2 text-[var(--agri-primary)]" /> Harvest Actions & Bidding
                 </h3>
-                <p className="text-sm opacity-80 mb-6">Manage your harvest, update estimates, and interact with buyer bids for this farm's predictions.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  <Button variant="secondary" onClick={() => alert('Update Estimate coming soon!')}>Update Estimate</Button>
-                  <Button variant="secondary" onClick={() => alert('Confirm Harvest coming soon!')}>Confirm Harvest</Button>
-                  <Button variant="accent" onClick={() => alert('View Bids coming soon!')}>View Bids</Button>
-                  <Button variant="primary" onClick={() => alert('Convert to Trade coming soon!')}>Convert to Trade</Button>
-                </div>
+                <p className="text-sm opacity-80 mb-4">Manage your harvest, review buyer bids, and convert accepted bids into trade requests.</p>
+
+                {/* Active prediction status */}
+                {(() => {
+                  const activePred = selectedFarm.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
+                  if (!activePred) return (
+                    <p className="text-sm opacity-50 mb-4">No active harvest prediction for this farm. Create a listing from the Sell page to enable bidding.</p>
+                  );
+                  const canConfirm = activePred.bidding_status === 'ALLOCATED';
+                  const canConvert = activePred.bidding_status === 'HARVEST_CONFIRMED';
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2 text-xs mb-3">
+                        <span className="opacity-60">Bidding status:</span>
+                        <span className="font-bold text-[var(--agri-primary)]">{activePred.bidding_status}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        <Link href="/dashboard/seller/bids">
+                          <Button variant="accent" size="sm">
+                            <ArrowRight size={14} className="mr-1" /> Manage Bids
+                          </Button>
+                        </Link>
+                        {canConfirm && (
+                          <Button variant="secondary" size="sm" onClick={() => {
+                            setConfirmPredId(activePred.id);
+                            setConfirmQty(String(activePred.expected_quantity_volume || ''));
+                            setConfirmAddress(selectedFarm.physical_address || '');
+                            setConfirmLat(String(selectedFarm.latitude || '8.1333'));
+                            setConfirmLng(String(selectedFarm.longitude || '4.2667'));
+                            setShowConfirmHarvest(true);
+                          }}>
+                            <CheckCircle size={14} className="mr-1" /> Confirm Harvest
+                          </Button>
+                        )}
+                        {canConvert && (
+                          <Button variant="primary" size="sm" disabled={convertingPredId === activePred.id} onClick={async () => {
+                            if (!window.confirm('Convert all accepted bids into trade requests?')) return;
+                            setConvertingPredId(activePred.id);
+                            setActionError('');
+                            const { error } = await convertBidsToTrades(supabase, activePred.id);
+                            setConvertingPredId(null);
+                            if (error) setActionError(error.message);
+                            else { setActionSuccess('Bids converted to trade requests! Proceed to My Requests to upload evidence.'); loadFarms(); }
+                          }}>
+                            {convertingPredId === activePred.id ? <Loader2 size={14} className="animate-spin mr-1" /> : <ArrowRight size={14} className="mr-1" />}
+                            Convert to Trades
+                          </Button>
+                        )}
+                        <Link href="/dashboard/seller/requests">
+                          <Button variant="ghost" size="sm">My Requests</Button>
+                        </Link>
+                      </div>
+                    </div>
+                  );
+                })()}
               </Card>
 
             </div>
@@ -423,6 +492,58 @@ export default function SellerDeviceReadingsPage() {
               <div className="flex justify-end space-x-2 pt-4">
                 <Button variant="ghost" type="button" onClick={() => setShowRegisterDevice(false)}>Cancel</Button>
                 <Button variant="primary" type="submit">Connect Device</Button>
+              </div>
+            </form>
+          </Card>
+        </div>
+      )}
+
+      {/* CONFIRM HARVEST MODAL */}
+      {showConfirmHarvest && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-md">
+            <h2 className="text-2xl font-bold mb-2">Confirm Harvest Ready</h2>
+            <p className="text-sm opacity-80 mb-4">Set the final harvest quantity and pickup details. Buyers with accepted bids can then be converted to trade requests.</p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              if (!confirmAddress.trim()) return;
+              setConfirmSubmitting(true);
+              const { error } = await confirmPredictedHarvest(supabase, {
+                predictionId: confirmPredId,
+                finalQuantity: parseInt(confirmQty),
+                pickupAddress: confirmAddress,
+                pickupLatitude: parseFloat(confirmLat) || 8.1333,
+                pickupLongitude: parseFloat(confirmLng) || 4.2667,
+              });
+              setConfirmSubmitting(false);
+              setShowConfirmHarvest(false);
+              if (error) setActionError(error.message);
+              else { setActionSuccess('Harvest confirmed! You can now convert accepted bids to trade requests.'); loadFarms(); }
+            }} className="space-y-4">
+              <div>
+                <Label>Final Harvest Quantity</Label>
+                <Input required type="number" min="1" value={confirmQty} onChange={(e) => setConfirmQty(e.target.value)} />
+              </div>
+              <div>
+                <Label>Pickup Address</Label>
+                <Input required value={confirmAddress} onChange={(e) => setConfirmAddress(e.target.value)} placeholder="Physical farm address" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Latitude</Label>
+                  <Input type="number" step="any" value={confirmLat} onChange={(e) => setConfirmLat(e.target.value)} />
+                </div>
+                <div>
+                  <Label>Longitude</Label>
+                  <Input type="number" step="any" value={confirmLng} onChange={(e) => setConfirmLng(e.target.value)} />
+                </div>
+              </div>
+              <div className="flex justify-end space-x-2 pt-2">
+                <Button variant="ghost" type="button" onClick={() => setShowConfirmHarvest(false)} disabled={confirmSubmitting}>Cancel</Button>
+                <Button variant="primary" type="submit" disabled={confirmSubmitting}>
+                  {confirmSubmitting ? <Loader2 className="animate-spin mr-2" size={16} /> : <CheckCircle size={16} className="mr-1" />}
+                  Confirm Harvest
+                </Button>
               </div>
             </form>
           </Card>

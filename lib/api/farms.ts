@@ -74,7 +74,7 @@ export async function registerSellerDevice(
 }
 
 export async function getDeviceReadings(
-  supabase: SupabaseClient<any>, 
+  supabase: SupabaseClient<any>,
   deviceId: string,
   limit: number = 24
 ) {
@@ -110,6 +110,89 @@ export async function createManualBiddingSale(
     p_pickup_address: params.pickupAddress,
     p_pickup_latitude: params.pickupLatitude,
     p_pickup_longitude: params.pickupLongitude
+  });
+  return { data, error };
+}
+
+// ── Bid Management ────────────────────────────────────────────────────────────
+
+/**
+ * Loads all active harvest predictions for a seller's farms, with all bids.
+ * Bids include nested buyer profile (full_name, phone_number).
+ */
+export async function getSellerBidListings(
+  supabase: SupabaseClient<any>,
+  userId: string
+) {
+  const { data: farms, error: farmError } = await supabase
+    .from('farms')
+    .select('id')
+    .eq('user_id', userId);
+
+  if (farmError || !farms) return { data: null, error: farmError };
+
+  const farmIds = (farms as any[]).map((f) => f.id);
+  if (farmIds.length === 0) return { data: [], error: null };
+
+  const { data, error } = await supabase
+    .from('harvest_predictions')
+    .select('*, farms(id, name, crop_type, physical_address, latitude, longitude, user_id), harvest_bids(*, buyer_profile:buyer_id(full_name, phone_number))')
+    .in('farm_id', farmIds)
+    .in('bidding_status', ['OPEN', 'SELLER_REVIEWING', 'ALLOCATED', 'HARVEST_CONFIRMED', 'CONVERTED_TO_TRADE'])
+    .order('created_at', { ascending: false });
+
+  return { data, error };
+}
+
+/** Seller rejects a PENDING bid. */
+export async function rejectHarvestBid(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_reject_harvest_bid', {
+    p_bid_id: bidId
+  });
+  return { data, error };
+}
+
+/** Seller accepts a bid fully or partially. */
+export async function allocateHarvestBid(
+  supabase: SupabaseClient<any>,
+  bidId: string,
+  acceptedQuantity: number
+) {
+  const { data, error } = await supabase.rpc('rpc_allocate_harvest_bid', {
+    p_bid_id: bidId,
+    p_accepted_quantity: acceptedQuantity
+  });
+  return { data, error };
+}
+
+/** Seller confirms harvest is ready, sets final quantity + pickup coords. */
+export async function confirmPredictedHarvest(
+  supabase: SupabaseClient<any>,
+  params: {
+    predictionId: string;
+    finalQuantity: number;
+    pickupAddress: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_confirm_predicted_harvest', {
+    p_prediction_id: params.predictionId,
+    p_final_quantity: params.finalQuantity,
+    p_pickup_address: params.pickupAddress,
+    p_pickup_latitude: params.pickupLatitude,
+    p_pickup_longitude: params.pickupLongitude
+  });
+  return { data, error };
+}
+
+/** Converts all ACCEPTED/PARTIALLY_ACCEPTED bids into EVIDENCE_PENDING trade_requests. */
+export async function convertBidsToTrades(
+  supabase: SupabaseClient<any>,
+  predictionId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_convert_bids_to_trades', {
+    p_prediction_id: predictionId
   });
   return { data, error };
 }
