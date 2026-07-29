@@ -18,6 +18,7 @@ export default function SellerDeviceReadingsPage() {
   const [loading, setLoading] = useState(true);
   const [farms, setFarms] = useState<any[]>([]);
   const [selectedFarm, setSelectedFarm] = useState<any | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<any | null>(null);
   const [deviceReadings, setDeviceReadings] = useState<any[]>([]);
   
   // Modals state
@@ -41,11 +42,18 @@ export default function SellerDeviceReadingsPage() {
 
   useEffect(() => {
     if (selectedFarm?.iot_devices?.[0]) {
+      setSelectedDevice(selectedFarm.iot_devices[0]);
       loadReadings(selectedFarm.iot_devices[0].id);
     } else {
+      setSelectedDevice(null);
       setDeviceReadings([]);
     }
   }, [selectedFarm]);
+
+  const handleDeviceSelect = (device: any) => {
+    setSelectedDevice(device);
+    loadReadings(device.id);
+  };
 
   const loadFarms = async () => {
     setLoading(true);
@@ -188,16 +196,54 @@ export default function SellerDeviceReadingsPage() {
                     </div>
                   </div>
                   
-                  {!selectedFarm.iot_devices || selectedFarm.iot_devices.length === 0 ? (
-                    <Button onClick={() => setShowRegisterDevice(true)} variant="accent">
-                      <Cpu size={16} className="mr-2" /> Connect Hardware
+                  <div className="flex space-x-2">
+                    <Button variant="accent" size="sm" onClick={() => setShowRegisterDevice(true)}>
+                      <Plus size={16} className="mr-1" /> Add Device
                     </Button>
-                  ) : (
-                    <Button variant="secondary" onClick={() => loadReadings(selectedFarm.iot_devices[0].id)}>
-                      <RefreshCw size={16} className="mr-2" /> Refresh Data
-                    </Button>
-                  )}
+                  </div>
                 </div>
+              </Card>
+
+              {/* Hardware Devices List */}
+              <Card>
+                <h3 className="font-bold flex items-center mb-4 border-b border-white/10 pb-4">
+                  <Cpu className="mr-2 text-blue-400" /> Registered Hardware
+                </h3>
+                {selectedFarm.iot_devices && selectedFarm.iot_devices.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedFarm.iot_devices.map((device: any) => (
+                      <div 
+                        key={device.id} 
+                        className={`p-3 rounded-lg flex items-center justify-between transition-colors border ${selectedDevice?.id === device.id ? 'border-blue-500 bg-blue-500/10' : 'border-white/10 hover:bg-white/5'}`}
+                      >
+                        <div>
+                          <div className="font-bold text-sm">{device.device_name}</div>
+                          <div className="text-xs opacity-60">SN: {device.device_serial_number} • {device.device_type}</div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <div className="text-xs font-bold text-green-400">{device.device_status}</div>
+                            <div className="text-xs opacity-60">
+                              {device.last_seen_at ? `Last seen: ${new Date(device.last_seen_at).toLocaleTimeString()}` : 'Never seen'}
+                            </div>
+                          </div>
+                          {selectedDevice?.id !== device.id && (
+                            <Button size="sm" variant="secondary" onClick={() => handleDeviceSelect(device)}>
+                              View Telemetry
+                            </Button>
+                          )}
+                          {selectedDevice?.id === device.id && (
+                            <Button size="sm" variant="ghost" onClick={() => loadReadings(device.id)}>
+                              <RefreshCw size={14} className="mr-1" /> Refresh
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center opacity-60 py-4">No hardware connected. Click "Add Device" to link an IoT sensor gateway.</div>
+                )}
               </Card>
 
               {/* Prediction Engine State */}
@@ -233,10 +279,10 @@ export default function SellerDeviceReadingsPage() {
               })}
 
               {/* Telemetry Visualizer */}
-              {selectedFarm.iot_devices?.length > 0 && (
+              {selectedDevice && (
                 <Card>
                   <h3 className="font-bold flex items-center mb-4 border-b border-white/10 pb-4">
-                    <Activity className="mr-2" /> Real-time Telemetry (Device: {selectedFarm.iot_devices[0].device_serial_number})
+                    <Activity className="mr-2 text-green-400" /> Real-time Telemetry (Device: {selectedDevice.device_serial_number})
                   </h3>
                   
                   {deviceReadings.length > 0 ? (
@@ -297,6 +343,20 @@ export default function SellerDeviceReadingsPage() {
                   )}
                 </Card>
               )}
+
+              {/* Seller Harvest Actions */}
+              <Card className="border-t-4 border-t-[var(--agri-primary)]">
+                <h3 className="font-bold flex items-center mb-4">
+                  <CheckCircle className="mr-2 text-[var(--agri-primary)]" /> Harvest Actions & Bidding
+                </h3>
+                <p className="text-sm opacity-80 mb-6">Manage your harvest, update estimates, and interact with buyer bids for this farm's predictions.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                  <Button variant="secondary" onClick={() => alert('Update Estimate coming soon!')}>Update Estimate</Button>
+                  <Button variant="secondary" onClick={() => alert('Confirm Harvest coming soon!')}>Confirm Harvest</Button>
+                  <Button variant="accent" onClick={() => alert('View Bids coming soon!')}>View Bids</Button>
+                  <Button variant="primary" onClick={() => alert('Convert to Trade coming soon!')}>Convert to Trade</Button>
+                </div>
+              </Card>
 
             </div>
           ) : (

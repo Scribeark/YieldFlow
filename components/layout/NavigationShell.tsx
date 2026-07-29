@@ -87,6 +87,8 @@ export default function NavigationShell({ children }: { children: React.ReactNod
           <>
             <Link href="/dashboard/buyer" className="hover:opacity-80 transition block py-2 md:py-0">Dashboard</Link>
             <Link href="/dashboard/buyer/buy" className="hover:opacity-80 transition block py-2 md:py-0">Buy</Link>
+            <Link href="/dashboard/buyer/pre-harvest" className="hover:opacity-80 transition block py-2 md:py-0">Upcoming Harvests</Link>
+            <Link href="/dashboard/buyer/my-bids" className="hover:opacity-80 transition block py-2 md:py-0">My Bids</Link>
             <Link href="/dashboard/buyer/demands" className="hover:opacity-80 transition block py-2 md:py-0">My Demands</Link>
             <Link href="/dashboard/buyer/orders" className="hover:opacity-80 transition block py-2 md:py-0">My Orders</Link>
             <Link href="/dashboard/buyer/sellers-map" className="hover:opacity-80 transition block py-2 md:py-0">Sellers Map</Link>

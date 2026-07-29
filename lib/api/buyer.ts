@@ -66,6 +66,40 @@ export async function confirmOrder(
   }
 }
 
+export async function getMyBids(supabase: SupabaseClient<any>, userId: string) {
+  const { data, error } = await supabase
+    .from('harvest_bids')
+    .select('*, harvest_predictions(*, farms(*))')
+    .eq('buyer_id', userId)
+    .order('created_at', { ascending: false });
+  return { data, error };
+}
+
+export async function placeHarvestBid(
+  supabase: SupabaseClient<any>,
+  params: {
+    predictionId: string;
+    quantity: number;
+    pricePerUnit: number;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
+    p_harvest_prediction_id: params.predictionId,
+    p_bid_quantity: params.quantity,
+    p_bid_price_per_unit: params.pricePerUnit
+  });
+  return { data, error };
+}
+
+export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
+  const { data, error } = await supabase
+    .from('harvest_predictions')
+    .select('*, farms(*)')
+    .eq('bidding_status', 'OPEN')
+    .order('created_at', { ascending: false });
+  return { data, error };
+}
+
 export async function requestEvidence(
   supabase: SupabaseClient<Database>,
   requestId: string

@@ -87,3 +87,29 @@ export async function getDeviceReadings(
 
   return { data, error };
 }
+
+export async function createManualBiddingSale(
+  supabase: SupabaseClient<any>,
+  params: {
+    farmId: string;
+    cropType: string;
+    totalQuantity: number;
+    quantityUnit: string;
+    minPricePerUnit: number;
+    pickupAddress: string;
+    pickupLatitude: number;
+    pickupLongitude: number;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_create_manual_bidding_sale', {
+    p_farm_id: params.farmId,
+    p_crop_type: params.cropType,
+    p_total_quantity: params.totalQuantity,
+    p_quantity_unit: params.quantityUnit,
+    p_min_price_per_unit: params.minPricePerUnit,
+    p_pickup_address: params.pickupAddress,
+    p_pickup_latitude: params.pickupLatitude,
+    p_pickup_longitude: params.pickupLongitude
+  });
+  return { data, error };
+}
