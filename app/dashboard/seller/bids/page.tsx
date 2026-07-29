@@ -90,8 +90,8 @@ function AcceptModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
-      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 flex items-start justify-center z-[9999] p-4 pt-[10vh] overflow-y-auto">
+      <Card className="w-full max-w-md my-8">
         <h2 className="text-xl font-bold mb-4">Accept Bid</h2>
         <p className="text-sm opacity-80 mb-4">
           Buyer requested <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.<br />
@@ -152,8 +152,8 @@ function ConfirmHarvestModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
-      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 flex items-start justify-center z-[9999] p-4 pt-[10vh] overflow-y-auto">
+      <Card className="w-full max-w-md my-8">
         <h2 className="text-xl font-bold mb-2">Confirm Harvest Ready</h2>
         <p className="text-sm opacity-80 mb-4">Confirm the actual harvest quantity and pickup details. This will lock in the allocation and allow conversion to trade requests.</p>
         {err && <Alert variant="error" className="mb-3">{err}</Alert>}
