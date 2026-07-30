@@ -37,10 +37,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     } else if (profile) {
       const correctDashboard = ROLE_ROUTES[profile.declared_profession];
       
-      const isAdminRoute = pathname.startsWith('/dashboard/dev/') || pathname.startsWith('/dashboard/admin/');
-      const isAuthorizedAdmin = profile.app_role === 'admin' && isAdminRoute;
-
-      if (pathname.startsWith('/dashboard/') && !pathname.startsWith(correctDashboard) && !isAuthorizedAdmin) {
+      if (pathname.startsWith('/dashboard/') && !pathname.startsWith(correctDashboard)) {
         router.push('/unauthorized');
       } else if (pathname === '/' || pathname === '/login' || pathname === '/signup') {
         router.push(correctDashboard);
@@ -54,8 +51,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
 
   if (profile && pathname.startsWith('/dashboard/')) {
     const correctDashboard = ROLE_ROUTES[profile.declared_profession];
-    const isAdminRoute = pathname.startsWith('/dashboard/dev/') || pathname.startsWith('/dashboard/admin/');
-    if (!pathname.startsWith(correctDashboard) && !(profile.app_role === 'admin' && isAdminRoute)) {
+    if (!pathname.startsWith(correctDashboard)) {
       return null;
     }
   }
@@ -106,16 +102,6 @@ export default function NavigationShell({ children }: { children: React.ReactNod
           </>
         ) : null}
 
-        {profile.app_role === 'admin' && (
-          <>
-            <Link href="/dashboard/admin" className="text-yellow-300 hover:text-yellow-100 font-bold transition block py-2 md:py-0 md:ml-4 md:border-l md:pl-4 border-white/20">
-              🛡️ Admin
-            </Link>
-            <Link href="/dashboard/dev/iot-simulator" className="text-yellow-300 hover:text-yellow-100 font-bold transition block py-2 md:py-0 md:ml-4">
-              ⚙️ IoT Simulator
-            </Link>
-          </>
-        )}
       </>
     );
   };
