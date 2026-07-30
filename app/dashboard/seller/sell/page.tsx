@@ -15,6 +15,7 @@ import { getSellerFarms, createManualBiddingSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
 import { LocationPicker } from '@/components/shared/LocationPicker';
 import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info } from 'lucide-react';
+import { useMapsKey } from '@/components/providers/MapsProvider';
 
 type ListingMode = 'standard' | 'bulk';
 
@@ -28,6 +29,7 @@ const COMMODITY_OPTIONS = [
 export default function SellerSellPage() {
   const { user, profile } = useAuthStore();
   const supabase = createClient();
+  const mapsApiKey = useMapsKey();
 
   const [mode, setMode] = useState<ListingMode>('standard');
   const [loading, setLoading] = useState(true);
@@ -287,7 +289,7 @@ export default function SellerSellPage() {
 
                 <div className="space-y-2 border-t border-white/10 pt-5">
                   <LocationPicker
-                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
+                    apiKey={mapsApiKey}
                     address={stdAddress}
                     lat={stdLat}
                     lng={stdLng}
@@ -354,7 +356,7 @@ export default function SellerSellPage() {
 
                 <div className="space-y-2 border-t border-white/10 pt-5">
                   <LocationPicker
-                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
+                    apiKey={mapsApiKey}
                     address={bulkAddress}
                     lat={bulkLat}
                     lng={bulkLng}

@@ -42,13 +42,20 @@ export function LocationPicker({
     setError(null);
     setSuccess(null);
     
-    const result = await geocodeAddress(address, apiKey);
+    let result = await geocodeAddress(address, apiKey);
+    
+    // Fallback 1: Append Nigeria if missing
+    if (!result && !address.toLowerCase().includes('nigeria')) {
+      result = await geocodeAddress(`${address}, Nigeria`, apiKey);
+    }
+
     if (result) {
       onLatChange(result.lat);
       onLngChange(result.lng);
       setSuccess('Location resolved successfully.');
+      setShowAdvanced(false);
     } else {
-      setError('Address not found. Try adding city/state, or enter coordinates manually.');
+      setError('Address could not be resolved. Try adding city/state, use GPS, or open Advanced Coordinates.');
       setShowAdvanced(true);
     }
     setGeocoding(false);

@@ -17,6 +17,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RegisterFarmModal } from '@/components/seller/RegisterFarmModal';
 import { ConnectDeviceModal } from '@/components/seller/ConnectDeviceModal';
+import { useMapsKey } from '@/components/providers/MapsProvider';
 
 // Status color helper for badges
 const getStatusColor = (status: string) => {
@@ -34,6 +35,7 @@ const getStatusColor = (status: string) => {
 export default function SellerDeviceReadingsPage() {
   const { user, profile } = useAuthStore();
   const supabase = createClient();
+  const mapsApiKey = useMapsKey();
   
   const [loading, setLoading] = useState(true);
   const [farms, setFarms] = useState<any[]>([]);
@@ -517,7 +519,7 @@ export default function SellerDeviceReadingsPage() {
       {showCreateFarm && profile?.id && (
         <RegisterFarmModal 
           userId={profile.id}
-          googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
+          googleMapsApiKey={mapsApiKey}
           onClose={() => setShowCreateFarm(false)}
           onSuccess={(newFarm) => {
             setShowCreateFarm(false);
