@@ -37,7 +37,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `Device is not active. Current status: ${device.device_status}` }, { status: 403 });
     }
 
-    const payload = await request.json();
+    let payload;
+    try {
+      payload = await request.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
     let readings = [];
 
     // Normalize single vs batch payload
