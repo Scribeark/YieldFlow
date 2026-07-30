@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { Loader2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { createSellerFarm } from '@/lib/api/farms';
+import { LocationPicker } from '@/components/shared/LocationPicker';
 
 const CROP_OPTIONS = [
   'Maize',
@@ -21,11 +22,12 @@ const CROP_OPTIONS = [
 
 interface RegisterFarmModalProps {
   userId: string;
+  googleMapsApiKey: string;
   onSuccess: (newFarm: any) => void;
   onClose: () => void;
 }
 
-export function RegisterFarmModal({ userId, onSuccess, onClose }: RegisterFarmModalProps) {
+export function RegisterFarmModal({ userId, googleMapsApiKey, onSuccess, onClose }: RegisterFarmModalProps) {
   const supabase = createClient();
   
   const [farmName, setFarmName] = useState('');
@@ -51,6 +53,11 @@ export function RegisterFarmModal({ userId, onSuccess, onClose }: RegisterFarmMo
       return;
     }
 
+    if (!latitude || !longitude) {
+      setError('Please resolve the address or enter coordinates before registering the farm.');
+      return;
+    }
+
     setSubmitting(true);
     
     const { data, error: apiError } = await createSellerFarm(supabase, userId, {
@@ -59,8 +66,8 @@ export function RegisterFarmModal({ userId, onSuccess, onClose }: RegisterFarmMo
       plantingDate,
       maturityDays: parseInt(maturityDays, 10),
       address,
-      latitude: latitude ? parseFloat(latitude) : 0,
-      longitude: longitude ? parseFloat(longitude) : 0
+      latitude: parseFloat(latitude),
+      longitude: parseFloat(longitude)
     });
     
     setSubmitting(false);
@@ -125,46 +132,15 @@ export function RegisterFarmModal({ userId, onSuccess, onClose }: RegisterFarmMo
             </div>
 
             <div className="border-t border-white/10 pt-4">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-bold opacity-80">Location Details</h3>
-                <Button 
-                  type="button" 
-                  variant="secondary" 
-                  size="sm" 
-                  onClick={() => {
-                    if (navigator.geolocation) {
-                      navigator.geolocation.getCurrentPosition(
-                        (position) => {
-                          setLatitude(position.coords.latitude.toString());
-                          setLongitude(position.coords.longitude.toString());
-                        },
-                        (err) => setError('Failed to retrieve GPS location. You can enter coordinates manually.')
-                      );
-                    } else {
-                      setError('Geolocation is not supported by your browser.');
-                    }
-                  }}
-                  className="text-xs h-7"
-                >
-                  Use current GPS location
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <Label>Physical Address / Location</Label>
-                  <Input required value={address} onChange={(e) => setAddress(e.target.value)} placeholder="e.g. 123 Farm Road, Kano" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Latitude (Optional)</Label>
-                    <Input type="number" step="any" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="8.1333" />
-                  </div>
-                  <div>
-                    <Label>Longitude (Optional)</Label>
-                    <Input type="number" step="any" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="4.2667" />
-                  </div>
-                </div>
-              </div>
+              <LocationPicker
+                apiKey={googleMapsApiKey}
+                address={address}
+                lat={latitude}
+                lng={longitude}
+                onAddressChange={setAddress}
+                onLatChange={(val) => setLatitude(val.toString())}
+                onLngChange={(val) => setLongitude(val.toString())}
+              />
             </div>
           </form>
         </div>

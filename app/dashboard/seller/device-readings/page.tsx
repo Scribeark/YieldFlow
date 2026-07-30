@@ -32,7 +32,7 @@ const getStatusColor = (status: string) => {
 };
 
 export default function SellerDeviceReadingsPage() {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
@@ -51,8 +51,8 @@ export default function SellerDeviceReadingsPage() {
   const [actionSuccess, setActionSuccess] = useState('');
 
   useEffect(() => {
-    if (user) loadFarms();
-  }, [user]);
+    if (profile?.id) loadFarms();
+  }, [profile?.id]);
 
   useEffect(() => {
     if (selectedFarm?.iot_devices?.[0]) {
@@ -66,8 +66,9 @@ export default function SellerDeviceReadingsPage() {
   }, [selectedFarm]);
 
   const loadFarms = async () => {
+    if (!profile?.id) return;
     setLoading(true);
-    const { data } = await getSellerFarms(supabase, user!.id);
+    const { data } = await getSellerFarms(supabase, profile.id);
     setFarms(data || []);
     if (data && data.length > 0 && !selectedFarm) {
       setSelectedFarm(data[0]);
@@ -513,9 +514,10 @@ export default function SellerDeviceReadingsPage() {
         </div>
       </div>
 
-      {showCreateFarm && (
+      {showCreateFarm && profile?.id && (
         <RegisterFarmModal 
-          userId={user!.id}
+          userId={profile.id}
+          googleMapsApiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
           onClose={() => setShowCreateFarm(false)}
           onSuccess={(newFarm) => {
             setShowCreateFarm(false);
@@ -525,9 +527,9 @@ export default function SellerDeviceReadingsPage() {
         />
       )}
 
-      {showRegisterDevice && selectedFarm && (
+      {showRegisterDevice && selectedFarm && profile?.id && (
         <ConnectDeviceModal
-          userId={user!.id}
+          userId={profile.id}
           selectedFarm={selectedFarm}
           onClose={() => setShowRegisterDevice(false)}
           onSuccess={() => {

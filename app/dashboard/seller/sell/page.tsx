@@ -13,7 +13,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { getSellerFarms, createManualBiddingSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
-import { Store, Layers, Loader2, CheckCircle, ArrowRight, MapPin, Info } from 'lucide-react';
+import { LocationPicker } from '@/components/shared/LocationPicker';
+import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info } from 'lucide-react';
 
 type ListingMode = 'standard' | 'bulk';
 
@@ -43,8 +44,8 @@ export default function SellerSellPage() {
   const [stdQuantity, setStdQuantity] = useState('');
   const [stdUnit, setStdUnit] = useState('kg');
   const [stdAddress, setStdAddress] = useState('');
-  const [stdLat, setStdLat] = useState(8.1333);
-  const [stdLng, setStdLng] = useState(4.2667);
+  const [stdLat, setStdLat] = useState<number | string>('');
+  const [stdLng, setStdLng] = useState<number | string>('');
 
   // ── Bulk Bidding fields ───────────────────────────────────────────────────
   const [bulkFarmId, setBulkFarmId] = useState('');
@@ -54,8 +55,8 @@ export default function SellerSellPage() {
   const [bulkUnit, setBulkUnit] = useState('kg');
   const [bulkMinPrice, setBulkMinPrice] = useState('');
   const [bulkAddress, setBulkAddress] = useState('');
-  const [bulkLat, setBulkLat] = useState(8.1333);
-  const [bulkLng, setBulkLng] = useState(4.2667);
+  const [bulkLat, setBulkLat] = useState<number | string>('');
+  const [bulkLng, setBulkLng] = useState<number | string>('');
 
   useEffect(() => {
     if (user) loadFarms();
@@ -86,8 +87,8 @@ export default function SellerSellPage() {
       setStdCommoditySelect(getCommodityValue(crop));
       if (getCommodityValue(crop) === 'Other') setStdCommodityCustom(crop);
       setStdAddress(farm.physical_address || '');
-      setStdLat(farm.latitude || 8.1333);
-      setStdLng(farm.longitude || 4.2667);
+      setStdLat(farm.latitude || '');
+      setStdLng(farm.longitude || '');
     }
   };
 
@@ -99,8 +100,8 @@ export default function SellerSellPage() {
       setBulkCommoditySelect(getCommodityValue(crop));
       if (getCommodityValue(crop) === 'Other') setBulkCommodityCustom(crop);
       setBulkAddress(farm.physical_address || '');
-      setBulkLat(farm.latitude || 8.1333);
-      setBulkLng(farm.longitude || 4.2667);
+      setBulkLat(farm.latitude || '');
+      setBulkLng(farm.longitude || '');
     }
   };
 
@@ -120,8 +121,8 @@ export default function SellerSellPage() {
       quantity_volume: parseInt(stdQuantity),
       quantity_unit: stdUnit,
       physical_address: stdAddress,
-      computed_latitude: stdLat,
-      computed_longitude: stdLng,
+      computed_latitude: typeof stdLat === 'string' ? parseFloat(stdLat) : stdLat,
+      computed_longitude: typeof stdLng === 'string' ? parseFloat(stdLng) : stdLng,
     });
     setSubmitting(false);
 
@@ -153,8 +154,8 @@ export default function SellerSellPage() {
         name: `Farm - ${bulkAddress.split(',')[0]}`,
         crop_type: finalCommodity,
         physical_address: bulkAddress,
-        latitude: bulkLat,
-        longitude: bulkLng
+        latitude: typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat,
+        longitude: typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng
       }).select('id').single();
 
       if (farmError) {
@@ -172,8 +173,8 @@ export default function SellerSellPage() {
       quantityUnit: bulkUnit,
       minPricePerUnit: parseFloat(bulkMinPrice),
       pickupAddress: bulkAddress,
-      pickupLatitude: bulkLat,
-      pickupLongitude: bulkLng
+      pickupLatitude: typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat,
+      pickupLongitude: typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng
     });
     setSubmitting(false);
 
@@ -285,8 +286,16 @@ export default function SellerSellPage() {
                 </div>
 
                 <div className="space-y-2 border-t border-white/10 pt-5">
-                  <Label className="flex items-center"><MapPin size={14} className="mr-1" /> Pickup / Farm Location</Label>
-                  <Input required value={stdAddress} onChange={(e) => setStdAddress(e.target.value)} placeholder="e.g. 12 Farm Road, Ogbomosho" />
+                  <LocationPicker
+                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
+                    address={stdAddress}
+                    lat={stdLat}
+                    lng={stdLng}
+                    onAddressChange={setStdAddress}
+                    onLatChange={setStdLat}
+                    onLngChange={setStdLng}
+                    label="Pickup / Farm Location"
+                  />
                 </div>
 
                 <div className="flex justify-end pt-2">
@@ -344,8 +353,16 @@ export default function SellerSellPage() {
                 </div>
 
                 <div className="space-y-2 border-t border-white/10 pt-5">
-                  <Label className="flex items-center"><MapPin size={14} className="mr-1" /> Pickup / Farm Location</Label>
-                  <Input required value={bulkAddress} onChange={(e) => setBulkAddress(e.target.value)} placeholder="e.g. 12 Farm Road, Ogbomosho" />
+                  <LocationPicker
+                    apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || ''}
+                    address={bulkAddress}
+                    lat={bulkLat}
+                    lng={bulkLng}
+                    onAddressChange={setBulkAddress}
+                    onLatChange={setBulkLat}
+                    onLngChange={setBulkLng}
+                    label="Pickup / Farm Location"
+                  />
                 </div>
 
                 <div className="bg-black/20 p-4 rounded-lg text-sm opacity-80 border border-white/10">
