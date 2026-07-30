@@ -78,7 +78,7 @@ export function RegisterFarmModal({ userId, onSuccess, onClose }: RegisterFarmMo
         <div className="p-5 border-b border-white/10 flex justify-between items-center sticky top-0 bg-[var(--card-bg)] z-10">
           <div>
             <h2 className="text-xl font-bold">Register New Farm</h2>
-            <p className="text-sm opacity-70">Add your farm to track IoT telemetry and readiness.</p>
+            <p className="text-sm opacity-70">Register a farm location to connect devices and monitor harvest readiness.</p>
           </div>
           <button onClick={onClose} className="p-2 rounded-full hover:bg-white/10 transition">
             <X size={20} />
@@ -125,7 +125,30 @@ export function RegisterFarmModal({ userId, onSuccess, onClose }: RegisterFarmMo
             </div>
 
             <div className="border-t border-white/10 pt-4">
-              <h3 className="text-sm font-bold mb-3 opacity-80">Location Details</h3>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-sm font-bold opacity-80">Location Details</h3>
+                <Button 
+                  type="button" 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => {
+                    if (navigator.geolocation) {
+                      navigator.geolocation.getCurrentPosition(
+                        (position) => {
+                          setLatitude(position.coords.latitude.toString());
+                          setLongitude(position.coords.longitude.toString());
+                        },
+                        (err) => setError('Failed to retrieve GPS location. You can enter coordinates manually.')
+                      );
+                    } else {
+                      setError('Geolocation is not supported by your browser.');
+                    }
+                  }}
+                  className="text-xs h-7"
+                >
+                  Use current GPS location
+                </Button>
+              </div>
               <div className="space-y-4">
                 <div>
                   <Label>Physical Address / Location</Label>

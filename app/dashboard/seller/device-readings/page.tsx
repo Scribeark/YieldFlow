@@ -104,8 +104,8 @@ export default function SellerDeviceReadingsPage() {
       {/* A. Header Area */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--foreground)]">Farm IoT Monitor</h1>
-          <p className="opacity-70 mt-1">Manage farm locations, IoT devices, sensor readings, and harvest readiness.</p>
+          <h1 className="text-3xl font-bold text-[var(--foreground)]">Farm & Device Monitor</h1>
+          <p className="opacity-70 mt-1">Manage farm locations, connected devices, readings, and harvest readiness.</p>
         </div>
         <div className="mt-4 md:mt-0 flex flex-wrap gap-3">
           {selectedFarm && (
@@ -143,21 +143,21 @@ export default function SellerDeviceReadingsPage() {
         </Card>
       </div>
 
-      {/* C. IoT Pipeline Explanation Section */}
+      {/* C. Farm Monitoring Flow UI */}
       <div className="mb-8 p-4 rounded-xl border border-[var(--agri-primary)]/20 bg-[var(--agri-primary)]/5">
-        <h3 className="text-sm font-bold opacity-80 mb-3 flex items-center"><Target size={14} className="mr-2"/> Platform IoT Pipeline</h3>
+        <h3 className="text-sm font-bold opacity-80 mb-3 flex items-center"><Target size={14} className="mr-2"/> Farm Monitoring Flow</h3>
         <div className="flex flex-col md:flex-row items-center justify-between gap-2 overflow-x-auto text-xs pb-2 whitespace-nowrap">
           <div className="flex items-center gap-2"><MapPin size={16} className="text-green-500"/> 1. Farm Setup</div>
           <ArrowRight size={14} className="opacity-30 hidden md:block" />
           <div className="flex items-center gap-2"><Cpu size={16} className="text-blue-500"/> 2. Connect Device</div>
           <ArrowRight size={14} className="opacity-30 hidden md:block" />
-          <div className="flex items-center gap-2"><Activity size={16} className="text-yellow-500"/> 3. Data Ingestion</div>
+          <div className="flex items-center gap-2"><Activity size={16} className="text-yellow-500"/> 3. Device Readings</div>
           <ArrowRight size={14} className="opacity-30 hidden md:block" />
-          <div className="flex items-center gap-2"><BarChart2 size={16} className="text-purple-500"/> 4. Prediction Engine</div>
+          <div className="flex items-center gap-2"><BarChart2 size={16} className="text-purple-500"/> 4. Harvest Analysis</div>
           <ArrowRight size={14} className="opacity-30 hidden md:block" />
-          <div className="flex items-center gap-2"><Sprout size={16} className="text-[var(--agri-primary)]"/> 5. Readiness State</div>
+          <div className="flex items-center gap-2"><Sprout size={16} className="text-[var(--agri-primary)]"/> 5. Readiness Status</div>
           <ArrowRight size={14} className="opacity-30 hidden md:block" />
-          <div className="flex items-center gap-2"><ShoppingCart size={16} className="text-orange-500"/> 6. Marketplace Bidding</div>
+          <div className="flex items-center gap-2"><ShoppingCart size={16} className="text-orange-500"/> 6. Buyer Bidding</div>
         </div>
       </div>
 
@@ -179,7 +179,7 @@ export default function SellerDeviceReadingsPage() {
               <Sprout size={48} className="mx-auto mb-4 opacity-20" />
               <h3 className="text-lg font-bold mb-2">No farms registered yet</h3>
               <p className="text-sm opacity-60 mb-6 max-w-xs mx-auto">
-                Register your first farm to connect IoT devices, track sensor telemetry, and unlock harvest predictions.
+                Register your first farm to connect devices, track readings, and unlock harvest predictions.
               </p>
               <Button onClick={() => setShowCreateFarm(true)} variant="primary">
                 Register First Farm
@@ -308,7 +308,7 @@ export default function SellerDeviceReadingsPage() {
                   <div className="text-center py-6 border border-dashed border-white/10 rounded-lg bg-black/10">
                     <Wifi size={24} className="mx-auto mb-2 opacity-30" />
                     <p className="text-sm font-medium mb-1">No devices connected to this farm.</p>
-                    <p className="text-xs opacity-60">Connect a device to begin receiving sensor readings into the ingestion layer.</p>
+                    <p className="text-xs opacity-60">Connect a device to begin tracking readings for harvest analysis.</p>
                   </div>
                 )}
               </Card>
@@ -318,10 +318,10 @@ export default function SellerDeviceReadingsPage() {
                 <Card>
                   <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
                     <h3 className="font-bold flex items-center">
-                      <Activity className="mr-2 text-green-400" /> Sensor Readings (Ingestion Layer)
+                      <Activity className="mr-2 text-green-400" /> Device Readings
                     </h3>
                     <div className="text-xs opacity-60 bg-black/30 px-2 py-1 rounded-md">
-                      Showing telemetry for: <strong>{selectedDevice.device_name}</strong>
+                      Showing readings for: <strong>{selectedDevice.device_name}</strong>
                     </div>
                   </div>
 
@@ -393,7 +393,7 @@ export default function SellerDeviceReadingsPage() {
                     <div className="text-center py-8 border border-dashed border-white/10 rounded-lg bg-black/10">
                       <Activity size={32} className="mx-auto mb-3 opacity-30" />
                       <p className="text-sm font-medium mb-1">No readings recorded yet.</p>
-                      <p className="text-xs opacity-60">Use the IoT simulator or connect active hardware to start streaming telemetry.</p>
+                      <p className="text-xs opacity-60">Use the simulator or connect an active device to start receiving readings.</p>
                     </div>
                   )}
                 </Card>
@@ -404,7 +404,7 @@ export default function SellerDeviceReadingsPage() {
                 <Card className="border-t-4 border-t-purple-500">
                   <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
                     <h3 className="font-bold flex items-center">
-                      <BarChart2 className="mr-2 text-purple-400" /> Prediction & Marketplace State
+                      <BarChart2 className="mr-2 text-purple-400" /> Harvest Analysis & Marketplace Status
                     </h3>
                     <div className="text-[10px] opacity-60">
                       Engine: {activePred.prediction_engine || 'Hybrid MVP'} • Updated: {new Date(activePred.updated_at).toLocaleString()}
@@ -413,7 +413,7 @@ export default function SellerDeviceReadingsPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div className="space-y-4">
-                      <h4 className="text-xs uppercase opacity-50 font-bold tracking-wider">Model Output</h4>
+                      <h4 className="text-xs uppercase opacity-50 font-bold tracking-wider">Analysis Output</h4>
                       <div className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5">
                         <span className="text-sm">Readiness Score</span>
                         <span className="font-mono font-bold text-lg">{activePred.readiness_score?.toFixed(1) || '0.0'} / 100</span>
@@ -440,16 +440,16 @@ export default function SellerDeviceReadingsPage() {
                       {['BUYER_BIDDING_OPEN', 'HARVEST_READY'].includes(activePred.readiness_status) ? (
                         <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
                           <ShoppingCart size={24} className="text-blue-400 mb-2" />
-                          <h5 className="font-bold text-blue-400 mb-1">Harvest is open to buyers!</h5>
-                          <p className="text-xs opacity-80 mb-3">The model determined this crop is ready for the marketplace. Bidding is {activePred.bidding_status}.</p>
+                          <h5 className="font-bold text-blue-400 mb-1">This harvest can now appear to buyers!</h5>
+                          <p className="text-xs opacity-80 mb-3">The analysis determined this crop is ready for the marketplace. Bidding is {activePred.bidding_status}.</p>
                           <Link href="/dashboard/seller/bids" className="w-full">
-                            <Button variant="primary" className="w-full text-sm">View & Manage Bids</Button>
+                            <Button variant="primary" className="w-full text-sm">View Bids</Button>
                           </Link>
                         </div>
                       ) : (
                         <div className="bg-black/20 border border-dashed border-white/20 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
                           <Target size={24} className="opacity-30 mb-2" />
-                          <h5 className="font-bold opacity-80 mb-1">Not open for bidding yet.</h5>
+                          <h5 className="font-bold opacity-80 mb-1">Harvest is not open for buyer bidding yet.</h5>
                           <p className="text-xs opacity-60">Readiness score must reach the threshold to trigger marketplace visibility.</p>
                         </div>
                       )}
@@ -495,8 +495,8 @@ export default function SellerDeviceReadingsPage() {
               ) : (
                 <Card className="text-center py-8 bg-black/20 border-dashed border-white/10">
                   <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
-                  <p className="text-sm font-bold opacity-80 mb-1">No active prediction cycle.</p>
-                  <p className="text-xs opacity-50">Create a listing from the Sell page to initialize a prediction cycle for this farm.</p>
+                  <p className="text-sm font-bold opacity-80 mb-1">No active harvest analysis.</p>
+                  <p className="text-xs opacity-50">Create a listing from the Sell page to initialize analysis for this farm.</p>
                 </Card>
               )}
 
@@ -506,7 +506,7 @@ export default function SellerDeviceReadingsPage() {
               <div className="text-center">
                 <MapPin size={48} className="mx-auto mb-4 opacity-20" />
                 <h3 className="text-lg font-bold mb-2">Select a farm</h3>
-                <p className="text-sm opacity-60">Click a farm from the list to view its devices, telemetry, and harvest readiness.</p>
+                <p className="text-sm opacity-60">Click a farm from the list to view its connected devices, readings, and harvest readiness.</p>
               </div>
             </div>
           )}
