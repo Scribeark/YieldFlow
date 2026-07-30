@@ -297,6 +297,7 @@ export default function SellerSellPage() {
                     onLatChange={setStdLat}
                     onLngChange={setStdLng}
                     label="Pickup / Farm Location"
+                    hideAdvancedCoordinates={true}
                   />
                 </div>
 
@@ -364,6 +365,7 @@ export default function SellerSellPage() {
                     onLatChange={setBulkLat}
                     onLngChange={setBulkLng}
                     label="Pickup / Farm Location"
+                    hideAdvancedCoordinates={true}
                   />
                 </div>
 

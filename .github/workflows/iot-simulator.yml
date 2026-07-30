@@ -1,0 +1,29 @@
+name: IoT Telemetry Simulator
+
+on:
+  schedule:
+    # Run every 15 minutes
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Allows manual triggering from GitHub UI
+
+jobs:
+  simulate-telemetry:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Simulator
+        env:
+          IOT_INGEST_URL: ${{ secrets.IOT_INGEST_URL }}
+          IOT_DEVICE_KEYS_JSON: ${{ secrets.IOT_DEVICE_KEYS_JSON }}
+        run: python scripts/iot_simulator.py

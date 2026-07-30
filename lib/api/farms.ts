@@ -5,8 +5,14 @@ export async function getSellerFarms(supabase: SupabaseClient<any>, userId: stri
     .from('farms')
     .select('*, iot_devices(*), harvest_predictions(*)')
     .eq('user_id', userId)
+    .or('farm_status.eq.ACTIVE,farm_status.is.null')
     .order('created_at', { ascending: false });
 
+  return { data, error };
+}
+
+export async function archiveFarm(supabase: SupabaseClient<any>, farmId: string) {
+  const { data, error } = await (supabase as any).rpc('rpc_archive_farm', { p_farm_id: farmId });
   return { data, error };
 }
 

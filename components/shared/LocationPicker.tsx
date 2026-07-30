@@ -16,6 +16,7 @@ interface LocationPickerProps {
   label?: string;
   placeholder?: string;
   required?: boolean;
+  hideAdvancedCoordinates?: boolean;
 }
 
 export function LocationPicker({
@@ -28,7 +29,8 @@ export function LocationPicker({
   onLngChange,
   label = "Physical Address / Location",
   placeholder = "e.g. 12 Farm Road, Kano",
-  required = true
+  required = true,
+  hideAdvancedCoordinates = false
 }: LocationPickerProps) {
   const [geocoding, setGeocoding] = useState(false);
   const [gpsLoading, setGpsLoading] = useState(false);
@@ -50,13 +52,14 @@ export function LocationPicker({
     }
 
     if (result) {
+      onAddressChange(result.address);
       onLatChange(result.lat);
       onLngChange(result.lng);
-      setSuccess('Location resolved successfully.');
+      setSuccess(`Location found: ${result.address}`);
       setShowAdvanced(false);
     } else {
-      setError('Address could not be resolved. Try adding city/state, use GPS, or open Advanced Coordinates.');
-      setShowAdvanced(true);
+      setError('Address could not be found. Try adding city/state or use current GPS location.');
+      if (!hideAdvancedCoordinates) setShowAdvanced(true);
     }
     setGeocoding(false);
   };
@@ -140,10 +143,11 @@ export function LocationPicker({
       {error && <div className="text-xs text-red-400">{error}</div>}
       {success && <div className="text-xs text-green-400">{success}</div>}
 
-      <div className="pt-2 border-t border-white/5 mt-2">
-        <button
-          type="button"
-          onClick={() => setShowAdvanced(!showAdvanced)}
+      {!hideAdvancedCoordinates && (
+        <div className="pt-2 border-t border-white/5 mt-2">
+          <button
+            type="button"
+            onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center text-xs opacity-60 hover:opacity-100 transition-opacity"
         >
           {showAdvanced ? <ChevronUp size={12} className="mr-1" /> : <ChevronDown size={12} className="mr-1" />}
@@ -179,6 +183,7 @@ export function LocationPicker({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

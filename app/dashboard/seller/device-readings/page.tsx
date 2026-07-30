@@ -8,16 +8,18 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades } from '@/lib/api/farms';
+import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm } from '@/lib/api/farms';
 import { 
   Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, 
   RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight,
-  TrendingUp, Wifi, Target, Sprout, ShoppingCart, Truck, Leaf
+  TrendingUp, Wifi, Target, Sprout, ShoppingCart, Truck, Leaf, XCircle, Trash2, Archive
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RegisterFarmModal } from '@/components/seller/RegisterFarmModal';
 import { ConnectDeviceModal } from '@/components/seller/ConnectDeviceModal';
 import { useMapsKey } from '@/components/providers/MapsProvider';
+import { generateDeviceIngestionKey, retireDevice } from '@/lib/api/devices';
+import { Copy, Key } from 'lucide-react';
 
 // Status color helper for badges
 const getStatusColor = (status: string) => {
@@ -51,6 +53,8 @@ export default function SellerDeviceReadingsPage() {
   const [convertingPredId, setConvertingPredId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
+  const [generatedKey, setGeneratedKey] = useState<{ id: string, key: string } | null>(null);
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
 
   useEffect(() => {
     if (profile?.id) loadFarms();
@@ -89,11 +93,82 @@ export default function SellerDeviceReadingsPage() {
     setDeviceReadings(sorted);
   };
 
+  const handleGenerateKey = async (deviceId: string) => {
+    setIsGeneratingKey(true);
+    setActionError('');
+    setActionSuccess('');
+    setGeneratedKey(null);
+
+    const res = await generateDeviceIngestionKey(deviceId);
+    if ('error' in res) {
+      setActionError(res.error);
+    } else {
+      setGeneratedKey({ id: deviceId, key: res.rawKey });
+      setActionSuccess('Key generated successfully! Copy it now, it will not be shown again.');
+      loadFarms(); // Reload to get updated ingest_key_hash existence
+    }
+    setIsGeneratingKey(false);
+  };
+  const [isArchivingFarm, setIsArchivingFarm] = useState(false);
+  const [retiringDeviceId, setRetiringDeviceId] = useState<string | null>(null);
+
+  const handleArchiveFarm = async (farmId: string) => {
+    if (!window.confirm("Are you sure you want to archive this farm? This will retire all associated devices. Historical data will be preserved.")) return;
+    
+    setIsArchivingFarm(true);
+    setActionError('');
+    try {
+      const supabase = createClient();
+      const { data, error: apiError } = await archiveFarm(supabase, farmId);
+      
+      if (apiError) throw new Error(apiError.message);
+      
+      if (data && data.success === false) {
+        throw new Error(data.error || 'Failed to archive farm');
+      }
+
+      // Success
+      if (selectedFarm?.id === farmId) {
+        setSelectedFarm(null);
+        setSelectedDevice(null);
+      }
+      loadFarms(); // reload the list
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to archive farm.');
+    } finally {
+      setIsArchivingFarm(false);
+    }
+  };
+
+  const handleRetireDevice = async (deviceId: string) => {
+    if (!window.confirm("Are you sure you want to retire this device? It will stop receiving new readings. Historical data will be preserved.")) return;
+    
+    setRetiringDeviceId(deviceId);
+    setActionError('');
+    try {
+      const res = await retireDevice(deviceId);
+      if (!res.success) {
+        throw new Error(res.error || 'Failed to retire device');
+      }
+      
+      if (selectedDevice?.id === deviceId) {
+        setSelectedDevice(null);
+      }
+      loadFarms(); // reload list
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to retire device.');
+    } finally {
+      setRetiringDeviceId(null);
+    }
+  };
+
   const activePred = selectedFarm?.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
 
   // Computed summary metrics
   const totalFarms = farms.length;
-  const connectedDevices = farms.reduce((sum, f) => sum + (f.iot_devices?.length || 0), 0);
+  const connectedDevices = farms.reduce((sum, f) => sum + (f.iot_devices?.filter((d: any) => d.device_status !== 'RETIRED').length || 0), 0);
   const activeReadings = deviceReadings.length; // From current selected device context
   const readyFarms = farms.filter(f => f.harvest_predictions?.some((p: any) => 
     p.prediction_cycle_status === 'ACTIVE' && ['READY_SOON', 'HARVEST_READY', 'BUYER_BIDDING_OPEN'].includes(p.readiness_status)
@@ -216,8 +291,8 @@ export default function SellerDeviceReadingsPage() {
                         <span className="truncate max-w-[120px]">{farm.physical_address || 'No address set'}</span>
                       </div>
                       <div className="flex items-center">
-                        <Wifi size={12} className={farm.iot_devices?.length > 0 ? 'text-green-400 mr-1' : 'text-gray-500 mr-1'} />
-                        {farm.iot_devices?.length || 0} Device(s)
+                        <Wifi size={12} className={farm.iot_devices?.filter((d: any) => d.device_status !== 'RETIRED').length > 0 ? 'text-green-400 mr-1' : 'text-gray-500 mr-1'} />
+                        {farm.iot_devices?.filter((d: any) => d.device_status !== 'RETIRED').length || 0} Device(s)
                       </div>
                     </div>
                   </Card>
@@ -241,6 +316,16 @@ export default function SellerDeviceReadingsPage() {
                       <MapPin size={14} className="mr-1"/> {selectedFarm.physical_address}
                     </p>
                   </div>
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={() => handleArchiveFarm(selectedFarm.id)}
+                    disabled={isArchivingFarm}
+                    className="bg-red-500/20 text-red-400 hover:bg-red-500/40 hover:text-white"
+                  >
+                    {isArchivingFarm ? <Loader2 size={16} className="animate-spin mr-2" /> : <Archive size={16} className="mr-2" />}
+                    Archive Farm
+                  </Button>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -274,35 +359,80 @@ export default function SellerDeviceReadingsPage() {
                   </Button>
                 </div>
 
-                {selectedFarm.iot_devices && selectedFarm.iot_devices.length > 0 ? (
+                {selectedFarm.iot_devices && selectedFarm.iot_devices.filter((d: any) => d.device_status !== 'RETIRED').length > 0 ? (
                   <div className="space-y-2">
-                    {selectedFarm.iot_devices.map((device: any) => (
+                    {selectedFarm.iot_devices.filter((d: any) => d.device_status !== 'RETIRED').map((device: any) => (
                       <div 
                         key={device.id} 
                         className={`p-3 rounded-lg flex items-center justify-between transition-colors border ${selectedDevice?.id === device.id ? 'border-blue-500/50 bg-blue-500/10' : 'border-white/10 bg-black/20'}`}
                       >
-                        <div className="flex flex-col">
+                        <div className="flex flex-col flex-1">
                           <span className="font-bold text-sm">{device.device_name}</span>
                           <span className="text-xs opacity-60">SN: {device.device_serial_number} • {device.device_type}</span>
                           {device.firmware_version && <span className="text-[10px] opacity-40">Firmware: {device.firmware_version}</span>}
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <div className="text-[10px] uppercase font-bold text-green-400 tracking-wider flex items-center justify-end">
-                                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse mr-1"></div>
-                                {device.device_status}
-                              </div>
-                              <div className="text-[10px] opacity-50">
-                                {device.last_seen_at ? `Last seen: ${new Date(device.last_seen_at).toLocaleString()}` : 'Never seen'}
+                          
+                          <div className="mt-2 pt-2 border-t border-white/5 text-[10px] space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="opacity-60">Ingestion Key:</span>
+                              {device.ingest_key_hash ? (
+                                <span className="text-green-400 font-bold flex items-center"><CheckCircle size={10} className="mr-1"/> Active</span>
+                              ) : (
+                                <span className="text-red-400 flex items-center"><XCircle size={10} className="mr-1"/> None</span>
+                              )}
+                            </div>
+                            {device.ingest_key_last_used_at && (
+                              <div className="opacity-50">Key last used: {new Date(device.ingest_key_last_used_at).toLocaleString()}</div>
+                            )}
+                          </div>
+                          
+                          {generatedKey?.id === device.id && (
+                            <div className="mt-2 p-2 bg-green-500/10 border border-green-500/30 rounded text-xs">
+                              <div className="font-bold text-green-400 mb-1">New Key Generated (Copy now):</div>
+                              <div className="flex items-center gap-2">
+                                <code className="bg-black p-1 px-2 rounded font-mono flex-1 select-all break-all">{generatedKey?.key}</code>
+                                <Button size="sm" variant="secondary" onClick={() => navigator.clipboard.writeText(generatedKey?.key || '')} className="h-7 px-2 shrink-0">
+                                  <Copy size={12} />
+                                </Button>
                               </div>
                             </div>
-                          </div>
-                          {selectedDevice?.id !== device.id && (
-                            <Button size="sm" variant="secondary" onClick={() => { setSelectedDevice(device); loadReadings(device.id); }} className="h-7 text-xs">
-                              Select & View Readings
-                            </Button>
                           )}
+                        </div>
+                        <div className="flex flex-col items-end justify-between self-stretch">
+                          <div className="text-right">
+                            <div className="text-[10px] uppercase font-bold text-green-400 tracking-wider flex items-center justify-end">
+                              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse mr-1"></div>
+                              {device.device_status}
+                            </div>
+                            <div className="text-[10px] opacity-50 mt-1">
+                              {device.last_seen_at ? `Seen: ${new Date(device.last_seen_at).toLocaleDateString()}` : 'Never seen'}
+                            </div>
+                          </div>
+                          <div className="flex gap-2 mt-2">
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              disabled={isGeneratingKey}
+                              onClick={() => handleGenerateKey(device.id)} 
+                              className="h-7 text-[10px] border-white/20 hover:border-white/40"
+                            >
+                              <Key size={12} className="mr-1"/>
+                              {device.ingest_key_hash ? 'Rotate Key' : 'Generate Key'}
+                            </Button>
+                            {selectedDevice?.id !== device.id && (
+                              <Button size="sm" variant="secondary" onClick={() => { setSelectedDevice(device); loadReadings(device.id); }} className="h-7 text-[10px]">
+                                View Readings
+                              </Button>
+                            )}
+                            <Button 
+                              size="sm" 
+                              variant="secondary" 
+                              disabled={retiringDeviceId === device.id}
+                              onClick={() => handleRetireDevice(device.id)} 
+                              className="h-7 text-[10px] bg-red-500/10 text-red-400 hover:bg-red-500/30 px-2"
+                            >
+                              {retiringDeviceId === device.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
