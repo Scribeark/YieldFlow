@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 # Environment Configuration
 INGEST_URL = os.environ.get('IOT_INGEST_URL', 'http://localhost:3000/api/iot/ingest/readings')
 DEVICE_KEYS_JSON = os.environ.get('IOT_DEVICE_KEYS_JSON', '[]')
+VERCEL_PROTECTION_BYPASS = os.environ.get('VERCEL_PROTECTION_BYPASS')
 # LOOP_INTERVAL defines the sleep time in seconds if running in loop mode
 LOOP_INTERVAL = int(os.environ.get('IOT_LOOP_INTERVAL', '0'))
 
@@ -41,6 +42,9 @@ def post_readings(device_key, readings):
         'Content-Type': 'application/json',
         'x-device-key': device_key
     }
+    
+    if VERCEL_PROTECTION_BYPASS:
+        headers['x-vercel-protection-bypass'] = VERCEL_PROTECTION_BYPASS
     payload = {
         "readings": readings
     }

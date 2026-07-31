@@ -14,6 +14,9 @@ Raw keys are never stored in the database. Instead, the server hashes the incomi
 **Required Header:**
 `x-device-key`: `<RAW_DEVICE_KEY>`
 
+**Optional Header (for Vercel Protected Deployments):**
+`x-vercel-protection-bypass`: `<VERCEL_PROTECTION_BYPASS_SECRET>`
+
 ## Key Management (Farm & Devices Dashboard)
 
 Sellers can manage device keys directly in the **Farm & Devices** dashboard.
@@ -107,3 +110,13 @@ A GitHub Action automatically runs the simulator every 15 minutes.
 To configure this on a new repository or environment, add the following GitHub Secrets:
 1. `IOT_INGEST_URL`: `https://your-production-url.com/api/iot/ingest/readings`
 2. `IOT_DEVICE_KEYS_JSON`: `["ydf_key1", "ydf_key2"]`
+3. `VERCEL_PROTECTION_BYPASS`: (Optional) Bypass token if Vercel deployment protection is enabled.
+
+### cURL Test (Vercel Protected Deployment)
+```bash
+curl -i -X POST "$IOT_INGEST_URL" \
+  -H "Content-Type: application/json" \
+  -H "x-device-key: RAW_DEVICE_KEY" \
+  -H "x-vercel-protection-bypass: VERCEL_PROTECTION_BYPASS" \
+  --data '{"soil_moisture":45.2,"ambient_temperature":27.5,"ambient_humidity":65.0,"rainfall_mm":0}'
+```
