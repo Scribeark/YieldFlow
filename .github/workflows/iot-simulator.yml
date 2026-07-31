@@ -1,10 +1,14 @@
 name: IoT Telemetry Simulator
 
+# Interval: Every 15 minutes (UTC). GitHub may delay up to ~10min on free tier.
+# To change interval: update the cron expression below.
+# Format: '*/N * * * *' where N is minutes (minimum 5).
+# To manually run: go to Actions tab → IoT Telemetry Simulator → Run workflow
+
 on:
   schedule:
-    # Run every 15 minutes
     - cron: '*/15 * * * *'
-  workflow_dispatch: # Allows manual triggering from GitHub UI
+  workflow_dispatch: # Manual trigger from GitHub Actions UI
 
 jobs:
   simulate-telemetry:
@@ -22,9 +26,45 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Validate secrets
+        env:
+          IOT_INGEST_URL: ${{ secrets.IOT_INGEST_URL }}
+          IOT_DEVICE_KEYS_JSON: ${{ secrets.IOT_DEVICE_KEYS_JSON }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
+        run: |
+          echo "=== Secret Validation ==="
+          if [ -z "$IOT_INGEST_URL" ]; then
+            echo "FAIL: IOT_INGEST_URL secret is missing or empty."
+            exit 1
+          else
+            echo "OK: IOT_INGEST_URL is set."
+          fi
+
+          if [ -z "$IOT_DEVICE_KEYS_JSON" ]; then
+            echo "FAIL: IOT_DEVICE_KEYS_JSON secret is missing or empty."
+            exit 1
+          else
+            echo "OK: IOT_DEVICE_KEYS_JSON is set."
+          fi
+
+          if [ -z "$VERCEL_PROTECTION_BYPASS" ]; then
+            echo "WARN: VERCEL_PROTECTION_BYPASS is not set. Required if Vercel deployment protection is enabled."
+          else
+            echo "OK: VERCEL_PROTECTION_BYPASS is set."
+          fi
+          echo "=== Validation complete ==="
+
       - name: Run Simulator
         env:
           IOT_INGEST_URL: ${{ secrets.IOT_INGEST_URL }}
           IOT_DEVICE_KEYS_JSON: ${{ secrets.IOT_DEVICE_KEYS_JSON }}
           VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: python scripts/iot_simulator.py
+
+      - name: Report success
+        run: |
+          echo "=== Simulator run complete ==="
+          echo "Timestamp (UTC): $(date -u)"
+          echo "If the simulator printed [Success], readings were inserted into iot_sensor_streams."
+          echo "Verify in Supabase: SELECT * FROM iot_sensor_streams ORDER BY recorded_at DESC LIMIT 10;"
+          echo "Verify device: SELECT last_seen_at, ingest_key_last_used_at FROM iot_devices WHERE id = '<your-device-id>';"
