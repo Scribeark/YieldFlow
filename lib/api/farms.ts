@@ -24,9 +24,9 @@ export async function startHarvestAnalysis(supabase: SupabaseClient<any>, farmId
       prediction_cycle_status: 'ACTIVE',
       readiness_status: 'NOT_READY',
       readiness_score: 0.0,
-      bidding_status: 'NOT_READY',
-      prediction_engine: 'hybrid_mvp',
-      bidding_origin: 'IOT_AUTO'
+      bidding_status: 'CLOSED',
+      prediction_engine: 'hybrid_score',
+      bidding_origin: 'IOT'
     })
     .select()
     .single();
