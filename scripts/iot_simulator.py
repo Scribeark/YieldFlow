@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import random
@@ -56,8 +57,10 @@ def post_readings(device_key, readings):
             print(f"[Success] Device {masked_key} - Inserted {len(readings)} readings.")
         else:
             print(f"[Error] Device {masked_key} - Status {response.status_code}: {response.text}")
+            sys.exit(1)
     except Exception as e:
         print(f"[Request Failed] Error connecting to {INGEST_URL}: {str(e)}")
+        sys.exit(1)
 
 def run_simulation():
     keys = load_keys()

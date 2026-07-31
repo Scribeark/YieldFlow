@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm } from '@/lib/api/farms';
+import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, startHarvestAnalysis } from '@/lib/api/farms';
 import { 
   Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, 
   RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight,
@@ -110,7 +110,26 @@ export default function SellerDeviceReadingsPage() {
     setIsGeneratingKey(false);
   };
   const [isArchivingFarm, setIsArchivingFarm] = useState(false);
+  const [isStartingAnalysis, setIsStartingAnalysis] = useState(false);
   const [retiringDeviceId, setRetiringDeviceId] = useState<string | null>(null);
+
+  const handleStartAnalysis = async (farmId: string) => {
+    setIsStartingAnalysis(true);
+    setActionError('');
+    try {
+      const supabase = createClient();
+      const { data, error } = await startHarvestAnalysis(supabase, farmId);
+      if (error) throw new Error(error.message);
+      
+      setActionSuccess('Harvest analysis started successfully.');
+      loadFarms(); // reload list
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to start analysis.');
+    } finally {
+      setIsStartingAnalysis(false);
+    }
+  };
 
   const handleArchiveFarm = async (farmId: string) => {
     if (!window.confirm("Are you sure you want to archive this farm? This will retire all associated devices. Historical data will be preserved.")) return;
@@ -629,7 +648,17 @@ export default function SellerDeviceReadingsPage() {
                 <Card className="text-center py-8 bg-black/20 border-dashed border-white/10">
                   <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
                   <p className="text-sm font-bold opacity-80 mb-1">No active harvest analysis.</p>
-                  <p className="text-xs opacity-50">Create a listing from the Sell page to initialize analysis for this farm.</p>
+                  <p className="text-xs opacity-50 mb-4">Start analysis to compute harvest readiness based on IoT readings.</p>
+                  <Button 
+                    variant="primary" 
+                    size="sm" 
+                    disabled={isStartingAnalysis}
+                    onClick={() => handleStartAnalysis(selectedFarm.id)}
+                  >
+                    {isStartingAnalysis ? <Loader2 size={16} className="animate-spin mr-2" /> : <Activity size={16} className="mr-2" />}
+                    Start Harvest Analysis
+                  </Button>
+                  {actionError && <Alert variant="error" className="mt-3 text-left">{actionError}</Alert>}
                 </Card>
               )}
 

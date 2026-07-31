@@ -16,6 +16,24 @@ export async function archiveFarm(supabase: SupabaseClient<any>, farmId: string)
   return { data, error };
 }
 
+export async function startHarvestAnalysis(supabase: SupabaseClient<any>, farmId: string) {
+  const { data, error } = await supabase
+    .from('harvest_predictions')
+    .insert({
+      farm_id: farmId,
+      prediction_cycle_status: 'ACTIVE',
+      readiness_status: 'NOT_READY',
+      readiness_score: 0.0,
+      bidding_status: 'NOT_READY',
+      prediction_engine: 'hybrid_mvp',
+      bidding_origin: 'IOT_AUTO'
+    })
+    .select()
+    .single();
+
+  return { data, error };
+}
+
 export async function createSellerFarm(
   supabase: SupabaseClient<any>,
   userId: string,
