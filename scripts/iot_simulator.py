@@ -7,7 +7,10 @@ import requests
 from datetime import datetime, timezone
 
 # ─── Environment Configuration ────────────────────────────────────────────────
-INGEST_URL = os.environ.get('IOT_INGEST_URL', 'http://localhost:3000/api/iot/ingest/readings')
+# Sanitize the URL in case it contains accidental quotes, spaces, or newlines
+raw_url = os.environ.get('IOT_INGEST_URL', 'http://localhost:3000/api/iot/ingest/readings')
+INGEST_URL = raw_url.strip().strip("'").strip('"')
+
 DEVICE_KEYS_JSON = os.environ.get('IOT_DEVICE_KEYS_JSON', '[]')
 VERCEL_PROTECTION_BYPASS = os.environ.get('VERCEL_PROTECTION_BYPASS')
 # LOOP_INTERVAL: seconds between runs in loop mode (0 = one-shot, used for local dev)
@@ -55,7 +58,12 @@ def post_readings(device_key, readings):
     masked_key = device_key[:8] + "..." if len(device_key) > 8 else "***"
 
     print(f"[Info] Posting {len(readings)} reading(s) for device key {masked_key}...")
+    print(f"==================================================")
     print(f"[Info] Target URL: {INGEST_URL}")
+    print(f"==================================================")
+
+    if not INGEST_URL.startswith("http"):
+        print("[Error] IOT_INGEST_URL does not start with http/https. It might be malformed.")
 
     try:
         response = requests.post(INGEST_URL, json=payload, headers=headers, timeout=15)
@@ -63,6 +71,12 @@ def post_readings(device_key, readings):
 
         if status == 201:
             print(f"[Success] HTTP {status} - Inserted {len(readings)} reading(s). Response: {response.text}")
+        elif status == 404:
+            print(f"[Error] HTTP {status} - Not Found (404).")
+            print("[Error] The URL may be malformed or pointing to the wrong domain.")
+            print(f"[Error] The exact URL requested was: {INGEST_URL}")
+            print(f"  Response body: {response.text}")
+            sys.exit(1)
         elif status == 401:
             print(f"[Error] HTTP {status} - Unauthorized.")
             print("[Error] Possible causes:")

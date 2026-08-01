@@ -160,11 +160,19 @@ The workflow is at `.github/workflows/iot-simulator.yml`.
 
 | Secret | Value |
 |---|---|
-| `IOT_INGEST_URL` | `https://your-vercel-domain.vercel.app/api/iot/ingest/readings` |
+| `IOT_INGEST_URL` | `https://yield-flow-joenny-agro.vercel.app/api/iot/ingest/readings` |
 | `IOT_DEVICE_KEYS_JSON` | `["raw_key_copied_from_farm_devices_ui"]` |
 | `VERCEL_PROTECTION_BYPASS` | The actual bypass token from Vercel Dashboard → Settings → Deployment Protection → Protection Bypass for Automation |
 
-> ⚠️ `IOT_DEVICE_KEYS_JSON` must contain the **raw** key shown in the UI immediately after generating/rotating — not the hash value from the Supabase `iot_devices` table.
+> ⚠️ **CRITICAL: `IOT_INGEST_URL` Format**
+> The URL must be EXACTLY the raw string: `https://yield-flow-joenny-agro.vercel.app/api/iot/ingest/readings`
+> - **NO** quotes around it.
+> - **NO** backticks.
+> - **NO** markdown links or HTML.
+> - **NO** trailing slash.
+> 
+> ⚠️ **CRITICAL: `IOT_DEVICE_KEYS_JSON` Format**
+> `IOT_DEVICE_KEYS_JSON` must contain the **raw** key shown in the UI immediately after generating/rotating — not the hash value from the Supabase `iot_devices` table.
 > If you rotate a device key, update this secret with the new raw key.
 
 ### How to Verify the Simulator Worked
