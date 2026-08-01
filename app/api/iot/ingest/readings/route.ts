@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
+export async function GET() {
+  return NextResponse.json({
+    ok: true,
+    route: '/api/iot/ingest/readings',
+    method: 'POST required for ingestion'
+  }, { status: 200 });
+}
+
 export async function POST(request: Request) {
   try {
     const deviceKey = request.headers.get('x-device-key');
