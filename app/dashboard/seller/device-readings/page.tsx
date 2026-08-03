@@ -17,11 +17,11 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RegisterFarmModal } from '@/components/seller/RegisterFarmModal';
 import { ConnectDeviceModal } from '@/components/seller/ConnectDeviceModal';
+import { StartHarvestAnalysisModal } from '@/components/seller/StartHarvestAnalysisModal';
 import { useMapsKey } from '@/components/providers/MapsProvider';
 import { generateDeviceIngestionKey, retireDevice } from '@/lib/api/devices';
 import { Copy, Key } from 'lucide-react';
 
-// Status color helper for badges
 const getStatusColor = (status: string) => {
   switch (status) {
     case 'HARVEST_READY': return 'text-green-500 bg-green-500/10 border-green-500/20';
@@ -32,6 +32,14 @@ const getStatusColor = (status: string) => {
     case 'NOT_READY': return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
     default: return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
   }
+};
+
+const getFreshnessState = (lastSeenAt: string | null) => {
+  if (!lastSeenAt) return { state: 'NO_DATA', color: 'text-gray-400 bg-gray-500/20' };
+  const diffHours = (new Date().getTime() - new Date(lastSeenAt).getTime()) / (1000 * 60 * 60);
+  if (diffHours < 3) return { state: 'FRESH', color: 'text-green-400 bg-green-500/20' };
+  if (diffHours <= 12) return { state: 'DELAYED', color: 'text-yellow-400 bg-yellow-500/20' };
+  return { state: 'STALE', color: 'text-red-400 bg-red-500/20' };
 };
 
 export default function SellerDeviceReadingsPage() {
@@ -48,6 +56,7 @@ export default function SellerDeviceReadingsPage() {
   // Modals state
   const [showCreateFarm, setShowCreateFarm] = useState(false);
   const [showRegisterDevice, setShowRegisterDevice] = useState(false);
+  const [showStartAnalysis, setShowStartAnalysis] = useState(false);
   
   // Action state
   const [convertingPredId, setConvertingPredId] = useState<string | null>(null);
@@ -113,22 +122,14 @@ export default function SellerDeviceReadingsPage() {
   const [isStartingAnalysis, setIsStartingAnalysis] = useState(false);
   const [retiringDeviceId, setRetiringDeviceId] = useState<string | null>(null);
 
-  const handleStartAnalysis = async (farmId: string) => {
-    setIsStartingAnalysis(true);
-    setActionError('');
-    try {
-      const supabase = createClient();
-      const { data, error } = await startHarvestAnalysis(supabase, farmId);
-      if (error) throw new Error(error.message);
-      
-      setActionSuccess('Harvest analysis started successfully.');
-      loadFarms(); // reload list
-    } catch (err: any) {
-      console.error(err);
-      setActionError(err.message || 'Failed to start analysis.');
-    } finally {
-      setIsStartingAnalysis(false);
-    }
+  const handleStartAnalysisClick = () => {
+    setShowStartAnalysis(true);
+  };
+
+  const handleStartAnalysisSuccess = () => {
+    setShowStartAnalysis(false);
+    setActionSuccess('Harvest analysis started successfully.');
+    loadFarms();
   };
 
   const handleArchiveFarm = async (farmId: string) => {
@@ -418,12 +419,17 @@ export default function SellerDeviceReadingsPage() {
                         </div>
                         <div className="flex flex-col items-end justify-between self-stretch">
                           <div className="text-right">
-                            <div className="text-[10px] uppercase font-bold text-green-400 tracking-wider flex items-center justify-end">
+                            <div className="text-[10px] uppercase font-bold text-green-400 tracking-wider flex items-center justify-end mb-1">
                               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse mr-1"></div>
                               {device.device_status}
                             </div>
-                            <div className="text-[10px] opacity-50 mt-1">
-                              {device.last_seen_at ? `Seen: ${new Date(device.last_seen_at).toLocaleDateString()}` : 'Never seen'}
+                            <div className="flex items-center justify-end gap-1">
+                              <div className="text-[10px] opacity-50">
+                                {device.last_seen_at ? `Seen: ${new Date(device.last_seen_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}` : 'Never'}
+                              </div>
+                              <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-bold ${getFreshnessState(device.last_seen_at).color}`}>
+                                {getFreshnessState(device.last_seen_at).state}
+                              </span>
                             </div>
                           </div>
                           <div className="flex gap-2 mt-2">
@@ -589,22 +595,47 @@ export default function SellerDeviceReadingsPage() {
                     <div className="space-y-4">
                       <h4 className="text-xs uppercase opacity-50 font-bold tracking-wider">Marketplace Trigger</h4>
                       
-                      {['BUYER_BIDDING_OPEN', 'HARVEST_READY'].includes(activePred.readiness_status) ? (
-                        <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
-                          <ShoppingCart size={24} className="text-blue-400 mb-2" />
-                          <h5 className="font-bold text-blue-400 mb-1">This harvest can now appear to buyers!</h5>
-                          <p className="text-xs opacity-80 mb-3">The analysis determined this crop is ready for the marketplace. Bidding is {activePred.bidding_status}.</p>
-                          <Link href="/dashboard/seller/bids" className="w-full">
-                            <Button variant="primary" className="w-full text-sm">View Bids</Button>
-                          </Link>
-                        </div>
-                      ) : (
-                        <div className="bg-black/20 border border-dashed border-white/20 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
-                          <Target size={24} className="opacity-30 mb-2" />
-                          <h5 className="font-bold opacity-80 mb-1">Harvest is not open for buyer bidding yet.</h5>
-                          <p className="text-xs opacity-60">Readiness score must reach the threshold to trigger marketplace visibility.</p>
-                        </div>
-                      )}
+                      {(() => {
+                        // Check if the overall farm data is stale based on its devices
+                        const farmDevices = selectedFarm.iot_devices?.filter((d: any) => d.device_status !== 'RETIRED') || [];
+                        const latestSeen = farmDevices.reduce((latest: Date | null, d: any) => {
+                          if (!d.last_seen_at) return latest;
+                          const dDate = new Date(d.last_seen_at);
+                          return !latest || dDate > latest ? dDate : latest;
+                        }, null);
+                        const isStale = latestSeen ? getFreshnessState(latestSeen.toISOString()).state === 'STALE' : true;
+
+                        if (isStale) {
+                          return (
+                            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
+                              <AlertTriangle size={24} className="text-red-400 mb-2" />
+                              <h5 className="font-bold text-red-400 mb-1">Data is Stale</h5>
+                              <p className="text-xs opacity-80 mb-3">The IoT devices have not sent data recently. The readiness prediction is paused and this farm is hidden from the marketplace until fresh data arrives.</p>
+                            </div>
+                          );
+                        }
+
+                        if (['BUYER_BIDDING_OPEN', 'HARVEST_READY'].includes(activePred.readiness_status)) {
+                          return (
+                            <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
+                              <ShoppingCart size={24} className="text-blue-400 mb-2" />
+                              <h5 className="font-bold text-blue-400 mb-1">This harvest can now appear to buyers!</h5>
+                              <p className="text-xs opacity-80 mb-3">The analysis determined this crop is ready for the marketplace. Bidding is {activePred.bidding_status}.</p>
+                              <Link href="/dashboard/seller/bids" className="w-full">
+                                <Button variant="primary" className="w-full text-sm">View Bids</Button>
+                              </Link>
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <div className="bg-black/20 border border-dashed border-white/20 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
+                            <Target size={24} className="opacity-30 mb-2" />
+                            <h5 className="font-bold opacity-80 mb-1">Harvest is not open for buyer bidding yet.</h5>
+                            <p className="text-xs opacity-60">Readiness score must reach the threshold to trigger marketplace visibility.</p>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 
@@ -652,10 +683,9 @@ export default function SellerDeviceReadingsPage() {
                   <Button 
                     variant="primary" 
                     size="sm" 
-                    disabled={isStartingAnalysis}
-                    onClick={() => handleStartAnalysis(selectedFarm.id)}
+                    onClick={handleStartAnalysisClick}
                   >
-                    {isStartingAnalysis ? <Loader2 size={16} className="animate-spin mr-2" /> : <Activity size={16} className="mr-2" />}
+                    <Activity size={16} className="mr-2" />
                     Start Harvest Analysis
                   </Button>
                   {actionError && <Alert variant="error" className="mt-3 text-left">{actionError}</Alert>}
@@ -697,6 +727,14 @@ export default function SellerDeviceReadingsPage() {
             setShowRegisterDevice(false);
             loadFarms();
           }}
+        />
+      )}
+
+      {showStartAnalysis && selectedFarm && (
+        <StartHarvestAnalysisModal
+          farm={selectedFarm}
+          onClose={() => setShowStartAnalysis(false)}
+          onSuccess={handleStartAnalysisSuccess}
         />
       )}
     </PageContainer>

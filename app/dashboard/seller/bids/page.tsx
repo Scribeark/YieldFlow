@@ -26,7 +26,9 @@ import {
 
 function calcStats(prediction: any) {
   const bids: any[] = prediction.harvest_bids || [];
-  const total = prediction.expected_quantity_volume || 0;
+  const max = prediction.expected_quantity_max || prediction.expected_quantity_volume || 0;
+  const min = prediction.expected_quantity_min || null;
+  const total = max;
   const accepted = bids
     .filter((b) => ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'CONVERTED_TO_TRADE'].includes(b.bid_status))
     .reduce((sum, b) => sum + (b.accepted_quantity || 0), 0);
@@ -36,7 +38,7 @@ function calcStats(prediction: any) {
   const converted = bids
     .filter((b) => b.bid_status === 'CONVERTED_TO_TRADE')
     .reduce((sum, b) => sum + (b.accepted_quantity || 0), 0);
-  return { total, accepted, remaining: Math.max(0, total - accepted), pending, converted };
+  return { min, max, total, accepted, remaining: Math.max(0, total - accepted), pending, converted };
 }
 
 const BID_STATUS_STYLES: Record<string, string> = {
@@ -338,23 +340,31 @@ export default function SellerBidManagementPage() {
                 </div>
 
                 {/* Quantity Stats Bar */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 p-4 bg-black/20 rounded-lg text-center">
+                <div className={`grid gap-3 mt-4 p-4 bg-black/20 rounded-lg text-center ${stats.converted > 0 ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
                   <div>
-                    <div className="text-xs opacity-60 mb-1">Total Listed</div>
-                    <div className="font-bold text-lg">{stats.total} <span className="text-xs opacity-70">{unit}</span></div>
+                    <div className="text-xs opacity-60 mb-1">Expected Range</div>
+                    <div className="font-bold text-lg">
+                      {stats.min ? `${stats.min} - ${stats.max}` : stats.max} <span className="text-xs opacity-70">{unit}</span>
+                    </div>
                   </div>
                   <div>
-                    <div className="text-xs opacity-60 mb-1">Accepted</div>
+                    <div className="text-xs opacity-60 mb-1">Provisional Accepted</div>
                     <div className="font-bold text-lg text-green-400">{stats.accepted} <span className="text-xs opacity-70">{unit}</span></div>
                   </div>
                   <div>
-                    <div className="text-xs opacity-60 mb-1">Remaining</div>
+                    <div className="text-xs opacity-60 mb-1">Remaining Forecast</div>
                     <div className="font-bold text-lg text-blue-400">{stats.remaining} <span className="text-xs opacity-70">{unit}</span></div>
                   </div>
                   <div>
                     <div className="text-xs opacity-60 mb-1">Pending Bids</div>
                     <div className="font-bold text-lg text-yellow-400">{stats.pending} <span className="text-xs opacity-70">{unit}</span></div>
                   </div>
+                  {stats.converted > 0 && (
+                    <div>
+                      <div className="text-xs opacity-60 mb-1">Converted Trade</div>
+                      <div className="font-bold text-lg text-purple-400">{stats.converted} <span className="text-xs opacity-70">{unit}</span></div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Quantity progress bar */}

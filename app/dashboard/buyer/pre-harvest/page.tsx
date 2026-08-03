@@ -101,8 +101,12 @@ export default function BuyerHarvestOpportunitiesPage() {
               <div className="bg-black/20 p-4 rounded-lg mb-4 flex-grow">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <div className="text-xs opacity-60 mb-1">Total Quantity</div>
-                    <div className="font-bold text-lg">{opp.expected_quantity_volume} <span className="text-sm opacity-70">{opp.expected_quantity_unit}</span></div>
+                    <div className="text-xs opacity-60 mb-1">Expected Harvest</div>
+                    <div className="font-bold text-lg">
+                      {opp.expected_quantity_min && opp.expected_quantity_max 
+                        ? `${opp.expected_quantity_min} - ${opp.expected_quantity_max}` 
+                        : opp.expected_quantity_volume} <span className="text-sm opacity-70">{opp.expected_quantity_unit}</span>
+                    </div>
                   </div>
                   <div>
                     <div className="text-xs opacity-60 mb-1">Min Price / {opp.expected_quantity_unit}</div>
@@ -115,7 +119,7 @@ export default function BuyerHarvestOpportunitiesPage() {
                 {opp.bidding_origin !== 'MANUAL' && opp.readiness_score != null && (
                   <div className="mt-4 pt-4 border-t border-white/10">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="text-xs opacity-60">IoT Readiness Score</span>
+                      <span className="text-xs opacity-60">Farm Readiness Score</span>
                       <span className="text-xs font-bold text-green-400">{Math.round(opp.readiness_score)}/100</span>
                     </div>
                     <div className="w-full bg-white/10 rounded-full h-1.5">

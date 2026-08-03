@@ -16,7 +16,25 @@ export async function archiveFarm(supabase: SupabaseClient<any>, farmId: string)
   return { data, error };
 }
 
-export async function startHarvestAnalysis(supabase: SupabaseClient<any>, farmId: string) {
+export async function startHarvestAnalysis(
+  supabase: SupabaseClient<any>,
+  farmId: string,
+  params: {
+    cropType: string;
+    minQuantity: number;
+    maxQuantity: number;
+    unit: string;
+  }
+) {
+  // First update the farm crop type
+  const { error: farmError } = await supabase
+    .from('farms')
+    .update({ crop_type: params.cropType })
+    .eq('id', farmId);
+    
+  if (farmError) return { data: null, error: farmError };
+
+  // Then create the prediction
   const { data, error } = await supabase
     .from('harvest_predictions')
     .insert({
@@ -26,7 +44,11 @@ export async function startHarvestAnalysis(supabase: SupabaseClient<any>, farmId
       readiness_score: 0.0,
       bidding_status: 'CLOSED',
       prediction_engine: 'hybrid_score',
-      bidding_origin: 'IOT'
+      bidding_origin: 'IOT',
+      expected_quantity_min: params.minQuantity,
+      expected_quantity_max: params.maxQuantity,
+      expected_quantity_volume: params.maxQuantity,
+      expected_quantity_unit: params.unit
     })
     .select()
     .single();

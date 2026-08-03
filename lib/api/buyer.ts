@@ -112,10 +112,40 @@ export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bi
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
   const { data, error } = await supabase
     .from('harvest_predictions')
-    .select('*, farms(name, crop_type, physical_address, latitude, longitude)')
+    .select('*, farms(name, crop_type, physical_address, latitude, longitude, iot_devices(last_seen_at))')
     .eq('bidding_status', 'OPEN')
     .order('created_at', { ascending: false });
-  return { data, error };
+
+  if (error || !data) return { data, error };
+
+  // Defensive filtering for IoT origin
+  const validData = data.filter((row: any) => {
+    if (row.bidding_origin === 'IOT') {
+      const farm = row.farms;
+      if (!farm) return false;
+      
+      // 1. Business Data completeness
+      if (!farm.crop_type || farm.crop_type === 'Unknown Crop' || farm.crop_type.trim() === '') return false;
+      if (!row.expected_quantity_min || row.expected_quantity_min <= 0) return false;
+      if (!row.expected_quantity_max || row.expected_quantity_max < row.expected_quantity_min) return false;
+
+      // 2. Freshness check (data must be <= 3 hours old for IoT readiness to remain valid)
+      const devices = farm.iot_devices || [];
+      const latestSeen = devices.reduce((latest: Date | null, d: any) => {
+        if (!d.last_seen_at) return latest;
+        const dDate = new Date(d.last_seen_at);
+        return !latest || dDate > latest ? dDate : latest;
+      }, null);
+      
+      if (!latestSeen) return false;
+      
+      const diffHours = (new Date().getTime() - latestSeen.getTime()) / (1000 * 60 * 60);
+      if (diffHours > 3) return false; // Stale data hides it from marketplace
+    }
+    return true;
+  });
+
+  return { data: validData, error };
 }
 
 export async function requestEvidence(
