@@ -89,9 +89,6 @@ export async function createSellerFarm(
     .insert({
       user_id: userId,
       name: params.name,
-      crop_type: 'Mixed', // Legacy column, bypassed
-      planting_date: null,
-      expected_maturity_days: null,
       latitude: params.latitude,
       longitude: params.longitude,
       physical_address: params.address,
