@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
@@ -79,9 +81,15 @@ export function LocationPicker({
         onLngChange(pos.coords.longitude);
         
         // Reverse geocode to get a readable address if possible
-        const result = await geocodeAddress(`${pos.coords.latitude},${pos.coords.longitude}`, apiKey);
-        if (result && result.address) {
-          onAddressChange(result.address);
+        try {
+          // Google's geocoding API can take a lat,lng string in the address parameter, 
+          // or ideally in a latlng parameter. We'll use the existing function which passes it as address.
+          const result = await geocodeAddress(`${pos.coords.latitude},${pos.coords.longitude}`, apiKey);
+          if (result && result.address) {
+            onAddressChange(result.address);
+          }
+        } catch (e) {
+          console.error("Reverse geocode failed:", e);
         }
         
         setSuccess('GPS location acquired.');
@@ -89,10 +97,18 @@ export function LocationPicker({
       },
       (err) => {
         console.warn('GPS error:', err);
-        setError('Could not get GPS location. Please search for your address instead.');
+        let errorMessage = 'Could not get GPS location. Please search for your address instead.';
+        if (err.code === 1) {
+          errorMessage = 'Location access denied. Please enable location permissions in your browser.';
+        } else if (err.code === 2) {
+          errorMessage = 'Location unavailable. Please check your device GPS.';
+        } else if (err.code === 3) {
+          errorMessage = 'Location request timed out. Please try again.';
+        }
+        setError(errorMessage);
         setGpsLoading(false);
       },
-      { timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
