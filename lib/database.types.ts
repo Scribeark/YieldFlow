@@ -9,6 +9,214 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      farms: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          crop_type: string
+          planting_date: string | null
+          expected_maturity_days: number | null
+          physical_address: string | null
+          latitude: number | null
+          longitude: number | null
+          farm_status: string | null
+          farm_size_value: number | null
+          farm_size_unit: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          crop_type: string
+          planting_date?: string | null
+          expected_maturity_days?: number | null
+          physical_address?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          farm_status?: string | null
+          farm_size_value?: number | null
+          farm_size_unit?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['farms']['Insert']>
+        Relationships: []
+      }
+      farm_crop_allocations: {
+        Row: {
+          id: string
+          farm_id: string
+          user_id: string
+          crop_type: string
+          land_size_value: number | null
+          land_size_unit: string | null
+          expected_harvest_min: number | null
+          expected_harvest_max: number | null
+          expected_harvest_unit: string
+          planting_date: string | null
+          expected_maturity_days: number | null
+          expected_maturity_date: string | null
+          minimum_price_per_unit: number | null
+          allocation_status: string
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          farm_id: string
+          user_id: string
+          crop_type: string
+          land_size_value?: number | null
+          land_size_unit?: string | null
+          expected_harvest_min?: number | null
+          expected_harvest_max?: number | null
+          expected_harvest_unit?: string
+          planting_date?: string | null
+          expected_maturity_days?: number | null
+          expected_maturity_date?: string | null
+          minimum_price_per_unit?: number | null
+          allocation_status?: string
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['farm_crop_allocations']['Insert']>
+        Relationships: []
+      }
+      harvest_predictions: {
+        Row: {
+          id: string
+          farm_id: string
+          crop_allocation_id: string | null
+          prediction_cycle_status: string
+          readiness_status: string
+          readiness_score: number
+          bidding_status: string
+          bidding_origin: string
+          prediction_engine: string
+          expected_quantity_min: number | null
+          expected_quantity_max: number | null
+          expected_quantity_volume: number | null
+          expected_quantity_unit: string | null
+          confirmed_quantity: number | null
+          minimum_price_per_unit: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          farm_id: string
+          crop_allocation_id?: string | null
+          prediction_cycle_status?: string
+          readiness_status?: string
+          readiness_score?: number
+          bidding_status?: string
+          bidding_origin?: string
+          prediction_engine?: string
+          expected_quantity_min?: number | null
+          expected_quantity_max?: number | null
+          expected_quantity_volume?: number | null
+          expected_quantity_unit?: string | null
+          confirmed_quantity?: number | null
+          minimum_price_per_unit?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['harvest_predictions']['Insert']>
+        Relationships: []
+      }
+      iot_devices: {
+        Row: {
+          id: string
+          user_id: string
+          farm_id: string
+          crop_allocation_id: string | null
+          device_name: string
+          device_serial_number: string
+          device_type: string
+          device_status: string
+          installation_latitude: number | null
+          installation_longitude: number | null
+          installation_address: string | null
+          last_seen_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          farm_id: string
+          crop_allocation_id?: string | null
+          device_name: string
+          device_serial_number: string
+          device_type: string
+          device_status?: string
+          installation_latitude?: number | null
+          installation_longitude?: number | null
+          installation_address?: string | null
+          last_seen_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['iot_devices']['Insert']>
+        Relationships: []
+      }
+      iot_sensor_streams: {
+        Row: {
+          id: string
+          device_id: string
+          farm_id: string
+          crop_allocation_id: string | null
+          soil_moisture: number
+          ambient_temperature: number
+          ambient_humidity: number
+          recorded_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          device_id: string
+          farm_id: string
+          crop_allocation_id?: string | null
+          soil_moisture: number
+          ambient_temperature: number
+          ambient_humidity: number
+          recorded_at?: string
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['iot_sensor_streams']['Insert']>
+        Relationships: []
+      }
+      harvest_bids: {
+        Row: {
+          id: string
+          prediction_id: string
+          buyer_id: string
+          bid_status: string
+          desired_quantity: number
+          accepted_quantity: number | null
+          offered_price_per_unit: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          prediction_id: string
+          buyer_id: string
+          bid_status?: string
+          desired_quantity: number
+          accepted_quantity?: number | null
+          offered_price_per_unit?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['harvest_bids']['Insert']>
+        Relationships: []
+      }
       users: {
         Row: {
           id: string

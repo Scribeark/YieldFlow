@@ -3,7 +3,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
 export async function getSellerFarms(supabase: SupabaseClient<any>, userId: string) {
   const { data, error } = await supabase
     .from('farms')
-    .select('*, iot_devices(*), harvest_predictions(*)')
+    .select('*, iot_devices(*), harvest_predictions(*), farm_crop_allocations(*)')
     .eq('user_id', userId)
     .or('farm_status.eq.ACTIVE,farm_status.is.null')
     .order('created_at', { ascending: false });
@@ -16,43 +16,59 @@ export async function archiveFarm(supabase: SupabaseClient<any>, farmId: string)
   return { data, error };
 }
 
-export async function startHarvestAnalysis(
+// Removed deprecated startHarvestAnalysis flow that erroneously created predictions directly
+
+export async function getCropAllocations(supabase: SupabaseClient<any>, farmId: string) {
+  const { data, error } = await supabase
+    .from('farm_crop_allocations')
+    .select('*, harvest_predictions(*), iot_devices(*)')
+    .eq('farm_id', farmId)
+    .neq('allocation_status', 'ARCHIVED')
+    .order('created_at', { ascending: false });
+  return { data, error };
+}
+
+export async function createCropAllocationDraft(
   supabase: SupabaseClient<any>,
-  farmId: string,
   params: {
+    farmId: string;
     cropType: string;
-    minQuantity: number;
-    maxQuantity: number;
-    unit: string;
+    landSizeValue?: number;
+    landSizeUnit?: string;
+    expectedHarvestMin?: number;
+    expectedHarvestMax?: number;
+    expectedHarvestUnit: string;
+    plantingDate?: string;
+    expectedMaturityDays?: number;
+    minimumPricePerUnit?: number;
+    notes?: string;
   }
 ) {
-  // First update the farm crop type
-  const { error: farmError } = await supabase
-    .from('farms')
-    .update({ crop_type: params.cropType })
-    .eq('id', farmId);
-    
-  if (farmError) return { data: null, error: farmError };
+  const { data, error } = await supabase.rpc('rpc_save_crop_allocation_draft', {
+    p_farm_id: params.farmId,
+    p_crop_type: params.cropType,
+    p_land_size_value: params.landSizeValue || null,
+    p_land_size_unit: params.landSizeUnit || null,
+    p_expected_harvest_min: params.expectedHarvestMin || null,
+    p_expected_harvest_max: params.expectedHarvestMax || null,
+    p_expected_harvest_unit: params.expectedHarvestUnit || 'kg',
+    p_planting_date: params.plantingDate || null,
+    p_expected_maturity_days: params.expectedMaturityDays || null,
+    p_minimum_price_per_unit: params.minimumPricePerUnit || null,
+    p_notes: params.notes || null
+  });
+  return { data, error };
+}
 
-  // Then create the prediction
-  const { data, error } = await supabase
-    .from('harvest_predictions')
-    .insert({
-      farm_id: farmId,
-      prediction_cycle_status: 'ACTIVE',
-      readiness_status: 'NOT_READY',
-      readiness_score: 0.0,
-      bidding_status: 'CLOSED',
-      prediction_engine: 'hybrid_score',
-      bidding_origin: 'IOT',
-      expected_quantity_min: params.minQuantity,
-      expected_quantity_max: params.maxQuantity,
-      expected_quantity_volume: params.maxQuantity,
-      expected_quantity_unit: params.unit
-    })
-    .select()
-    .single();
-
+export async function openCropAllocationBidding(
+  supabase: SupabaseClient<any>,
+  allocationId: string,
+  minPrice?: number
+) {
+  const { data, error } = await supabase.rpc('rpc_open_crop_allocation_bidding', {
+    p_crop_allocation_id: allocationId,
+    p_minimum_price_per_unit: minPrice || null
+  });
   return { data, error };
 }
 
@@ -61,12 +77,11 @@ export async function createSellerFarm(
   userId: string,
   params: {
     name: string;
-    cropType: string;
-    plantingDate: string;
-    maturityDays: number;
     latitude: number;
     longitude: number;
     address: string;
+    farmSizeValue?: number;
+    farmSizeUnit?: string;
   }
 ) {
   const { data, error } = await supabase
@@ -74,12 +89,14 @@ export async function createSellerFarm(
     .insert({
       user_id: userId,
       name: params.name,
-      crop_type: params.cropType,
-      planting_date: params.plantingDate,
-      expected_maturity_days: params.maturityDays,
+      crop_type: 'Mixed', // Legacy column, bypassed
+      planting_date: null,
+      expected_maturity_days: null,
       latitude: params.latitude,
       longitude: params.longitude,
-      physical_address: params.address
+      physical_address: params.address,
+      farm_size_value: params.farmSizeValue || null,
+      farm_size_unit: params.farmSizeUnit || null
     })
     .select()
     .single();
@@ -98,6 +115,7 @@ export async function registerSellerDevice(
     latitude: number;
     longitude: number;
     address: string;
+    cropAllocationId?: string;
   }
 ) {
   const { data, error } = await supabase
@@ -105,6 +123,7 @@ export async function registerSellerDevice(
     .insert({
       user_id: userId,
       farm_id: farmId,
+      crop_allocation_id: params.cropAllocationId || null,
       device_name: params.name,
       device_serial_number: params.serial,
       device_type: params.type,

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, startHarvestAnalysis } from '@/lib/api/farms';
+import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding } from '@/lib/api/farms';
 import { 
   Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, 
   RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight,
@@ -17,7 +17,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RegisterFarmModal } from '@/components/seller/RegisterFarmModal';
 import { ConnectDeviceModal } from '@/components/seller/ConnectDeviceModal';
-import { StartHarvestAnalysisModal } from '@/components/seller/StartHarvestAnalysisModal';
+import { CreateCropAllocationModal } from '@/components/seller/CreateCropAllocationModal';
 import { useMapsKey } from '@/components/providers/MapsProvider';
 import { generateDeviceIngestionKey, retireDevice } from '@/lib/api/devices';
 import { Copy, Key } from 'lucide-react';
@@ -56,7 +56,7 @@ export default function SellerDeviceReadingsPage() {
   // Modals state
   const [showCreateFarm, setShowCreateFarm] = useState(false);
   const [showRegisterDevice, setShowRegisterDevice] = useState(false);
-  const [showStartAnalysis, setShowStartAnalysis] = useState(false);
+  const [showCreateAllocation, setShowCreateAllocation] = useState(false);
   
   // Action state
   const [convertingPredId, setConvertingPredId] = useState<string | null>(null);
@@ -119,17 +119,25 @@ export default function SellerDeviceReadingsPage() {
     setIsGeneratingKey(false);
   };
   const [isArchivingFarm, setIsArchivingFarm] = useState(false);
-  const [isStartingAnalysis, setIsStartingAnalysis] = useState(false);
   const [retiringDeviceId, setRetiringDeviceId] = useState<string | null>(null);
+  const [isOpeningBidding, setIsOpeningBidding] = useState<string | null>(null);
 
-  const handleStartAnalysisClick = () => {
-    setShowStartAnalysis(true);
-  };
-
-  const handleStartAnalysisSuccess = () => {
-    setShowStartAnalysis(false);
-    setActionSuccess('Harvest analysis started successfully.');
-    loadFarms();
+  const handleOpenBidding = async (allocId: string) => {
+    if (!window.confirm("Open this crop plot for buyer bidding?")) return;
+    setIsOpeningBidding(allocId);
+    setActionError('');
+    try {
+      const { data, error } = await openCropAllocationBidding(supabase, allocId);
+      if (error) throw new Error(error.message);
+      if (data && data.success === false) throw new Error(data.error);
+      setActionSuccess('Bidding opened successfully!');
+      loadFarms();
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to open bidding.');
+    } finally {
+      setIsOpeningBidding(null);
+    }
   };
 
   const handleArchiveFarm = async (farmId: string) => {
@@ -184,7 +192,7 @@ export default function SellerDeviceReadingsPage() {
     }
   };
 
-  const activePred = selectedFarm?.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
+
 
   // Computed summary metrics
   const totalFarms = farms.length;
@@ -557,140 +565,116 @@ export default function SellerDeviceReadingsPage() {
                 </Card>
               )}
 
-              {/* Prediction Engine & Marketplace Trigger */}
-              {activePred ? (
-                <Card className="border-t-4 border-t-purple-500">
-                  <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
-                    <h3 className="font-bold flex items-center">
-                      <BarChart2 className="mr-2 text-purple-400" /> Harvest Analysis & Marketplace Status
-                    </h3>
-                    <div className="text-[10px] opacity-60">
-                      Engine: {activePred.prediction_engine || 'Hybrid MVP'} • Updated: {new Date(activePred.updated_at).toLocaleString()}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div className="space-y-4">
-                      <h4 className="text-xs uppercase opacity-50 font-bold tracking-wider">Analysis Output</h4>
-                      <div className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5">
-                        <span className="text-sm">Readiness Score</span>
-                        <span className="font-mono font-bold text-lg">{activePred.readiness_score?.toFixed(1) || '0.0'} / 100</span>
-                      </div>
-                      <div className="flex items-center justify-between bg-black/20 p-3 rounded-lg border border-white/5">
-                        <span className="text-sm">Readiness Status</span>
-                        <span className={`text-xs px-2 py-1 rounded-md font-bold border ${getStatusColor(activePred.readiness_status)}`}>
-                          {activePred.readiness_status}
-                        </span>
-                      </div>
-                      <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-                        <div className="text-xs opacity-60 mb-1">Predicted Harvest Window</div>
-                        <div className="font-bold text-sm">
-                          {activePred.predicted_harvest_start ? new Date(activePred.predicted_harvest_start).toLocaleDateString() : 'N/A'} 
-                          {' → '} 
-                          {activePred.predicted_harvest_end ? new Date(activePred.predicted_harvest_end).toLocaleDateString() : 'N/A'}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <h4 className="text-xs uppercase opacity-50 font-bold tracking-wider">Marketplace Trigger</h4>
-                      
-                      {(() => {
-                        // Check if the overall farm data is stale based on its devices
-                        const farmDevices = selectedFarm.iot_devices?.filter((d: any) => d.device_status !== 'RETIRED') || [];
-                        const latestSeen = farmDevices.reduce((latest: Date | null, d: any) => {
-                          if (!d.last_seen_at) return latest;
-                          const dDate = new Date(d.last_seen_at);
-                          return !latest || dDate > latest ? dDate : latest;
-                        }, null);
-                        const isStale = latestSeen ? getFreshnessState(latestSeen.toISOString()).state === 'STALE' : true;
-
-                        if (isStale) {
-                          return (
-                            <div className="bg-red-500/10 border border-red-500/30 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
-                              <AlertTriangle size={24} className="text-red-400 mb-2" />
-                              <h5 className="font-bold text-red-400 mb-1">Data is Stale</h5>
-                              <p className="text-xs opacity-80 mb-3">The IoT devices have not sent data recently. The readiness prediction is paused and this farm is hidden from the marketplace until fresh data arrives.</p>
-                            </div>
-                          );
-                        }
-
-                        if (['BUYER_BIDDING_OPEN', 'HARVEST_READY'].includes(activePred.readiness_status)) {
-                          return (
-                            <div className="bg-blue-500/10 border border-blue-500/30 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
-                              <ShoppingCart size={24} className="text-blue-400 mb-2" />
-                              <h5 className="font-bold text-blue-400 mb-1">This harvest can now appear to buyers!</h5>
-                              <p className="text-xs opacity-80 mb-3">The analysis determined this crop is ready for the marketplace. Bidding is {activePred.bidding_status}.</p>
-                              <Link href="/dashboard/seller/bids" className="w-full">
-                                <Button variant="primary" className="w-full text-sm">View Bids</Button>
-                              </Link>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div className="bg-black/20 border border-dashed border-white/20 p-4 rounded-lg flex flex-col items-center justify-center h-full text-center">
-                            <Target size={24} className="opacity-30 mb-2" />
-                            <h5 className="font-bold opacity-80 mb-1">Harvest is not open for buyer bidding yet.</h5>
-                            <p className="text-xs opacity-60">Readiness score must reach the threshold to trigger marketplace visibility.</p>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-
-                  {/* Actions Area */}
-                  {actionError && <Alert variant="error" className="mb-3">{actionError}</Alert>}
-                  {actionSuccess && <Alert variant="success" className="mb-3">{actionSuccess}</Alert>}
-                  
-                  <div className="border-t border-white/10 pt-4 flex flex-wrap gap-3 items-center">
-                    <span className="text-xs opacity-50 font-bold uppercase tracking-wider mr-2">Quick Actions:</span>
-                    
-                    {activePred.bidding_status === 'ALLOCATED' && (
-                      <Button variant="secondary" size="sm" onClick={() => {
-                        // Normally opens Confirm Harvest Modal (handled via /dashboard/seller/bids in this flow to avoid duplication, or implement here)
-                        alert("To confirm harvest and setup pickup details, use the Manage Bids view.");
-                      }}>
-                        <CheckCircle size={14} className="mr-1" /> Prepare Harvest Confirmation
-                      </Button>
-                    )}
-                    
-                    {activePred.bidding_status === 'HARVEST_CONFIRMED' && (
-                      <Button variant="primary" size="sm" disabled={convertingPredId === activePred.id} onClick={async () => {
-                        if (!window.confirm('Convert all accepted bids into trade requests?')) return;
-                        setConvertingPredId(activePred.id);
-                        setActionError('');
-                        const { error } = await convertBidsToTrades(supabase, activePred.id);
-                        setConvertingPredId(null);
-                        if (error) setActionError(error.message);
-                        else { setActionSuccess('Bids converted to trades! Check My Requests.'); loadFarms(); }
-                      }}>
-                        {convertingPredId === activePred.id ? <Loader2 size={14} className="animate-spin mr-1" /> : <ArrowRight size={14} className="mr-1" />}
-                        Convert to Trades
-                      </Button>
-                    )}
-                    
-                    <Link href="/dashboard/seller/bids">
-                      <Button variant="ghost" size="sm">Manage Bids Hub</Button>
-                    </Link>
-                  </div>
-                </Card>
-              ) : (
-                <Card className="text-center py-8 bg-black/20 border-dashed border-white/10">
-                  <BarChart2 size={32} className="mx-auto mb-3 opacity-30" />
-                  <p className="text-sm font-bold opacity-80 mb-1">No active harvest analysis.</p>
-                  <p className="text-xs opacity-50 mb-4">Start analysis to compute harvest readiness based on IoT readings.</p>
-                  <Button 
-                    variant="primary" 
-                    size="sm" 
-                    onClick={handleStartAnalysisClick}
-                  >
-                    <Activity size={16} className="mr-2" />
-                    Start Harvest Analysis
+              {/* Crop Allocations & Marketplace Trigger */}
+              <Card className="border-t-4 border-t-[var(--agri-primary)]">
+                <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3">
+                  <h3 className="font-bold flex items-center">
+                    <Sprout className="mr-2 text-[var(--agri-primary)]" /> Crop Plots & Harvest Bidding
+                  </h3>
+                  <Button variant="ghost" size="sm" onClick={() => setShowCreateAllocation(true)}>
+                    <Plus size={14} className="mr-1"/> Add Crop Plot
                   </Button>
-                  {actionError && <Alert variant="error" className="mt-3 text-left">{actionError}</Alert>}
-                </Card>
-              )}
+                </div>
+
+                {selectedFarm.farm_crop_allocations && selectedFarm.farm_crop_allocations.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedFarm.farm_crop_allocations.map((alloc: any) => {
+                      const activePred = alloc.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
+                      return (
+                        <div key={alloc.id} className="bg-black/20 p-4 rounded-lg border border-white/5 space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-bold flex items-center"><Leaf size={14} className="mr-1 text-green-400"/> {alloc.crop_type}</h4>
+                              <div className="text-xs opacity-60">
+                                Size: {alloc.land_size_value} {alloc.land_size_unit} • Planted: {alloc.planting_date ? new Date(alloc.planting_date).toLocaleDateString() : 'N/A'} • Maturity: {alloc.expected_maturity_days} days
+                              </div>
+                            </div>
+                            <div className="text-right text-xs">
+                              <span className={`px-2 py-1 rounded font-bold border ${alloc.allocation_status === 'ACTIVE' ? 'text-green-400 bg-green-500/10 border-green-500/30' : 'text-gray-400 bg-gray-500/10 border-gray-500/30'}`}>
+                                {alloc.allocation_status}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Prediction / Bidding Status */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-black/20 p-3 rounded-lg border border-white/5">
+                              <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold">IoT Readiness</div>
+                              {activePred ? (
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between"><span>Score:</span> <span className="font-mono font-bold">{activePred.readiness_score?.toFixed(1) || '0.0'} / 100</span></div>
+                                  <div className="flex justify-between items-center">
+                                    <span>Status:</span> 
+                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${getStatusColor(activePred.readiness_status)}`}>{activePred.readiness_status}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-xs opacity-50 py-2 text-center">No active readings analysis yet. Connect a device to this plot or farm.</div>
+                              )}
+                            </div>
+                            
+                            <div className="bg-black/20 p-3 rounded-lg border border-white/5">
+                              <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold">Marketplace Status</div>
+                              {activePred?.bidding_status === 'OPEN' ? (
+                                <div className="text-center text-blue-400 flex flex-col items-center">
+                                  <ShoppingCart size={16} className="mb-1" />
+                                  <div className="text-xs font-bold">Bidding is OPEN</div>
+                                  <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="mt-2 h-6 text-[10px]">View Bids</Button></Link>
+                                </div>
+                              ) : (
+                                <div className="text-center">
+                                  <div className="text-xs opacity-60 mb-2">Bidding is CLOSED</div>
+                                  <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
+                                    {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Actions */}
+                          {activePred && ['ALLOCATED', 'HARVEST_CONFIRMED'].includes(activePred.bidding_status) && (
+                            <div className="border-t border-white/10 pt-3 flex gap-2">
+                              {activePred.bidding_status === 'ALLOCATED' && (
+                                <Button variant="secondary" size="sm" onClick={() => alert("To confirm harvest and setup pickup details, use the Manage Bids view.")}>
+                                  <CheckCircle size={14} className="mr-1" /> Prepare Harvest Confirmation
+                                </Button>
+                              )}
+                              {activePred.bidding_status === 'HARVEST_CONFIRMED' && (
+                                <Button variant="primary" size="sm" disabled={convertingPredId === activePred.id} onClick={async () => {
+                                  if (!window.confirm('Convert all accepted bids into trade requests?')) return;
+                                  setConvertingPredId(activePred.id);
+                                  setActionError('');
+                                  const { error } = await convertBidsToTrades(supabase, activePred.id);
+                                  setConvertingPredId(null);
+                                  if (error) setActionError(error.message);
+                                  else { setActionSuccess('Bids converted to trades!'); loadFarms(); }
+                                }}>
+                                  {convertingPredId === activePred.id ? <Loader2 size={14} className="animate-spin mr-1" /> : <ArrowRight size={14} className="mr-1" />}
+                                  Convert to Trades
+                                </Button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-black/20 border-dashed border-white/10 rounded-lg">
+                    <Sprout size={32} className="mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-bold opacity-80 mb-1">No crop plots declared.</p>
+                    <p className="text-xs opacity-50 mb-4">Declare a crop plot to start IoT tracking and open buyer bidding.</p>
+                    <Button variant="primary" size="sm" onClick={() => setShowCreateAllocation(true)}>
+                      <Plus size={16} className="mr-2" />
+                      Add Crop Plot
+                    </Button>
+                  </div>
+                )}
+                
+                {actionError && <Alert variant="error" className="mt-4">{actionError}</Alert>}
+                {actionSuccess && <Alert variant="success" className="mt-4">{actionSuccess}</Alert>}
+              </Card>
 
             </div>
           ) : (
@@ -730,11 +714,15 @@ export default function SellerDeviceReadingsPage() {
         />
       )}
 
-      {showStartAnalysis && selectedFarm && (
-        <StartHarvestAnalysisModal
-          farm={selectedFarm}
-          onClose={() => setShowStartAnalysis(false)}
-          onSuccess={handleStartAnalysisSuccess}
+      {showCreateAllocation && selectedFarm && (
+        <CreateCropAllocationModal
+          farmId={selectedFarm.id}
+          onClose={() => setShowCreateAllocation(false)}
+          onSuccess={() => {
+            setShowCreateAllocation(false);
+            setActionSuccess('Crop plot created successfully.');
+            loadFarms();
+          }}
         />
       )}
     </PageContainer>

@@ -90,7 +90,7 @@ export default function BuyerHarvestOpportunitiesPage() {
 
               <h3 className="text-xl font-bold mb-1 flex items-center">
                 <Sprout className="mr-2 text-[var(--agri-primary)]" />
-                {opp.farms?.crop_type || 'Unknown Crop'}
+                {opp.farm_crop_allocations?.crop_type || opp.farms?.crop_type || 'Unknown Crop'}
               </h3>
 
               <div className="text-sm opacity-80 flex items-center mb-4">

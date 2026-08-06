@@ -24,6 +24,7 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
   const [deviceType, setDeviceType] = useState('Soil & Weather Multi-Sensor');
   const [deviceStatus, setDeviceStatus] = useState('ACTIVE');
   const [firmwareVersion, setFirmwareVersion] = useState('');
+  const [cropAllocationId, setCropAllocationId] = useState('');
   const [address, setAddress] = useState(selectedFarm?.physical_address || '');
   const [latitude, setLatitude] = useState(selectedFarm?.latitude ? String(selectedFarm.latitude) : '');
   const [longitude, setLongitude] = useState(selectedFarm?.longitude ? String(selectedFarm.longitude) : '');
@@ -46,7 +47,8 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
       latitude: latitude ? parseFloat(latitude) : 0,
       longitude: longitude ? parseFloat(longitude) : 0,
       status: deviceStatus,
-      firmware_version: firmwareVersion
+      firmware_version: firmwareVersion,
+      cropAllocationId: cropAllocationId || undefined
     } as any); // using 'any' cast because the API signature may not expect firmware_version yet, but it satisfies UI requirements safely
     
     setSubmitting(false);
@@ -109,6 +111,21 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
               <Label>Firmware Version (Optional)</Label>
               <Input value={firmwareVersion} onChange={(e) => setFirmwareVersion(e.target.value)} placeholder="e.g. v1.2.4" />
             </div>
+
+            {selectedFarm?.farm_crop_allocations && selectedFarm.farm_crop_allocations.length > 0 && (
+              <div>
+                <Label>Link to Specific Crop Allocation (Optional)</Label>
+                <Select value={cropAllocationId} onChange={(e) => setCropAllocationId(e.target.value)}>
+                  <option value="">None (Farm-level device)</option>
+                  {selectedFarm.farm_crop_allocations.map((alloc: any) => (
+                    <option key={alloc.id} value={alloc.id}>
+                      {alloc.crop_type} ({alloc.land_size_value} {alloc.land_size_unit})
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs opacity-70 mt-1">Leave empty to monitor the entire farm instead of a specific crop plot.</p>
+              </div>
+            )}
 
             <div className="border-t border-white/10 pt-4">
               <h3 className="text-sm font-bold mb-3 opacity-80">Installation Location</h3>

@@ -69,7 +69,7 @@ export async function confirmOrder(
 export async function getMyBids(supabase: SupabaseClient<any>, userId: string) {
   const { data, error } = await supabase
     .from('harvest_bids')
-    .select('*, harvest_predictions(*, farms(name, crop_type, physical_address))')
+    .select('*, harvest_predictions(*, farms(name, physical_address), farm_crop_allocations(crop_type))')
     .eq('buyer_id', userId)
     .order('created_at', { ascending: false });
   return { data, error };
@@ -112,7 +112,7 @@ export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bi
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
   const { data, error } = await supabase
     .from('harvest_predictions')
-    .select('*, farms(name, crop_type, physical_address, latitude, longitude, iot_devices(last_seen_at))')
+    .select('*, farms(name, physical_address, latitude, longitude, iot_devices(last_seen_at)), farm_crop_allocations(crop_type)')
     .eq('bidding_status', 'OPEN')
     .order('created_at', { ascending: false });
 
@@ -124,8 +124,11 @@ export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
       const farm = row.farms;
       if (!farm) return false;
       
+      const alloc = row.farm_crop_allocations;
+      
       // 1. Business Data completeness
-      if (!farm.crop_type || farm.crop_type === 'Unknown Crop' || farm.crop_type.trim() === '') return false;
+      const cropType = alloc?.crop_type || farm.crop_type; // Fallback for legacy data
+      if (!cropType || cropType === 'Unknown Crop' || cropType.trim() === '') return false;
       if (!row.expected_quantity_min || row.expected_quantity_min <= 0) return false;
       if (!row.expected_quantity_max || row.expected_quantity_max < row.expected_quantity_min) return false;
 

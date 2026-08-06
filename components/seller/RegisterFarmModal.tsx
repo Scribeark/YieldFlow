@@ -10,15 +10,7 @@ import { createClient } from '@/lib/supabase/client';
 import { createSellerFarm } from '@/lib/api/farms';
 import { LocationPicker } from '@/components/shared/LocationPicker';
 
-const CROP_OPTIONS = [
-  'Maize',
-  'Rice',
-  'Cassava',
-  'Yam',
-  'Sorghum',
-  'Tomatoes',
-  'Other'
-];
+
 
 interface RegisterFarmModalProps {
   userId: string;
@@ -31,10 +23,8 @@ export function RegisterFarmModal({ userId, googleMapsApiKey, onSuccess, onClose
   const supabase = createClient();
   
   const [farmName, setFarmName] = useState('');
-  const [cropTypeSelect, setCropTypeSelect] = useState('Maize');
-  const [customCropType, setCustomCropType] = useState('');
-  const [plantingDate, setPlantingDate] = useState('');
-  const [maturityDays, setMaturityDays] = useState('120');
+  const [farmSizeValue, setFarmSizeValue] = useState('');
+  const [farmSizeUnit, setFarmSizeUnit] = useState('hectares');
   const [address, setAddress] = useState('');
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
@@ -46,12 +36,7 @@ export function RegisterFarmModal({ userId, googleMapsApiKey, onSuccess, onClose
     e.preventDefault();
     setError(null);
     
-    const finalCropType = cropTypeSelect === 'Other' ? customCropType.trim() : cropTypeSelect;
-    
-    if (!finalCropType) {
-      setError('Please enter a crop type.');
-      return;
-    }
+
 
     if (!latitude || !longitude) {
       setError('Please resolve the address or enter coordinates before registering the farm.');
@@ -62,12 +47,11 @@ export function RegisterFarmModal({ userId, googleMapsApiKey, onSuccess, onClose
     
     const { data, error: apiError } = await createSellerFarm(supabase, userId, {
       name: farmName,
-      cropType: finalCropType,
-      plantingDate,
-      maturityDays: parseInt(maturityDays, 10),
       address,
       latitude: parseFloat(latitude),
-      longitude: parseFloat(longitude)
+      longitude: parseFloat(longitude),
+      farmSizeValue: farmSizeValue ? parseFloat(farmSizeValue) : undefined,
+      farmSizeUnit: farmSizeValue ? farmSizeUnit : undefined
     });
     
     setSubmitting(false);
@@ -101,33 +85,19 @@ export function RegisterFarmModal({ userId, googleMapsApiKey, onSuccess, onClose
               <Input required value={farmName} onChange={(e) => setFarmName(e.target.value)} placeholder="e.g. North Plot A" />
             </div>
 
-            <div>
-              <Label>Crop Type</Label>
-              <Select required value={cropTypeSelect} onChange={(e) => setCropTypeSelect(e.target.value)}>
-                {CROP_OPTIONS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </Select>
-              {cropTypeSelect === 'Other' && (
-                <div className="mt-2">
-                  <Input 
-                    required 
-                    value={customCropType} 
-                    onChange={(e) => setCustomCropType(e.target.value)} 
-                    placeholder="Enter custom crop type" 
-                  />
-                </div>
-              )}
-            </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Planting Date</Label>
-                <Input required type="date" value={plantingDate} onChange={(e) => setPlantingDate(e.target.value)} />
+                <Label>Total Farm Size</Label>
+                <Input type="number" min="0" step="0.01" value={farmSizeValue} onChange={(e) => setFarmSizeValue(e.target.value)} placeholder="e.g. 5" />
               </div>
               <div>
-                <Label>Expected Maturity (Days)</Label>
-                <Input required type="number" min="1" value={maturityDays} onChange={(e) => setMaturityDays(e.target.value)} />
+                <Label>Unit</Label>
+                <Select value={farmSizeUnit} onChange={(e) => setFarmSizeUnit(e.target.value)}>
+                  <option value="hectares">Hectares</option>
+                  <option value="acres">Acres</option>
+                  <option value="square_meters">Square Meters</option>
+                  <option value="plots">Plots</option>
+                </Select>
               </div>
             </div>
 

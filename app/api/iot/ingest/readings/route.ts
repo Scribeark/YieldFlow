@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     const { data: device, error: deviceError } = await supabase
       .from('iot_devices')
-      .select('id, farm_id, device_status')
+      .select('id, farm_id, crop_allocation_id, device_status')
       .eq('ingest_key_hash', keyHash)
       .single();
 
@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       insertRows.push({
         farm_id: device.farm_id,
         device_id: device.id,
+        crop_allocation_id: device.crop_allocation_id,
         soil_moisture: r.soil_moisture,
         ambient_temperature: r.ambient_temperature,
         ambient_humidity: r.ambient_humidity,

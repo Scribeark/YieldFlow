@@ -4,7 +4,7 @@ import json
 import time
 import random
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # ─── Environment Configuration ────────────────────────────────────────────────
 # Sanitize the URL in case it contains accidental quotes, spaces, or newlines
@@ -32,10 +32,11 @@ def load_keys():
         return []
 
 # ─── Reading Generator ────────────────────────────────────────────────────────
-def generate_reading():
+def generate_reading(offset_minutes=0):
     """Generate a single realistic sensor reading."""
+    t = datetime.now(timezone.utc) - timedelta(minutes=offset_minutes)
     return {
-        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "recorded_at": t.isoformat(),
         "soil_moisture": round(random.uniform(30.0, 55.0), 1),      # 30-55%
         "ambient_temperature": round(random.uniform(22.0, 32.0), 1), # 22-32°C
         "ambient_humidity": round(random.uniform(50.0, 85.0), 1),    # 50-85%
@@ -115,7 +116,10 @@ def run_simulation():
     for key in keys:
         # Generate a batch of 1-5 realistic readings per device
         num_readings = random.randint(1, 5)
-        readings = [generate_reading() for _ in range(num_readings)]
+        readings = []
+        for i in range(num_readings):
+            offset = (num_readings - 1 - i) * 15
+            readings.append(generate_reading(offset_minutes=offset))
         post_readings(key, readings)
 
     print(f"[Info] Simulation complete.")

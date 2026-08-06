@@ -134,7 +134,7 @@ export default function BuyerMyBidsPage() {
             </div>
 
             <h3 className="text-lg font-bold mb-1">
-              {opp.farms?.crop_type || 'Unknown Crop'}
+              {opp.farm_crop_allocations?.crop_type || opp.farms?.crop_type || 'Unknown Crop'}
             </h3>
             <div className="text-sm opacity-70 flex items-center mb-2">
               <MapPin size={13} className="mr-1 flex-shrink-0" />
