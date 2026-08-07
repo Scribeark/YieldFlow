@@ -102,7 +102,10 @@ export default function SellerDeviceReadingsPage() {
     setDeviceReadings(sorted);
   };
 
-  const handleGenerateKey = async (deviceId: string) => {
+  const handleGenerateKey = async (deviceId: string, isRotation: boolean = false) => {
+    if (isRotation) {
+      if (!window.confirm("Are you sure you want to rotate the ingestion key? This will permanently invalidate the previous key and any devices using it will lose access.")) return;
+    }
     setIsGeneratingKey(true);
     setActionError('');
     setActionSuccess('');
@@ -397,6 +400,7 @@ export default function SellerDeviceReadingsPage() {
                         <div className="flex flex-col flex-1">
                           <span className="font-bold text-sm">{device.device_name}</span>
                           <span className="text-xs opacity-60">SN: {device.device_serial_number} • {device.device_type}</span>
+                          <div className="text-[10px] opacity-40 font-mono mt-1 mb-1">Device ID: {device.id}</div>
                           {device.firmware_version && <span className="text-[10px] opacity-40">Firmware: {device.firmware_version}</span>}
                           
                           <div className="mt-2 pt-2 border-t border-white/5 text-[10px] space-y-1">
@@ -445,7 +449,7 @@ export default function SellerDeviceReadingsPage() {
                               size="sm" 
                               variant="secondary" 
                               disabled={isGeneratingKey}
-                              onClick={() => handleGenerateKey(device.id)} 
+                              onClick={() => handleGenerateKey(device.id, !!device.ingest_key_hash)} 
                               className="h-7 text-[10px] border-white/20 hover:border-white/40"
                             >
                               <Key size={12} className="mr-1"/>
