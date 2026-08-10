@@ -9,6 +9,20 @@ import { Loader2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { registerSellerDevice } from '@/lib/api/farms';
 
+const AVAILABLE_MEASUREMENTS = [
+  { id: 'soil_moisture', label: 'Soil Moisture' },
+  { id: 'soil_temperature', label: 'Soil Temp' },
+  { id: 'ambient_temperature', label: 'Ambient Temp' },
+  { id: 'ambient_humidity', label: 'Humidity' },
+  { id: 'rainfall_mm', label: 'Rainfall (mm)' },
+  { id: 'irrigation_mm', label: 'Irrigation (mm)' },
+  { id: 'soil_ph', label: 'Soil pH' },
+  { id: 'soil_nitrogen', label: 'Nitrogen' },
+  { id: 'soil_phosphorus', label: 'Phosphorus' },
+  { id: 'soil_potassium', label: 'Potassium' },
+  { id: 'soil_salinity', label: 'Salinity' }
+];
+
 interface ConnectDeviceModalProps {
   userId: string;
   selectedFarm: any;
@@ -28,9 +42,16 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
   const [address, setAddress] = useState(selectedFarm?.physical_address || '');
   const [latitude, setLatitude] = useState(selectedFarm?.latitude ? String(selectedFarm.latitude) : '');
   const [longitude, setLongitude] = useState(selectedFarm?.longitude ? String(selectedFarm.longitude) : '');
+  const [supportedMeasurements, setSupportedMeasurements] = useState<string[]>(['soil_moisture', 'ambient_temperature']);
   
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const toggleMeasurement = (id: string) => {
+    setSupportedMeasurements(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +69,8 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
       longitude: longitude ? parseFloat(longitude) : 0,
       status: deviceStatus,
       firmware_version: firmwareVersion,
-      cropAllocationId: cropAllocationId || undefined
+      cropAllocationId: cropAllocationId || undefined,
+      supported_measurements: supportedMeasurements
     } as any); // using 'any' cast because the API signature may not expect firmware_version yet, but it satisfies UI requirements safely
     
     setSubmitting(false);
@@ -110,6 +132,23 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
             <div>
               <Label>Firmware Version (Optional)</Label>
               <Input value={firmwareVersion} onChange={(e) => setFirmwareVersion(e.target.value)} placeholder="e.g. v1.2.4" />
+            </div>
+
+            <div className="border-t border-white/10 pt-4">
+              <Label className="mb-3 block">Supported Measurements</Label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {AVAILABLE_MEASUREMENTS.map((m) => (
+                  <label key={m.id} className="flex items-center space-x-2 text-sm opacity-80 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-white/20 bg-black/50 text-[var(--agri-primary)] focus:ring-[var(--agri-primary)]"
+                      checked={supportedMeasurements.includes(m.id)}
+                      onChange={() => toggleMeasurement(m.id)}
+                    />
+                    <span>{m.label}</span>
+                  </label>
+                ))}
+              </div>
             </div>
 
             {selectedFarm?.farm_crop_allocations && selectedFarm.farm_crop_allocations.length > 0 && (

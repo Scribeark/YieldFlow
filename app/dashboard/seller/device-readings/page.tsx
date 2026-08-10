@@ -21,6 +21,7 @@ import { CreateCropAllocationModal } from '@/components/seller/CreateCropAllocat
 import { useMapsKey } from '@/components/providers/MapsProvider';
 import { generateDeviceIngestionKey, retireDevice } from '@/lib/api/devices';
 import { Copy, Key } from 'lucide-react';
+import { GENERIC_CROP_THRESHOLDS } from '@/lib/config/thresholds';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -30,9 +31,61 @@ const getStatusColor = (status: string) => {
     case 'READY_SOON': return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
     case 'WATCH': return 'text-orange-500 bg-orange-500/10 border-orange-500/20';
     case 'NOT_READY': return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
-    default: return 'text-gray-400 bg-gray-500/10 border-gray-500/20';
+    default:
+      return 'text-gray-400 bg-gray-500/10 border-gray-500/30';
   }
 };
+
+function getCropRiskInsight(alloc: any, readings: any[]) {
+  if (!readings || readings.length === 0) {
+    return { status: 'UNKNOWN', message: 'No readings available.', source: 'None' };
+  }
+  
+  if (readings.length < 3) {
+    return { status: 'UNKNOWN', message: 'Insufficient data for reliable recommendation. Need at least 3 readings.', source: 'None' };
+  }
+  
+  const latest = new Date(readings[0].recorded_at);
+  const earliest = new Date(readings[readings.length - 1].recorded_at);
+  const now = new Date();
+  
+  const hoursSinceLatest = (now.getTime() - latest.getTime()) / (1000 * 60 * 60);
+  if (hoursSinceLatest >= 4) {
+    return { status: 'UNKNOWN', message: 'Insufficient data for reliable recommendation. Readings are stale (>4h).', source: 'None' };
+  }
+  
+  const spanHours = (latest.getTime() - earliest.getTime()) / (1000 * 60 * 60);
+  if (spanHours < 2) {
+    return { status: 'UNKNOWN', message: 'Insufficient data for reliable recommendation. Need at least 2 hours span.', source: 'None' };
+  }
+  
+  const midpoint = new Date(earliest.getTime() + (latest.getTime() - earliest.getTime()) / 2);
+  const hasFirstHalf = readings.some(r => new Date(r.recorded_at) <= midpoint && new Date(r.recorded_at) > earliest);
+  const hasSecondHalf = readings.some(r => new Date(r.recorded_at) > midpoint && new Date(r.recorded_at) < latest);
+  
+  if (!hasFirstHalf || !hasSecondHalf) {
+    return { status: 'UNKNOWN', message: 'Insufficient data for reliable recommendation. Poor data distribution.', source: 'None' };
+  }
+  
+  const useConfigured = alloc.optimum_moisture_min != null && alloc.optimum_moisture_max != null;
+  const source = useConfigured ? 'Seller configured' : 'Generic fallback';
+  const minM = useConfigured ? alloc.optimum_moisture_min : GENERIC_CROP_THRESHOLDS.moisture.min;
+  const maxM = useConfigured ? alloc.optimum_moisture_max : GENERIC_CROP_THRESHOLDS.moisture.max;
+  
+  const currentMoisture = readings[0].soil_moisture;
+  
+  if (currentMoisture == null) {
+    return { status: 'UNKNOWN', message: 'Insufficient data for reliable recommendation. No moisture data.', source: 'None' };
+  }
+  
+  if (currentMoisture < minM) {
+    return { status: 'WARNING', message: `Moisture critically low (${currentMoisture}%). Irrigation recommended.`, source };
+  } else if (currentMoisture > maxM) {
+    return { status: 'WARNING', message: `Moisture high (${currentMoisture}%). Risk of waterlogging.`, source };
+  }
+  
+  return { status: 'OK', message: `Moisture optimal (${currentMoisture}%). No action needed.`, source };
+}
 
 const getFreshnessState = (lastSeenAt: string | null) => {
   if (!lastSeenAt) return { state: 'NO_DATA', color: 'text-gray-400 bg-gray-500/20' };
@@ -490,8 +543,11 @@ export default function SellerDeviceReadingsPage() {
                     <h3 className="font-bold flex items-center">
                       <Activity className="mr-2 text-green-400" /> Device Readings
                     </h3>
-                    <div className="text-xs opacity-60 bg-black/30 px-2 py-1 rounded-md">
-                      Showing readings for: <strong>{selectedDevice.device_name}</strong>
+                    <div className="text-xs opacity-60 bg-black/30 px-2 py-1 rounded-md flex gap-2">
+                      <span>Showing readings for: <strong>{selectedDevice.device_name}</strong></span>
+                      {selectedDevice.ingestion_mode === 'simulator' && (
+                        <span className="text-yellow-400 font-bold border border-yellow-400/30 px-1 rounded">SIMULATOR</span>
+                      )}
                     </div>
                   </div>
 
@@ -499,28 +555,52 @@ export default function SellerDeviceReadingsPage() {
                     <div className="space-y-6">
                       {/* Latest Metrics */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-                          <div className="flex items-center text-xs opacity-60 mb-2"><Droplets size={12} className="mr-1 text-blue-400"/> Soil Moisture</div>
-                          <div className="text-xl font-bold">{deviceReadings[deviceReadings.length-1].soil_moisture}%</div>
-                        </div>
-                        <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-                          <div className="flex items-center text-xs opacity-60 mb-2"><Thermometer size={12} className="mr-1 text-red-400"/> Ambient Temp</div>
-                          <div className="text-xl font-bold">{deviceReadings[deviceReadings.length-1].ambient_temperature}°C</div>
-                        </div>
-                        <div className="bg-black/30 p-3 rounded-lg border border-white/5">
-                          <div className="flex items-center text-xs opacity-60 mb-2"><CloudRain size={12} className="mr-1 text-cyan-400"/> Humidity</div>
-                          <div className="text-xl font-bold">{deviceReadings[deviceReadings.length-1].ambient_humidity}%</div>
-                        </div>
+                        {deviceReadings[0].soil_moisture !== null && (
+                          <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                            <div className="flex items-center text-xs opacity-60 mb-2"><Droplets size={12} className="mr-1 text-blue-400"/> Soil Moisture</div>
+                            <div className="text-xl font-bold">{deviceReadings[0].soil_moisture}%</div>
+                          </div>
+                        )}
+                        {deviceReadings[0].ambient_temperature !== null && (
+                          <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                            <div className="flex items-center text-xs opacity-60 mb-2"><Thermometer size={12} className="mr-1 text-red-400"/> Ambient Temp</div>
+                            <div className="text-xl font-bold">{deviceReadings[0].ambient_temperature}°C</div>
+                          </div>
+                        )}
+                        {deviceReadings[0].ambient_humidity !== null && (
+                          <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                            <div className="flex items-center text-xs opacity-60 mb-2"><CloudRain size={12} className="mr-1 text-cyan-400"/> Humidity</div>
+                            <div className="text-xl font-bold">{deviceReadings[0].ambient_humidity}%</div>
+                          </div>
+                        )}
+                        {deviceReadings[0].rainfall_mm !== null && (
+                          <div className="bg-black/30 p-3 rounded-lg border border-white/5">
+                            <div className="flex items-center text-xs opacity-60 mb-2"><CloudRain size={12} className="mr-1 text-blue-300"/> Rainfall</div>
+                            <div className="text-xl font-bold">{deviceReadings[0].rainfall_mm} <span className="text-xs font-normal opacity-70">mm</span></div>
+                          </div>
+                        )}
+                        
+                        {/* Specialized Metrics */}
+                        {deviceReadings[0].iot_sensor_observations?.map((obs: any) => (
+                          <div key={obs.metric_code} className="bg-black/30 p-3 rounded-lg border border-white/5 border-l-2 border-l-[var(--agri-primary)]">
+                            <div className="flex items-center text-xs opacity-60 mb-2 capitalize">
+                              <Activity size={12} className="mr-1 text-[var(--agri-primary)]"/> 
+                              {obs.metric_code.replace('soil_', 'Soil ').replace('_', ' ')}
+                            </div>
+                            <div className="text-xl font-bold">{obs.numeric_value} <span className="text-xs font-normal opacity-70">{obs.unit}</span></div>
+                          </div>
+                        ))}
+                        
                         <div className="bg-black/30 p-3 rounded-lg border border-white/5">
                           <div className="flex items-center text-xs opacity-60 mb-2"><Activity size={12} className="mr-1 text-purple-400"/> Last Recorded</div>
-                          <div className="text-xs font-bold pt-1">{new Date(deviceReadings[deviceReadings.length-1].recorded_at).toLocaleTimeString()}</div>
+                          <div className="text-xs font-bold pt-1">{new Date(deviceReadings[0].recorded_at).toLocaleTimeString()}</div>
                         </div>
                       </div>
 
                       {/* Chart Trends */}
                       <div className="h-64 w-full bg-black/20 rounded-lg p-4 border border-white/5">
                         <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={deviceReadings} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                          <LineChart data={[...deviceReadings].reverse()} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                             <XAxis dataKey="recorded_at" tickFormatter={(t) => new Date(t).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} stroke="#666" fontSize={10} />
                             <YAxis stroke="#666" fontSize={10} />
@@ -543,15 +623,21 @@ export default function SellerDeviceReadingsPage() {
                               <th className="px-3 py-2">Moisture</th>
                               <th className="px-3 py-2">Temp</th>
                               <th className="px-3 py-2">Humidity</th>
+                              <th className="px-3 py-2">Specialized Obs.</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-white/5">
-                            {[...deviceReadings].reverse().map((r: any, idx: number) => (
+                            {deviceReadings.map((r: any, idx: number) => (
                               <tr key={idx} className="hover:bg-white/5">
                                 <td className="px-3 py-2 opacity-70 text-xs">{new Date(r.recorded_at).toLocaleString()}</td>
                                 <td className="px-3 py-2">{r.soil_moisture}%</td>
                                 <td className="px-3 py-2">{r.ambient_temperature}°C</td>
                                 <td className="px-3 py-2">{r.ambient_humidity}%</td>
+                                <td className="px-3 py-2 text-xs opacity-70">
+                                  {r.iot_sensor_observations?.length > 0 
+                                    ? r.iot_sensor_observations.map((o: any) => `${o.metric_code}: ${o.numeric_value}${o.unit}`).join(', ')
+                                    : '-'}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -601,7 +687,7 @@ export default function SellerDeviceReadingsPage() {
                           </div>
 
                           {/* Prediction / Bidding Status */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                               <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold">IoT Readiness</div>
                               {activePred ? (
@@ -617,6 +703,38 @@ export default function SellerDeviceReadingsPage() {
                               )}
                             </div>
                             
+                            {/* Crop Risk Insight */}
+                            <div className="bg-black/20 p-3 rounded-lg border border-white/5">
+                              <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold flex items-center justify-between">
+                                <span>Health Insight</span>
+                              </div>
+                              {(() => {
+                                // Only show insight if we have readings for the selected device, and it belongs to this farm
+                                const insight = getCropRiskInsight(alloc, deviceReadings);
+                                
+                                const getIcon = () => {
+                                  if (insight.status === 'OK') return <CheckCircle size={16} className="text-green-400 mb-2" />;
+                                  if (insight.status === 'WARNING') return <AlertTriangle size={16} className="text-yellow-400 mb-2" />;
+                                  return <Activity size={16} className="text-gray-400 mb-2 opacity-50" />;
+                                };
+                                
+                                return (
+                                  <div className="text-center h-full flex flex-col justify-center">
+                                    <div className="flex justify-center">{getIcon()}</div>
+                                    <p className={`text-xs font-medium mb-1 ${
+                                      insight.status === 'OK' ? 'text-green-400' :
+                                      insight.status === 'WARNING' ? 'text-yellow-400' : 'text-gray-400'
+                                    }`}>
+                                      {insight.message}
+                                    </p>
+                                    <p className="text-[9px] opacity-60 italic mt-auto">
+                                      Threshold source: {insight.source}
+                                    </p>
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
                             <div className="bg-black/20 p-3 rounded-lg border border-white/5">
                               <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold">Marketplace Status</div>
                               {activePred?.bidding_status === 'OPEN' ? (
@@ -628,9 +746,36 @@ export default function SellerDeviceReadingsPage() {
                               ) : (
                                 <div className="text-center">
                                   <div className="text-xs opacity-60 mb-2">Bidding is CLOSED</div>
-                                  <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
-                                    {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
-                                  </Button>
+                                  
+                                  {/* Evidence Check */}
+                                  {(() => {
+                                    const hasValidEvidence = selectedFarm?.iot_devices?.some((d: any) => {
+                                      if (d.ingestion_mode !== 'direct_device') return false;
+                                      const createdDate = new Date(d.created_at);
+                                      const now = new Date();
+                                      const hoursDiff = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+                                      return hoursDiff >= 24;
+                                    });
+
+                                    if (!hasValidEvidence) {
+                                      return (
+                                        <div>
+                                          <Button size="sm" variant="primary" className="h-6 text-[10px] opacity-50 cursor-not-allowed" disabled>
+                                            <Target size={12} className="mr-1" /> Open Bidding
+                                          </Button>
+                                          <p className="text-[9px] text-yellow-400 mt-2 opacity-80 leading-tight">
+                                            Requires 24+ hours of sensor history from a physical device.
+                                          </p>
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
+                                        {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
+                                      </Button>
+                                    );
+                                  })()}
                                 </div>
                               )}
                             </div>
@@ -667,7 +812,7 @@ export default function SellerDeviceReadingsPage() {
                 ) : (
                   <div className="text-center py-8 bg-black/20 border-dashed border-white/10 rounded-lg">
                     <Sprout size={32} className="mx-auto mb-3 opacity-30" />
-                    <p className="text-sm font-bold opacity-80 mb-1">No crop plots declared.</p>
+                    <p className="text-sm font-bold opacity-80 mb-1">No crop production has been registered for this farm yet.</p>
                     <p className="text-xs opacity-50 mb-4">Declare a crop plot to start IoT tracking and open buyer bidding.</p>
                     <Button variant="primary" size="sm" onClick={() => setShowCreateAllocation(true)}>
                       <Plus size={16} className="mr-2" />
@@ -698,10 +843,14 @@ export default function SellerDeviceReadingsPage() {
           userId={profile.id}
           googleMapsApiKey={mapsApiKey}
           onClose={() => setShowCreateFarm(false)}
-          onSuccess={(newFarm) => {
+          onSuccess={(newFarm, action) => {
             setShowCreateFarm(false);
             loadFarms();
-            if (newFarm && newFarm[0]) setSelectedFarm(newFarm[0]);
+            const farm = Array.isArray(newFarm) ? newFarm[0] : newFarm;
+            if (farm) setSelectedFarm(farm);
+            if (action === 'add_crop') {
+              setTimeout(() => setShowCreateAllocation(true), 100);
+            }
           }}
         />
       )}

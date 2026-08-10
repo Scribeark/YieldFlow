@@ -113,6 +113,7 @@ export async function registerSellerDevice(
     longitude: number;
     address: string;
     cropAllocationId?: string;
+    supported_measurements?: string[];
   }
 ) {
   const { data, error } = await supabase
@@ -127,7 +128,8 @@ export async function registerSellerDevice(
       device_status: 'ACTIVE',
       installation_latitude: params.latitude,
       installation_longitude: params.longitude,
-      installation_address: params.address
+      installation_address: params.address,
+      supported_measurements: params.supported_measurements || []
     })
     .select()
     .single();

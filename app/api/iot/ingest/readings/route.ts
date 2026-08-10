@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 
     const { data: device, error: deviceError } = await supabase
       .from('iot_devices')
-      .select('id, farm_id, crop_allocation_id, device_status')
+      .select('id, farm_id, crop_allocation_id, device_status, ingestion_mode, supported_measurements')
       .eq('ingest_key_hash', keyHash)
       .single();
 
@@ -64,38 +64,90 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No readings found in payload' }, { status: 400 });
     }
 
-    // Prepare rows for insertion
-    const insertRows = [];
-    for (const r of readings) {
-      // Basic validation
-      if (typeof r.soil_moisture !== 'number' || 
-          typeof r.ambient_temperature !== 'number' || 
-          typeof r.ambient_humidity !== 'number') {
-        return NextResponse.json({ error: 'Invalid payload structure. Ensure moisture, temp, and humidity are numeric.' }, { status: 400 });
-      }
+    // Fallback timestamp for the entire batch if missing
+    const defaultRecordedAt = new Date().toISOString();
+    
+    // Ensure all readings have recorded_at and normalize them
+    readings = readings.map((r: any) => ({
+      ...r,
+      recorded_at: r.recorded_at || defaultRecordedAt
+    }));
 
-      insertRows.push({
-        farm_id: device.farm_id,
-        device_id: device.id,
-        crop_allocation_id: device.crop_allocation_id,
-        soil_moisture: r.soil_moisture,
-        ambient_temperature: r.ambient_temperature,
-        ambient_humidity: r.ambient_humidity,
-        rainfall_mm: r.rainfall_mm || 0.0,
-        recorded_at: r.recorded_at || new Date().toISOString(),
-        ingestion_source: 'api',
-        raw_payload: r
-      });
-    }
+    const supported = device.supported_measurements || [];
+    const ingestionSource = device.ingestion_mode === 'simulator' ? 'github_simulator' : 'direct_device';
 
-    // Insert readings
-    const { error: insertError } = await supabase
+    // Prepare Base Streams
+    const insertRows = readings.map((r: any) => ({
+      farm_id: device.farm_id,
+      device_id: device.id,
+      crop_allocation_id: device.crop_allocation_id,
+      soil_moisture: supported.includes('soil_moisture') && typeof r.soil_moisture === 'number' ? r.soil_moisture : null,
+      ambient_temperature: supported.includes('ambient_temperature') && typeof r.ambient_temperature === 'number' ? r.ambient_temperature : null,
+      ambient_humidity: supported.includes('ambient_humidity') && typeof r.ambient_humidity === 'number' ? r.ambient_humidity : null,
+      rainfall_mm: supported.includes('rainfall_mm') && typeof r.rainfall_mm === 'number' ? r.rainfall_mm : 0.0,
+      recorded_at: r.recorded_at,
+      ingestion_source: ingestionSource,
+      raw_payload: r
+    }));
+
+    // Upsert Base Streams (Handles Deduplication on device_id + recorded_at)
+    const { data: insertedStreams, error: insertError } = await supabase
       .from('iot_sensor_streams')
-      .insert(insertRows);
+      .upsert(insertRows, { onConflict: 'device_id,recorded_at' })
+      .select('id, recorded_at');
 
     if (insertError) {
-      console.error('[IoT Ingest] Insert error:', insertError);
-      return NextResponse.json({ error: 'Failed to insert readings' }, { status: 500 });
+      console.error('[IoT Ingest] Insert error (streams):', insertError);
+      return NextResponse.json({ error: 'Failed to insert base readings' }, { status: 500 });
+    }
+
+    // Map stream IDs for Specialized Observations
+    const streamMap = new Map();
+    if (insertedStreams) {
+      insertedStreams.forEach((s: any) => streamMap.set(s.recorded_at, s.id));
+    }
+
+    const specializedObservations: any[] = [];
+    
+    for (const r of readings) {
+      const streamId = streamMap.get(r.recorded_at);
+      if (!streamId) continue;
+      
+      const checkAndPush = (metricCode: string, jsonKey: string, unit: string) => {
+        if (supported.includes(metricCode) && typeof r[jsonKey] === 'number') {
+          specializedObservations.push({
+            stream_id: streamId,
+            device_id: device.id,
+            farm_id: device.farm_id,
+            crop_allocation_id: device.crop_allocation_id,
+            metric_code: metricCode,
+            numeric_value: r[jsonKey],
+            unit: unit,
+            recorded_at: r.recorded_at
+          });
+        }
+      };
+
+      checkAndPush('soil_temperature', 'soil_temperature', 'celsius');
+      checkAndPush('soil_ph', 'soil_ph', 'pH');
+      checkAndPush('soil_nitrogen', 'soil_nitrogen', 'mg/kg');
+      checkAndPush('soil_phosphorus', 'soil_phosphorus', 'mg/kg');
+      checkAndPush('soil_potassium', 'soil_potassium', 'mg/kg');
+      checkAndPush('soil_salinity', 'soil_salinity', 'dS/m');
+      checkAndPush('irrigation_mm', 'irrigation_mm', 'mm');
+    }
+
+    // Upsert Specialized Observations if any
+    if (specializedObservations.length > 0) {
+      const { error: obsError } = await supabase
+        .from('iot_sensor_observations')
+        .upsert(specializedObservations, { onConflict: 'device_id,metric_code,recorded_at' });
+
+      if (obsError) {
+        console.error('[IoT Ingest] Insert error (observations):', obsError);
+        // We do not fail the whole request if only specialized obs fail, 
+        // but it's important to log.
+      }
     }
 
     // Update device last_seen and key usage asynchronously
@@ -110,7 +162,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ 
       success: true, 
-      inserted: insertRows.length,
+      inserted_streams: insertRows.length,
+      inserted_observations: specializedObservations.length,
       device_id: device.id,
       farm_id: device.farm_id 
     }, { status: 201 });
