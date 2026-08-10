@@ -112,29 +112,22 @@ export async function POST(request: Request) {
     for (const r of readings) {
       const streamId = streamMap.get(r.recorded_at);
       if (!streamId) continue;
-      
-      const checkAndPush = (metricCode: string, jsonKey: string, unit: string) => {
-        if (supported.includes(metricCode) && typeof r[jsonKey] === 'number') {
-          specializedObservations.push({
-            stream_id: streamId,
-            device_id: device.id,
-            farm_id: device.farm_id,
-            crop_allocation_id: device.crop_allocation_id,
-            metric_code: metricCode,
-            numeric_value: r[jsonKey],
-            unit: unit,
-            recorded_at: r.recorded_at
-          });
+      if (Array.isArray(r.specialized_observations)) {
+        for (const obs of r.specialized_observations) {
+          if (supported.includes(obs.metric_code) && typeof obs.numeric_value === 'number') {
+            specializedObservations.push({
+              stream_id: streamId,
+              device_id: device.id,
+              farm_id: device.farm_id,
+              crop_allocation_id: device.crop_allocation_id,
+              metric_code: obs.metric_code,
+              numeric_value: obs.numeric_value,
+              unit: obs.unit || '',
+              recorded_at: r.recorded_at
+            });
+          }
         }
-      };
-
-      checkAndPush('soil_temperature', 'soil_temperature', 'celsius');
-      checkAndPush('soil_ph', 'soil_ph', 'pH');
-      checkAndPush('soil_nitrogen', 'soil_nitrogen', 'mg/kg');
-      checkAndPush('soil_phosphorus', 'soil_phosphorus', 'mg/kg');
-      checkAndPush('soil_potassium', 'soil_potassium', 'mg/kg');
-      checkAndPush('soil_salinity', 'soil_salinity', 'dS/m');
-      checkAndPush('irrigation_mm', 'irrigation_mm', 'mm');
+      }
     }
 
     // Upsert Specialized Observations if any

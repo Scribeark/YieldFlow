@@ -36,7 +36,6 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
   const [deviceName, setDeviceName] = useState('');
   const [deviceSerial, setDeviceSerial] = useState('');
   const [deviceType, setDeviceType] = useState('Soil & Weather Multi-Sensor');
-  const [deviceStatus, setDeviceStatus] = useState('ACTIVE');
   const [firmwareVersion, setFirmwareVersion] = useState('');
   const [cropAllocationId, setCropAllocationId] = useState('');
   const [address, setAddress] = useState(selectedFarm?.physical_address || '');
@@ -67,7 +66,6 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
       address,
       latitude: latitude ? parseFloat(latitude) : 0,
       longitude: longitude ? parseFloat(longitude) : 0,
-      status: deviceStatus,
       firmware_version: firmwareVersion,
       cropAllocationId: cropAllocationId || undefined,
       supported_measurements: supportedMeasurements
@@ -119,16 +117,7 @@ export function ConnectDeviceModal({ userId, selectedFarm, onSuccess, onClose }:
                   <option value="Weather Station">Weather Station</option>
                 </Select>
               </div>
-              <div>
-                <Label>Device Status</Label>
-                <Select required value={deviceStatus} onChange={(e) => setDeviceStatus(e.target.value)}>
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="MAINTENANCE">Maintenance</option>
-                </Select>
-              </div>
             </div>
-            
             <div>
               <Label>Firmware Version (Optional)</Label>
               <Input value={firmwareVersion} onChange={(e) => setFirmwareVersion(e.target.value)} placeholder="e.g. v1.2.4" />

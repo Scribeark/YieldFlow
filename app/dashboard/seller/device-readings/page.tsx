@@ -747,35 +747,9 @@ export default function SellerDeviceReadingsPage() {
                                 <div className="text-center">
                                   <div className="text-xs opacity-60 mb-2">Bidding is CLOSED</div>
                                   
-                                  {/* Evidence Check */}
-                                  {(() => {
-                                    const hasValidEvidence = selectedFarm?.iot_devices?.some((d: any) => {
-                                      if (d.ingestion_mode !== 'direct_device') return false;
-                                      const createdDate = new Date(d.created_at);
-                                      const now = new Date();
-                                      const hoursDiff = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
-                                      return hoursDiff >= 24;
-                                    });
-
-                                    if (!hasValidEvidence) {
-                                      return (
-                                        <div>
-                                          <Button size="sm" variant="primary" className="h-6 text-[10px] opacity-50 cursor-not-allowed" disabled>
-                                            <Target size={12} className="mr-1" /> Open Bidding
-                                          </Button>
-                                          <p className="text-[9px] text-yellow-400 mt-2 opacity-80 leading-tight">
-                                            Requires 24+ hours of sensor history from a physical device.
-                                          </p>
-                                        </div>
-                                      );
-                                    }
-
-                                    return (
-                                      <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
-                                        {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
-                                      </Button>
-                                    );
-                                  })()}
+                                  <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
+                                    {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
+                                  </Button>
                                 </div>
                               )}
                             </div>
