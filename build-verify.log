@@ -10,3 +10,43 @@
   Running TypeScript ...
   Finished TypeScript in 25.9s ...
   Collecting page data using 11 workers ...
+  Generating static pages using 11 workers (0/29) ...
+  Generating static pages using 11 workers (7/29) 
+  Generating static pages using 11 workers (14/29) 
+  Generating static pages using 11 workers (21/29) 
+✓ Generating static pages using 11 workers (29/29) in 2.4s
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /api/iot/ingest/readings
+├ ƒ /api/vehicle-document-ocr
+├ ○ /dashboard/buyer
+├ ○ /dashboard/buyer/buy
+├ ○ /dashboard/buyer/demands
+├ ○ /dashboard/buyer/demands/new
+├ ○ /dashboard/buyer/my-bids
+├ ○ /dashboard/buyer/orders
+├ ○ /dashboard/buyer/pre-harvest
+├ ○ /dashboard/buyer/sellers-map
+├ ○ /dashboard/carrier
+├ ○ /dashboard/carrier/active-bookings
+├ ○ /dashboard/carrier/fleet
+├ ○ /dashboard/carrier/jobs
+├ ○ /dashboard/carrier/tracking
+├ ○ /dashboard/seller
+├ ○ /dashboard/seller/bids
+├ ○ /dashboard/seller/buyer-demands
+├ ○ /dashboard/seller/buyers-map
+├ ○ /dashboard/seller/device-readings
+├ ○ /dashboard/seller/requests
+├ ○ /dashboard/seller/sell
+├ ○ /login
+├ ○ /signup
+└ ○ /unauthorized
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
