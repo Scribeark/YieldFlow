@@ -325,7 +325,7 @@ export default function SellerBidManagementPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-lg font-bold">{pred.farms?.name || 'Farm'} — {pred.farms?.crop_type || 'Crop'}</h2>
+                        <h2 className="text-lg font-bold">{pred.farms?.name || 'Farm'} — {pred.farm_crop_allocations?.crop_type || 'Crop'}</h2>
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${biddingColor}`}>{pred.bidding_status}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${isIoT ? 'bg-green-500/10 text-green-400' : 'bg-purple-500/10 text-purple-400'}`}>
                           {isIoT ? 'IoT Predicted' : 'Manual Listing'}

@@ -200,7 +200,7 @@ export async function getSellerBidListings(
 
   const { data, error } = await supabase
     .from('harvest_predictions')
-    .select('*, farms(id, name, crop_type, physical_address, latitude, longitude, user_id), harvest_bids(*, buyer_profile:buyer_id(full_name, phone_number))')
+    .select('*, farms(id, name, physical_address, latitude, longitude, user_id), farm_crop_allocations(crop_type), harvest_bids(*, buyer_profile:buyer_id(full_name, phone_number))')
     .in('farm_id', farmIds)
     .in('bidding_status', ['OPEN', 'SELLER_REVIEWING', 'ALLOCATED', 'HARVEST_CONFIRMED', 'CONVERTED_TO_TRADE'])
     .order('created_at', { ascending: false });

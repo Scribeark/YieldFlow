@@ -414,16 +414,33 @@ export default function SellerDeviceReadingsPage() {
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-black/20 p-3 rounded-lg">
-                    <div className="text-xs opacity-50 mb-1">Crop Type</div>
-                    <div className="font-bold flex items-center"><Leaf size={14} className="mr-2 text-green-400"/> {selectedFarm.crop_type}</div>
+                    <div className="text-xs opacity-50 mb-1">Crop Allocations</div>
+                    <div className="font-bold flex items-center">
+                      <Leaf size={14} className="mr-2 text-green-400"/> 
+                      {selectedFarm?.farm_crop_allocations?.length || 0}
+                    </div>
                   </div>
                   <div className="bg-black/20 p-3 rounded-lg">
-                    <div className="text-xs opacity-50 mb-1">Planting Date</div>
-                    <div className="font-bold">{new Date(selectedFarm.planting_date).toLocaleDateString()}</div>
+                    <div className="text-xs opacity-50 mb-1">Devices</div>
+                    <div className="font-bold flex items-center">
+                      <Cpu size={14} className="mr-2 text-blue-400"/>
+                      {selectedFarm?.iot_devices?.length || 0}
+                    </div>
                   </div>
                   <div className="bg-black/20 p-3 rounded-lg">
-                    <div className="text-xs opacity-50 mb-1">Expected Maturity</div>
-                    <div className="font-bold">{selectedFarm.expected_maturity_days} Days</div>
+                    <div className="text-xs opacity-50 mb-1">Overall Freshness</div>
+                    <div className="font-bold flex items-center">
+                      {(() => {
+                        const devices = selectedFarm?.iot_devices || [];
+                        if (devices.length === 0) return <span className="opacity-50">No Devices</span>;
+                        const mostRecent = devices
+                          .map((d: any) => d.last_seen_at ? new Date(d.last_seen_at).getTime() : 0)
+                          .sort((a: number, b: number) => b - a)[0];
+                        if (!mostRecent) return <span className="opacity-50">Never Seen</span>;
+                        const freshness = getFreshnessState(new Date(mostRecent).toISOString());
+                        return <span className={`${freshness.color}`}>{freshness.state}</span>;
+                      })()}
+                    </div>
                   </div>
                   <div className="bg-black/20 p-3 rounded-lg">
                     <div className="text-xs opacity-50 mb-1">Coordinates</div>
@@ -453,6 +470,11 @@ export default function SellerDeviceReadingsPage() {
                         <div className="flex flex-col flex-1">
                           <span className="font-bold text-sm">{device.device_name}</span>
                           <span className="text-xs opacity-60">SN: {device.device_serial_number} • {device.device_type}</span>
+                          {device.crop_allocation_id ? (
+                            <span className="text-[10px] text-green-400/90 font-medium block mt-1">Linked to crop: {selectedFarm.farm_crop_allocations?.find((a: any) => a.id === device.crop_allocation_id)?.crop_type || 'Unknown'}</span>
+                          ) : (
+                            <span className="text-[10px] text-blue-400/90 font-medium block mt-1">Farm-wide device</span>
+                          )}
                           <div className="text-[10px] opacity-40 font-mono mt-1 mb-1">Device ID: {device.id}</div>
                           {device.firmware_version && <span className="text-[10px] opacity-40">Firmware: {device.firmware_version}</span>}
                           
@@ -673,10 +695,35 @@ export default function SellerDeviceReadingsPage() {
                       return (
                         <div key={alloc.id} className="bg-black/20 p-4 rounded-lg border border-white/5 space-y-4">
                           <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-bold flex items-center"><Leaf size={14} className="mr-1 text-green-400"/> {alloc.crop_type}</h4>
-                              <div className="text-xs opacity-60">
-                                Size: {alloc.land_size_value} {alloc.land_size_unit} • Planted: {alloc.planting_date ? new Date(alloc.planting_date).toLocaleDateString() : 'N/A'} • Maturity: {alloc.expected_maturity_days} days
+                            <div className="space-y-1">
+                              <h4 className="font-bold flex items-center text-lg"><Leaf size={16} className="mr-2 text-green-400"/> {alloc.crop_type}</h4>
+                              <div className="text-sm opacity-80 flex flex-wrap gap-x-4 gap-y-1">
+                                <span><span className="opacity-70">Size:</span> {alloc.land_size_value} {alloc.land_size_unit}</span>
+                                <span><span className="opacity-70">Planted:</span> {alloc.planting_date ? new Date(alloc.planting_date).toLocaleDateString() : 'N/A'}</span>
+                                <span>
+                                  <span className="opacity-70">Est. Maturity:</span>{' '}
+                                  {alloc.planting_date && alloc.expected_maturity_days ? 
+                                    new Date(new Date(alloc.planting_date).getTime() + alloc.expected_maturity_days * 24 * 60 * 60 * 1000).toLocaleDateString() 
+                                    : `${alloc.expected_maturity_days} days`}
+                                </span>
+                              </div>
+                              <div className="text-sm opacity-80 flex flex-wrap gap-x-4 gap-y-1">
+                                <span>
+                                  <span className="opacity-70">Harvest Range:</span>{' '}
+                                  {alloc.expected_harvest_min || '?'} - {alloc.expected_harvest_max || '?'} {alloc.expected_harvest_unit}
+                                </span>
+                                <span>
+                                  <span className="opacity-70">Min Price:</span>{' '}
+                                  {alloc.minimum_price_per_unit ? `₦${alloc.minimum_price_per_unit} / ${alloc.expected_harvest_unit}` : 'Negotiable'}
+                                </span>
+                              </div>
+                              <div className="text-xs pt-1">
+                                <span className="opacity-60 mr-1">Linked Devices:</span>
+                                {(() => {
+                                  const linked = (selectedFarm.iot_devices || []).filter((d: any) => d.crop_allocation_id === alloc.id);
+                                  if (linked.length === 0) return <span className="text-yellow-400/80">None</span>;
+                                  return <span>{linked.map((d: any) => d.device_name).join(', ')}</span>;
+                                })()}
                               </div>
                             </div>
                             <div className="text-right text-xs">

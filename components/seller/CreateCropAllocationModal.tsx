@@ -41,6 +41,11 @@ export function CreateCropAllocationModal({ farmId, onSuccess, onClose }: Create
   const [minimumPricePerUnit, setMinimumPricePerUnit] = useState('');
   const [notes, setNotes] = useState('');
   
+  const [optimumSoilMoistureMin, setOptimumSoilMoistureMin] = useState('');
+  const [optimumSoilMoistureMax, setOptimumSoilMoistureMax] = useState('');
+  const [optimumTemperatureMin, setOptimumTemperatureMin] = useState('');
+  const [optimumTemperatureMax, setOptimumTemperatureMax] = useState('');
+  
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdPlot, setCreatedPlot] = useState<boolean>(false);
@@ -69,7 +74,11 @@ export function CreateCropAllocationModal({ farmId, onSuccess, onClose }: Create
       expectedHarvestMax: expectedHarvestMax ? parseInt(expectedHarvestMax, 10) : undefined,
       expectedHarvestUnit: expectedHarvestUnit,
       minimumPricePerUnit: minimumPricePerUnit ? parseFloat(minimumPricePerUnit) : undefined,
-      notes: notes || undefined
+      notes: notes || undefined,
+      optimumSoilMoistureMin: optimumSoilMoistureMin ? parseFloat(optimumSoilMoistureMin) : undefined,
+      optimumSoilMoistureMax: optimumSoilMoistureMax ? parseFloat(optimumSoilMoistureMax) : undefined,
+      optimumTemperatureMin: optimumTemperatureMin ? parseFloat(optimumTemperatureMin) : undefined,
+      optimumTemperatureMax: optimumTemperatureMax ? parseFloat(optimumTemperatureMax) : undefined
     });
     
     setSubmitting(false);
@@ -93,6 +102,10 @@ export function CreateCropAllocationModal({ farmId, onSuccess, onClose }: Create
     setExpectedHarvestUnit('kg');
     setMinimumPricePerUnit('');
     setNotes('');
+    setOptimumSoilMoistureMin('');
+    setOptimumSoilMoistureMax('');
+    setOptimumTemperatureMin('');
+    setOptimumTemperatureMax('');
     setCreatedPlot(false);
   };
 
@@ -206,6 +219,33 @@ export function CreateCropAllocationModal({ farmId, onSuccess, onClose }: Create
               <div className="border-t border-white/10 pt-4">
                 <Label>Notes / Description (Optional)</Label>
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Any special notes about this crop plot?" />
+              </div>
+
+              <div className="border-t border-white/10 pt-4 space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold mb-1 opacity-80">Monitoring thresholds (Optional)</h3>
+                  <p className="text-xs opacity-60 mb-3">These values customize monitoring recommendations. Leave blank to use clearly labelled generic fallback thresholds.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Optimum Soil Moisture Min (%)</Label>
+                    <Input type="number" step="0.1" value={optimumSoilMoistureMin} onChange={(e) => setOptimumSoilMoistureMin(e.target.value)} placeholder="e.g. 40" />
+                  </div>
+                  <div>
+                    <Label>Optimum Soil Moisture Max (%)</Label>
+                    <Input type="number" step="0.1" value={optimumSoilMoistureMax} onChange={(e) => setOptimumSoilMoistureMax(e.target.value)} placeholder="e.g. 80" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Optimum Temperature Min (°C)</Label>
+                    <Input type="number" step="0.1" value={optimumTemperatureMin} onChange={(e) => setOptimumTemperatureMin(e.target.value)} placeholder="e.g. 20" />
+                  </div>
+                  <div>
+                    <Label>Optimum Temperature Max (°C)</Label>
+                    <Input type="number" step="0.1" value={optimumTemperatureMax} onChange={(e) => setOptimumTemperatureMax(e.target.value)} placeholder="e.g. 30" />
+                  </div>
+                </div>
               </div>
             </form>
           )}
