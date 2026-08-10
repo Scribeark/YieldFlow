@@ -42,6 +42,10 @@ export async function createCropAllocationDraft(
     expectedMaturityDays?: number;
     minimumPricePerUnit?: number;
     notes?: string;
+    optimumSoilMoistureMin?: number;
+    optimumSoilMoistureMax?: number;
+    optimumTemperatureMin?: number;
+    optimumTemperatureMax?: number;
   }
 ) {
   const { data, error } = await supabase.rpc('rpc_save_crop_allocation_draft', {
@@ -55,7 +59,11 @@ export async function createCropAllocationDraft(
     p_planting_date: params.plantingDate || null,
     p_expected_maturity_days: params.expectedMaturityDays || null,
     p_minimum_price_per_unit: params.minimumPricePerUnit || null,
-    p_notes: params.notes || null
+    p_notes: params.notes || null,
+    p_optimum_soil_moisture_min: params.optimumSoilMoistureMin || null,
+    p_optimum_soil_moisture_max: params.optimumSoilMoistureMax || null,
+    p_optimum_temperature_min: params.optimumTemperatureMin || null,
+    p_optimum_temperature_max: params.optimumTemperatureMax || null
   });
   return { data, error };
 }

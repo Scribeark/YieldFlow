@@ -1,0 +1,23 @@
+
+> agri-data-hub@0.1.0 build
+> next build
+
+▲ Next.js 16.2.10 (Turbopack)
+- Environments: .env.local, .env.production
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 19.6s
+  Running TypeScript ...
+Failed to type check.
+
+./components/seller/CreateCropAllocationModal.tsx:78:7
+Type error: Object literal may only specify known properties, and 'optimumSoilMoistureMin' does not exist in type '{ farmId: string; cropType: string; landSizeValue?: number | undefined; landSizeUnit?: string | undefined; expectedHarvestMin?: number | undefined; expectedHarvestMax?: number | undefined; ... 4 more ...; notes?: string | undefined; }'.
+
+  [90m76 |[0m       minimumPricePerUnit: minimumPricePerUnit ? parseFloat(minimumPricePerUnit) : [36mundefined[0m,
+  [90m77 |[0m       notes: notes || [36mundefined[0m,
+[31m[1m>[0m [90m78 |[0m       optimumSoilMoistureMin: optimumSoilMoistureMin ? parseFloat(optimumSoilMoistureMin) ..[36m.[0m
+  [90m   |[0m       [31m[1m^[0m
+  [90m79 |[0m       optimumSoilMoistureMax: optimumSoilMoistureMax ? parseFloat(optimumSoilMoistureMax) ..[36m.[0m
+  [90m80 |[0m       optimumTemperatureMin: optimumTemperatureMin ? parseFloat(optimumTemperatureMin) : [36mu...[0m
+  [90m81 |[0m       optimumTemperatureMax: optimumTemperatureMax ? parseFloat(optimumTemperatureMax) : u...
+Next.js build worker exited with code: 1 and signal: null
