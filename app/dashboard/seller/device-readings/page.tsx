@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding } from '@/lib/api/farms';
+import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding, closeCropAllocationBidding, archiveCropAllocation } from '@/lib/api/farms';
 import { 
   Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, 
   RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight,
@@ -196,6 +196,44 @@ export default function SellerDeviceReadingsPage() {
     }
   };
 
+  const [isClosingBidding, setIsClosingBidding] = useState<string | null>(null);
+  const handleCloseBidding = async (allocId: string) => {
+    if (!window.confirm("Close this crop plot's bidding? This will cancel the prediction cycle. Ensure no pending bids or trades exist.")) return;
+    setIsClosingBidding(allocId);
+    setActionError('');
+    try {
+      const { data, error } = await closeCropAllocationBidding(supabase, allocId);
+      if (error) throw new Error(error.message);
+      if (data && data.success === false) throw new Error(data.error);
+      setActionSuccess('Bidding closed successfully!');
+      loadFarms();
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to close bidding.');
+    } finally {
+      setIsClosingBidding(null);
+    }
+  };
+
+  const [isArchivingAllocation, setIsArchivingAllocation] = useState<string | null>(null);
+  const handleArchiveAllocation = async (allocId: string) => {
+    if (!window.confirm("Archive this crop plot? Historical data will be preserved, but it will be hidden from active views.")) return;
+    setIsArchivingAllocation(allocId);
+    setActionError('');
+    try {
+      const { data, error } = await archiveCropAllocation(supabase, allocId);
+      if (error) throw new Error(error.message);
+      if (data && data.success === false) throw new Error(data.error);
+      setActionSuccess('Crop plot archived successfully!');
+      loadFarms();
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to archive crop plot.');
+    } finally {
+      setIsArchivingAllocation(null);
+    }
+  };
+
   const handleArchiveFarm = async (farmId: string) => {
     if (!window.confirm("Are you sure you want to archive this farm? This will retire all associated devices. Historical data will be preserved.")) return;
     
@@ -366,8 +404,7 @@ export default function SellerDeviceReadingsPage() {
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs opacity-70 mb-3">
-                      <div className="flex items-center"><Leaf size={12} className="mr-1"/> {farm.crop_type}</div>
-                      <div className="flex items-center"><Target size={12} className="mr-1"/> {farm.expected_maturity_days} days</div>
+                      <div className="flex items-center"><Leaf size={12} className="mr-1"/> {farm.farm_crop_allocations?.length || 0} Plot(s)</div>
                     </div>
                     <div className="flex items-center justify-between text-xs pt-2 border-t border-white/10">
                       <div className="flex items-center opacity-80">
@@ -787,16 +824,38 @@ export default function SellerDeviceReadingsPage() {
                               {activePred?.bidding_status === 'OPEN' ? (
                                 <div className="text-center text-blue-400 flex flex-col items-center">
                                   <ShoppingCart size={16} className="mb-1" />
-                                  <div className="text-xs font-bold">Bidding is OPEN</div>
-                                  <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="mt-2 h-6 text-[10px]">View Bids</Button></Link>
+                                  <div className="text-xs font-bold mb-2">Bidding is OPEN</div>
+                                  <div className="flex gap-2">
+                                    <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="h-6 text-[10px]">View Bids</Button></Link>
+                                    <Button 
+                                      size="sm" 
+                                      variant="secondary" 
+                                      className="h-6 text-[10px] text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                                      disabled={isClosingBidding === alloc.id} 
+                                      onClick={() => handleCloseBidding(alloc.id)}
+                                    >
+                                      {isClosingBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Close Listing
+                                    </Button>
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="text-center">
                                   <div className="text-xs opacity-60 mb-2">Bidding is CLOSED</div>
                                   
-                                  <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
-                                    {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
-                                  </Button>
+                                  <div className="flex gap-2 justify-center">
+                                    <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
+                                      {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      variant="secondary" 
+                                      className="h-6 text-[10px] text-red-400 hover:bg-red-500/20"
+                                      disabled={isArchivingAllocation === alloc.id} 
+                                      onClick={() => handleArchiveAllocation(alloc.id)}
+                                    >
+                                      {isArchivingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Archive size={12} className="mr-1" />} Archive Plot
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
                             </div>

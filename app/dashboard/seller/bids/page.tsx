@@ -15,7 +15,8 @@ import {
   rejectHarvestBid,
   allocateHarvestBid,
   confirmPredictedHarvest,
-  convertBidsToTrades
+  convertBidsToTrades,
+  closeCropAllocationBidding
 } from '@/lib/api/farms';
 import {
   Activity, Layers, RefreshCw, Loader2, CheckCircle, XCircle,
@@ -212,6 +213,32 @@ export default function SellerBidManagementPage() {
   const [confirmModal, setConfirmModal] = useState<any | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
 
+  const [isClosingListing, setIsClosingListing] = useState<string | null>(null);
+
+  const handleCloseListing = async (predId: string, allocId: string) => {
+    if (!allocId) {
+      alert("Cannot close: Missing allocation ID for this listing.");
+      return;
+    }
+    if (!window.confirm("Close this pre-harvest listing? This will cancel the bidding cycle. Ensure no pending bids or trades exist.")) return;
+    
+    setIsClosingListing(predId);
+    setActionError(null);
+    try {
+      const { data, error } = await closeCropAllocationBidding(supabase, allocId);
+      if (error) throw new Error(error.message);
+      if (data && data.success === false) throw new Error(data.error);
+      
+      setActionSuccess({ id: predId, msg: 'Listing closed successfully!' });
+      load();
+    } catch (err: any) {
+      console.error(err);
+      setActionError({ id: predId, msg: err.message || 'Failed to close listing.' });
+    } finally {
+      setIsClosingListing(null);
+    }
+  };
+
   const load = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
@@ -399,6 +426,18 @@ export default function SellerBidManagementPage() {
                         <Link href="/dashboard/seller/requests">
                           <Button variant="secondary" size="sm"><ArrowRight size={14} className="mr-1" /> View in My Requests</Button>
                         </Link>
+                      )}
+                      {pred.bidding_status === 'OPEN' && (
+                        <Button 
+                          variant="secondary" 
+                          size="sm" 
+                          onClick={() => handleCloseListing(pred.id, pred.crop_allocation_id)} 
+                          disabled={isClosingListing === pred.id}
+                          className="text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                        >
+                          {isClosingListing === pred.id ? <Loader2 className="animate-spin mr-1" size={14} /> : <XCircle size={14} className="mr-1" />}
+                          Close Pre-Harvest Listing
+                        </Button>
                       )}
                     </div>
 

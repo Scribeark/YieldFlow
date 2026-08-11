@@ -80,6 +80,26 @@ export async function openCropAllocationBidding(
   return { data, error };
 }
 
+export async function closeCropAllocationBidding(
+  supabase: SupabaseClient<any>,
+  allocationId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_close_crop_allocation_bidding', {
+    p_crop_allocation_id: allocationId
+  });
+  return { data, error };
+}
+
+export async function archiveCropAllocation(
+  supabase: SupabaseClient<any>,
+  allocationId: string
+) {
+    const { data, error } = await supabase.rpc('rpc_archive_crop_allocation', {
+      p_crop_allocation_id: allocationId
+    });
+    return { data, error };
+}
+
 export async function createSellerFarm(
   supabase: SupabaseClient<any>,
   userId: string,

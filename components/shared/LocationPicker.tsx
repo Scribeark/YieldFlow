@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Label } from '@/components/ui/Label';
 import { Button } from '@/components/ui/Button';
 import { Search, MapPin, Loader2, Navigation, ChevronDown, ChevronUp } from 'lucide-react';
-import { geocodeAddress } from '@/lib/maps/googleMaps';
+import { geocodeAddress, reverseGeocode } from '@/lib/maps/googleMaps';
 
 interface LocationPickerProps {
   apiKey: string;
@@ -82,14 +82,16 @@ export function LocationPicker({
         
         // Reverse geocode to get a readable address if possible
         try {
-          // Google's geocoding API can take a lat,lng string in the address parameter, 
-          // or ideally in a latlng parameter. We'll use the existing function which passes it as address.
-          const result = await geocodeAddress(`${pos.coords.latitude},${pos.coords.longitude}`, apiKey);
-          if (result && result.address) {
-            onAddressChange(result.address);
+          const formattedAddress = await reverseGeocode(pos.coords.latitude, pos.coords.longitude, apiKey);
+          if (formattedAddress) {
+            onAddressChange(formattedAddress);
+          } else {
+            // Fallback cleanly to stringified coordinates if reverse geocoding fails
+            onAddressChange(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
           }
         } catch (e) {
           console.error("Reverse geocode failed:", e);
+          onAddressChange(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
         }
         
         setSuccess('GPS location acquired.');
@@ -98,17 +100,17 @@ export function LocationPicker({
       (err) => {
         console.warn('GPS error:', err);
         let errorMessage = 'Could not get GPS location. Please search for your address instead.';
-        if (err.code === 1) {
-          errorMessage = 'Location access denied. Please enable location permissions in your browser.';
-        } else if (err.code === 2) {
-          errorMessage = 'Location unavailable. Please check your device GPS.';
-        } else if (err.code === 3) {
-          errorMessage = 'Location request timed out. Please try again.';
+        if (err.code === err.PERMISSION_DENIED) {
+          errorMessage = 'Location permission denied. Please enable GPS access or search manually.';
+        } else if (err.code === err.TIMEOUT) {
+          errorMessage = 'GPS request timed out. Please try again or search manually.';
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          errorMessage = 'Location unavailable. Please search manually.';
         }
         setError(errorMessage);
         setGpsLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   };
 

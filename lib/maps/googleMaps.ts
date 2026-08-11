@@ -60,6 +60,34 @@ export async function geocodeAddress(
 }
 
 /**
+ * Reverse geocodes coordinates to a human-readable address.
+ */
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+  apiKey: string
+): Promise<string | null> {
+  if (lat == null || lng == null || !apiKey) return null;
+
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&region=ng`;
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (data.status !== 'OK' || !data.results?.[0]) {
+      console.warn('[reverseGeocode] No result for:', lat, lng, 'Status:', data.status);
+      return null;
+    }
+
+    return data.results[0].formatted_address;
+  } catch (err) {
+    console.error('[reverseGeocode] Error:', err);
+    return null;
+  }
+}
+
+/**
  * Requests a driving route between two points using the Google Directions API.
  * Returns the DirectionsResult which can be rendered by DirectionsRenderer.
  * Returns null if the route cannot be calculated.
