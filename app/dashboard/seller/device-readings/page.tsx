@@ -903,22 +903,13 @@ export default function SellerDeviceReadingsPage() {
                         );
                       };
 
+                      const visiblePlots = selectedFarm.farm_crop_allocations?.filter((allocation: any) => allocation.allocation_status !== 'ARCHIVED') ?? [];
+
                       return (
                         <>
-                          {activePlots.length > 0 ? activePlots.map(renderPlot) : (
+                          {visiblePlots.length > 0 ? visiblePlots.map(renderPlot) : (
                             <div className="text-center py-6 text-sm opacity-50 bg-black/10 border border-white/5 rounded-lg border-dashed">
                               No active crop plots for this farm.
-                            </div>
-                          )}
-                          
-                          {archivedPlots.length > 0 && (
-                            <div className="mt-8 pt-6 border-t border-white/10">
-                              <h4 className="text-sm font-bold opacity-60 mb-4 flex items-center">
-                                <Archive size={14} className="mr-2" /> Archived Crop Plots
-                              </h4>
-                              <div className="space-y-4">
-                                {archivedPlots.map(renderPlot)}
-                              </div>
                             </div>
                           )}
                         </>
