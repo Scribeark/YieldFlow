@@ -276,6 +276,7 @@ export default function SellerDeviceReadingsPage() {
       
       if (selectedDevice?.id === deviceId) {
         setSelectedDevice(null);
+        setDeviceReadings([]);
       }
       loadFarms(); // reload list
     } catch (err: any) {
@@ -404,7 +405,7 @@ export default function SellerDeviceReadingsPage() {
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-xs opacity-70 mb-3">
-                      <div className="flex items-center"><Leaf size={12} className="mr-1"/> {farm.farm_crop_allocations?.length || 0} Plot(s)</div>
+                      <div className="flex items-center"><Leaf size={12} className="mr-1"/> {farm.farm_crop_allocations?.filter((a: any) => a.allocation_status !== 'ARCHIVED').length || 0} Plot(s)</div>
                     </div>
                     <div className="flex items-center justify-between text-xs pt-2 border-t border-white/10">
                       <div className="flex items-center opacity-80">
@@ -454,7 +455,7 @@ export default function SellerDeviceReadingsPage() {
                     <div className="text-xs opacity-50 mb-1">Crop Allocations</div>
                     <div className="font-bold flex items-center">
                       <Leaf size={14} className="mr-2 text-green-400"/> 
-                      {selectedFarm?.farm_crop_allocations?.length || 0}
+                      {selectedFarm?.farm_crop_allocations?.filter((a: any) => a.allocation_status !== 'ARCHIVED').length || 0}
                     </div>
                   </div>
                   <div className="bg-black/20 p-3 rounded-lg">
@@ -727,13 +728,18 @@ export default function SellerDeviceReadingsPage() {
 
                 {selectedFarm.farm_crop_allocations && selectedFarm.farm_crop_allocations.length > 0 ? (
                   <div className="space-y-4">
-                    {selectedFarm.farm_crop_allocations.map((alloc: any) => {
-                      const activePred = alloc.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
-                      return (
-                        <div key={alloc.id} className="bg-black/20 p-4 rounded-lg border border-white/5 space-y-4">
+                    {(() => {
+                      const activePlots = selectedFarm.farm_crop_allocations.filter((a: any) => a.allocation_status !== 'ARCHIVED');
+                      const archivedPlots = selectedFarm.farm_crop_allocations.filter((a: any) => a.allocation_status === 'ARCHIVED');
+
+                      const renderPlot = (alloc: any) => {
+                        const activePred = alloc.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
+                        const isArchived = alloc.allocation_status === 'ARCHIVED';
+                        return (
+                        <div key={alloc.id} className={`bg-black/20 p-4 rounded-lg border border-white/5 space-y-4 ${isArchived ? 'opacity-70' : ''}`}>
                           <div className="flex justify-between items-start">
                             <div className="space-y-1">
-                              <h4 className="font-bold flex items-center text-lg"><Leaf size={16} className="mr-2 text-green-400"/> {alloc.crop_type}</h4>
+                              <h4 className="font-bold flex items-center text-lg"><Leaf size={16} className={`mr-2 ${isArchived ? 'text-gray-400' : 'text-green-400'}`}/> {alloc.crop_type}</h4>
                               <div className="text-sm opacity-80 flex flex-wrap gap-x-4 gap-y-1">
                                 <span><span className="opacity-70">Size:</span> {alloc.land_size_value} {alloc.land_size_unit}</span>
                                 <span><span className="opacity-70">Planted:</span> {alloc.planting_date ? new Date(alloc.planting_date).toLocaleDateString() : 'N/A'}</span>
@@ -825,44 +831,47 @@ export default function SellerDeviceReadingsPage() {
                                 <div className="text-center text-blue-400 flex flex-col items-center">
                                   <ShoppingCart size={16} className="mb-1" />
                                   <div className="text-xs font-bold mb-2">Bidding is OPEN</div>
-                                  <div className="flex gap-2">
-                                    <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="h-6 text-[10px]">View Bids</Button></Link>
-                                    <Button 
-                                      size="sm" 
-                                      variant="secondary" 
-                                      className="h-6 text-[10px] text-red-400 bg-red-500/10 hover:bg-red-500/20"
-                                      disabled={isClosingBidding === alloc.id} 
-                                      onClick={() => handleCloseBidding(alloc.id)}
-                                    >
-                                      {isClosingBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Close Listing
-                                    </Button>
-                                  </div>
+                                  {!isArchived && (
+                                    <div className="flex gap-2">
+                                      <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="h-6 text-[10px]">View Bids</Button></Link>
+                                      <Button 
+                                        size="sm" 
+                                        variant="secondary" 
+                                        className="h-6 text-[10px] text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                                        disabled={isClosingBidding === alloc.id} 
+                                        onClick={() => handleCloseBidding(alloc.id)}
+                                      >
+                                        {isClosingBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Close Listing
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
                                 <div className="text-center">
                                   <div className="text-xs opacity-60 mb-2">Bidding is CLOSED</div>
-                                  
-                                  <div className="flex gap-2 justify-center">
-                                    <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
-                                      {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
-                                    </Button>
-                                    <Button 
-                                      size="sm" 
-                                      variant="secondary" 
-                                      className="h-6 text-[10px] text-red-400 hover:bg-red-500/20"
-                                      disabled={isArchivingAllocation === alloc.id} 
-                                      onClick={() => handleArchiveAllocation(alloc.id)}
-                                    >
-                                      {isArchivingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Archive size={12} className="mr-1" />} Archive Plot
-                                    </Button>
-                                  </div>
+                                  {!isArchived && (
+                                    <div className="flex gap-2 justify-center">
+                                      <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
+                                        {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
+                                      </Button>
+                                      <Button 
+                                        size="sm" 
+                                        variant="secondary" 
+                                        className="h-6 text-[10px] text-red-400 hover:bg-red-500/20"
+                                        disabled={isArchivingAllocation === alloc.id} 
+                                        onClick={() => handleArchiveAllocation(alloc.id)}
+                                      >
+                                        {isArchivingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Archive size={12} className="mr-1" />} Archive Plot
+                                      </Button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
                           </div>
                           
                           {/* Actions */}
-                          {activePred && ['ALLOCATED', 'HARVEST_CONFIRMED'].includes(activePred.bidding_status) && (
+                          {activePred && ['ALLOCATED', 'HARVEST_CONFIRMED'].includes(activePred.bidding_status) && !isArchived && (
                             <div className="border-t border-white/10 pt-3 flex gap-2">
                               {activePred.bidding_status === 'ALLOCATED' && (
                                 <Button variant="secondary" size="sm" onClick={() => alert("To confirm harvest and setup pickup details, use the Manage Bids view.")}>
@@ -886,8 +895,30 @@ export default function SellerDeviceReadingsPage() {
                             </div>
                           )}
                         </div>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {activePlots.length > 0 ? activePlots.map(renderPlot) : (
+                            <div className="text-center py-6 text-sm opacity-50 bg-black/10 border border-white/5 rounded-lg border-dashed">
+                              No active crop plots for this farm.
+                            </div>
+                          )}
+                          
+                          {archivedPlots.length > 0 && (
+                            <div className="mt-8 pt-6 border-t border-white/10">
+                              <h4 className="text-sm font-bold opacity-60 mb-4 flex items-center">
+                                <Archive size={14} className="mr-2" /> Archived Crop Plots
+                              </h4>
+                              <div className="space-y-4">
+                                {archivedPlots.map(renderPlot)}
+                              </div>
+                            </div>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </div>
                 ) : (
                   <div className="text-center py-8 bg-black/20 border-dashed border-white/10 rounded-lg">

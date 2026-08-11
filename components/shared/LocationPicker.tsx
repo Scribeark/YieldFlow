@@ -48,8 +48,9 @@ export function LocationPicker({
     
     let result = await geocodeAddress(address, apiKey);
     
-    // Fallback 1: Append Nigeria if missing
-    if (!result && !address.toLowerCase().includes('nigeria')) {
+    // Fallback 1: Append Nigeria if missing and it's not a coordinate string
+    const isCoordinate = /^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(address.trim());
+    if (!result && !isCoordinate && !address.toLowerCase().includes('nigeria')) {
       result = await geocodeAddress(`${address}, Nigeria`, apiKey);
     }
 
@@ -66,7 +67,7 @@ export function LocationPicker({
     setGeocoding(false);
   };
 
-  const handleGps = () => {
+  const handleGps = async () => {
     if (!navigator.geolocation) {
       setError('Browser GPS not supported. Please search for your address instead.');
       return;
@@ -75,43 +76,55 @@ export function LocationPicker({
     setError(null);
     setSuccess(null);
 
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        onLatChange(pos.coords.latitude);
-        onLngChange(pos.coords.longitude);
-        
-        // Reverse geocode to get a readable address if possible
-        try {
-          const formattedAddress = await reverseGeocode(pos.coords.latitude, pos.coords.longitude, apiKey);
-          if (formattedAddress) {
-            onAddressChange(formattedAddress);
-          } else {
-            // Fallback cleanly to stringified coordinates if reverse geocoding fails
-            onAddressChange(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
-          }
-        } catch (e) {
-          console.error("Reverse geocode failed:", e);
+    const getPos = (options: PositionOptions): Promise<GeolocationPosition> => {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
+      });
+    };
+
+    try {
+      let pos: GeolocationPosition;
+      try {
+        pos = await getPos({ enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 });
+      } catch (err: any) {
+        if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
+           console.warn('High accuracy GPS failed, falling back to low accuracy...', err);
+           pos = await getPos({ enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+        } else {
+           throw err;
+        }
+      }
+      
+      onLatChange(pos.coords.latitude);
+      onLngChange(pos.coords.longitude);
+      
+      try {
+        const formattedAddress = await reverseGeocode(pos.coords.latitude, pos.coords.longitude, apiKey);
+        if (formattedAddress) {
+          onAddressChange(formattedAddress);
+        } else {
           onAddressChange(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
         }
-        
-        setSuccess('GPS location acquired.');
-        setGpsLoading(false);
-      },
-      (err) => {
-        console.warn('GPS error:', err);
-        let errorMessage = 'Could not get GPS location. Please search for your address instead.';
-        if (err.code === err.PERMISSION_DENIED) {
-          errorMessage = 'Location permission denied. Please enable GPS access or search manually.';
-        } else if (err.code === err.TIMEOUT) {
-          errorMessage = 'GPS request timed out. Please try again or search manually.';
-        } else if (err.code === err.POSITION_UNAVAILABLE) {
-          errorMessage = 'Location unavailable. Please search manually.';
-        }
-        setError(errorMessage);
-        setGpsLoading(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+      } catch (e) {
+        console.error("Reverse geocode failed:", e);
+        onAddressChange(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+      }
+      
+      setSuccess('GPS location acquired.');
+    } catch (err: any) {
+      console.warn('GPS error:', err);
+      let errorMessage = 'Could not get GPS location. Please search for your address instead.';
+      if (err.code === err.PERMISSION_DENIED) {
+        errorMessage = 'Location permission denied. Please enable GPS access or search manually.';
+      } else if (err.code === err.TIMEOUT) {
+        errorMessage = 'GPS request timed out. Please try again or search manually.';
+      } else if (err.code === err.POSITION_UNAVAILABLE) {
+        errorMessage = 'Location unavailable. Please search manually.';
+      }
+      setError(errorMessage);
+    } finally {
+      setGpsLoading(false);
+    }
   };
 
   return (
