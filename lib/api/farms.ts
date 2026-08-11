@@ -92,6 +92,16 @@ export async function archiveCropAllocation(
     return { data, error };
 }
 
+export async function deleteCropAllocation(
+  supabase: SupabaseClient<any>,
+  allocationId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_delete_crop_allocation', {
+    p_crop_allocation_id: allocationId,
+  });
+  return { data, error };
+}
+
 export async function createSellerFarm(
   supabase: SupabaseClient<any>,
   userId: string,

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding, closeCropAllocationBidding, archiveCropAllocation } from '@/lib/api/farms';
+import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding, closeCropAllocationBidding, archiveCropAllocation, deleteCropAllocation } from '@/lib/api/farms';
 import { 
   Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, 
   RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight,
@@ -231,6 +231,42 @@ export default function SellerDeviceReadingsPage() {
       setActionError(err.message || 'Failed to archive crop plot.');
     } finally {
       setIsArchivingAllocation(null);
+    }
+  };
+
+  const [isDeletingAllocation, setIsDeletingAllocation] = useState<string | null>(null);
+  const handleDeleteAllocation = async (allocId: string, cropName: string) => {
+    if (!window.confirm("Permanently delete this crop plot? This cannot be undone.")) return;
+    
+    const confirmName = window.prompt(`Please type "${cropName}" to confirm permanent deletion:`);
+    if (confirmName !== cropName) {
+      alert("Crop name did not match. Deletion cancelled.");
+      return;
+    }
+
+    setIsDeletingAllocation(allocId);
+    setActionError('');
+    try {
+      const { data, error } = await deleteCropAllocation(supabase, allocId);
+      if (error) throw new Error(error.message);
+      if (data && data.success === false) throw new Error(data.error);
+      
+      setActionSuccess('Crop plot deleted permanently.');
+      
+      // Remove from selectedFarm immediately for instant UI update
+      setSelectedFarm(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          farm_crop_allocations: prev.farm_crop_allocations?.filter((a: any) => a.id !== allocId)
+        };
+      });
+      loadFarms();
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to delete crop plot. If history exists, use Archive instead.');
+    } finally {
+      setIsDeletingAllocation(null);
     }
   };
 
@@ -854,17 +890,43 @@ export default function SellerDeviceReadingsPage() {
                                       <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
                                         {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
                                       </Button>
+                                      
+                                      {/* Both Archive and Delete are available. Delete will fail if there is history. */}
                                       <Button 
                                         size="sm" 
                                         variant="secondary" 
                                         className="h-6 text-[10px] text-red-400 hover:bg-red-500/20"
-                                        disabled={isArchivingAllocation === alloc.id} 
+                                        disabled={isArchivingAllocation === alloc.id || isDeletingAllocation === alloc.id} 
                                         onClick={() => handleArchiveAllocation(alloc.id)}
                                       >
                                         {isArchivingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Archive size={12} className="mr-1" />} Archive Plot
                                       </Button>
+
+                                      <Button 
+                                        size="sm" 
+                                        variant="secondary" 
+                                        className="h-6 text-[10px] text-red-500 hover:bg-red-500/20"
+                                        disabled={isArchivingAllocation === alloc.id || isDeletingAllocation === alloc.id} 
+                                        onClick={() => handleDeleteAllocation(alloc.id, alloc.crop_name)}
+                                      >
+                                        {isDeletingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Delete
+                                      </Button>
                                     </div>
                                   )}
+                                </div>
+                              )}
+                              
+                              {isArchived && (
+                                <div className="mt-4 flex justify-center border-t border-white/5 pt-3">
+                                  <Button 
+                                    size="sm" 
+                                    variant="secondary" 
+                                    className="h-6 text-[10px] text-red-500 hover:bg-red-500/20"
+                                    disabled={isDeletingAllocation === alloc.id} 
+                                    onClick={() => handleDeleteAllocation(alloc.id, alloc.crop_name)}
+                                  >
+                                    {isDeletingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Delete Crop Plot
+                                  </Button>
                                 </div>
                               )}
                             </div>
