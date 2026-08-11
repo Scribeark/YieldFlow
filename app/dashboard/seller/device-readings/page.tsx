@@ -254,7 +254,7 @@ export default function SellerDeviceReadingsPage() {
       setActionSuccess('Crop plot deleted permanently.');
       
       // Remove from selectedFarm immediately for instant UI update
-      setSelectedFarm(prev => {
+      setSelectedFarm((prev: any) => {
         if (!prev) return prev;
         return {
           ...prev,
