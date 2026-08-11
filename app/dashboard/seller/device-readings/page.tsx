@@ -215,35 +215,10 @@ export default function SellerDeviceReadingsPage() {
     }
   };
 
-  const [isArchivingAllocation, setIsArchivingAllocation] = useState<string | null>(null);
-  const handleArchiveAllocation = async (allocId: string) => {
-    if (!window.confirm("Archive this crop plot? Historical data will be preserved, but it will be hidden from active views.")) return;
-    setIsArchivingAllocation(allocId);
-    setActionError('');
-    try {
-      const { data, error } = await archiveCropAllocation(supabase, allocId);
-      if (error) throw new Error(error.message);
-      if (data && data.success === false) throw new Error(data.error);
-      setActionSuccess('Crop plot archived successfully!');
-      loadFarms();
-    } catch (err: any) {
-      console.error(err);
-      setActionError(err.message || 'Failed to archive crop plot.');
-    } finally {
-      setIsArchivingAllocation(null);
-    }
-  };
-
   const [isDeletingAllocation, setIsDeletingAllocation] = useState<string | null>(null);
-  const handleDeleteAllocation = async (allocId: string, cropName: string) => {
-    if (!window.confirm("Permanently delete this crop plot? This cannot be undone.")) return;
+  const handleDeleteAllocation = async (allocId: string) => {
+    if (!window.confirm("Are you sure you want to permanently delete this crop plot?")) return;
     
-    const confirmName = window.prompt(`Please type "${cropName}" to confirm permanent deletion:`);
-    if (confirmName !== cropName) {
-      alert("Crop name did not match. Deletion cancelled.");
-      return;
-    }
-
     setIsDeletingAllocation(allocId);
     setActionError('');
     try {
@@ -264,7 +239,7 @@ export default function SellerDeviceReadingsPage() {
       loadFarms();
     } catch (err: any) {
       console.error(err);
-      setActionError(err.message || 'Failed to delete crop plot. If history exists, use Archive instead.');
+      setActionError(err.message || 'Failed to delete crop plot.');
     } finally {
       setIsDeletingAllocation(null);
     }
@@ -765,9 +740,6 @@ export default function SellerDeviceReadingsPage() {
                 {selectedFarm.farm_crop_allocations && selectedFarm.farm_crop_allocations.length > 0 ? (
                   <div className="space-y-4">
                     {(() => {
-                      const activePlots = selectedFarm.farm_crop_allocations.filter((a: any) => a.allocation_status !== 'ARCHIVED');
-                      const archivedPlots = selectedFarm.farm_crop_allocations.filter((a: any) => a.allocation_status === 'ARCHIVED');
-
                       const renderPlot = (alloc: any) => {
                         const activePred = alloc.harvest_predictions?.find((p: any) => p.prediction_cycle_status === 'ACTIVE');
                         const isArchived = alloc.allocation_status === 'ARCHIVED';
@@ -867,66 +839,37 @@ export default function SellerDeviceReadingsPage() {
                                 <div className="text-center text-blue-400 flex flex-col items-center">
                                   <ShoppingCart size={16} className="mb-1" />
                                   <div className="text-xs font-bold mb-2">Bidding is OPEN</div>
-                                  {!isArchived && (
-                                    <div className="flex gap-2">
-                                      <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="h-6 text-[10px]">View Bids</Button></Link>
-                                      <Button 
-                                        size="sm" 
-                                        variant="secondary" 
-                                        className="h-6 text-[10px] text-red-400 bg-red-500/10 hover:bg-red-500/20"
-                                        disabled={isClosingBidding === alloc.id} 
-                                        onClick={() => handleCloseBidding(alloc.id)}
-                                      >
-                                        {isClosingBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Close Listing
-                                      </Button>
-                                    </div>
-                                  )}
+                                  <div className="flex gap-2">
+                                    <Link href="/dashboard/seller/bids"><Button size="sm" variant="secondary" className="h-6 text-[10px]">View Bids</Button></Link>
+                                    <Button 
+                                      size="sm" 
+                                      variant="secondary" 
+                                      className="h-6 text-[10px] text-red-400 bg-red-500/10 hover:bg-red-500/20"
+                                      disabled={isClosingBidding === alloc.id} 
+                                      onClick={() => handleCloseBidding(alloc.id)}
+                                    >
+                                      {isClosingBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Close Listing
+                                    </Button>
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="text-center">
                                   <div className="text-xs opacity-60 mb-2">Bidding is CLOSED</div>
-                                  {!isArchived && (
-                                    <div className="flex gap-2 justify-center">
-                                      <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
-                                        {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
-                                      </Button>
-                                      
-                                      {/* Both Archive and Delete are available. Delete will fail if there is history. */}
-                                      <Button 
-                                        size="sm" 
-                                        variant="secondary" 
-                                        className="h-6 text-[10px] text-red-400 hover:bg-red-500/20"
-                                        disabled={isArchivingAllocation === alloc.id || isDeletingAllocation === alloc.id} 
-                                        onClick={() => handleArchiveAllocation(alloc.id)}
-                                      >
-                                        {isArchivingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Archive size={12} className="mr-1" />} Archive Plot
-                                      </Button>
-
-                                      <Button 
-                                        size="sm" 
-                                        variant="secondary" 
-                                        className="h-6 text-[10px] text-red-500 hover:bg-red-500/20"
-                                        disabled={isArchivingAllocation === alloc.id || isDeletingAllocation === alloc.id} 
-                                        onClick={() => handleDeleteAllocation(alloc.id, alloc.crop_name)}
-                                      >
-                                        {isDeletingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Delete
-                                      </Button>
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                              
-                              {isArchived && (
-                                <div className="mt-4 flex justify-center border-t border-white/5 pt-3">
-                                  <Button 
-                                    size="sm" 
-                                    variant="secondary" 
-                                    className="h-6 text-[10px] text-red-500 hover:bg-red-500/20"
-                                    disabled={isDeletingAllocation === alloc.id} 
-                                    onClick={() => handleDeleteAllocation(alloc.id, alloc.crop_name)}
-                                  >
-                                    {isDeletingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Delete Crop Plot
-                                  </Button>
+                                  <div className="flex gap-2 justify-center">
+                                    <Button size="sm" variant="primary" className="h-6 text-[10px]" disabled={isOpeningBidding === alloc.id} onClick={() => handleOpenBidding(alloc.id)}>
+                                      {isOpeningBidding === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <Target size={12} className="mr-1" />} Open Bidding
+                                    </Button>
+                                    
+                                    <Button 
+                                      size="sm" 
+                                      variant="secondary" 
+                                      className="h-6 text-[10px] text-red-500 hover:bg-red-500/20"
+                                      disabled={isDeletingAllocation === alloc.id} 
+                                      onClick={() => handleDeleteAllocation(alloc.id)}
+                                    >
+                                      {isDeletingAllocation === alloc.id ? <Loader2 size={12} className="animate-spin mr-1" /> : <XCircle size={12} className="mr-1" />} Delete
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
                             </div>
