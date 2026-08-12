@@ -90,12 +90,12 @@ export default function BuyerHarvestOpportunitiesPage() {
 
               <h3 className="text-xl font-bold mb-1 flex items-center">
                 <Sprout className="mr-2 text-[var(--agri-primary)]" />
-                {opp.farm_crop_allocations?.crop_type || opp.farms?.crop_type || 'Unknown Crop'}
+                {opp.crop_type || 'Unknown Crop'}
               </h3>
 
               <div className="text-sm opacity-80 flex items-center mb-4">
                 <MapPin size={14} className="mr-1 flex-shrink-0" />
-                {opp.farms?.physical_address || 'Address shared after bid conversion'}
+                Location hidden until trade conversion
               </div>
 
               <div className="bg-black/20 p-4 rounded-lg mb-4 flex-grow">
@@ -151,7 +151,7 @@ export default function BuyerHarvestOpportunitiesPage() {
         opportunity={selectedOpportunity}
         onSuccess={() => {
           setIsModalOpen(false);
-          setBidSuccess(`Bid placed on ${selectedOpportunity?.farms?.crop_type || 'this opportunity'}! Track it in My Bids.`);
+          setBidSuccess(`Bid placed on ${selectedOpportunity?.crop_type || 'this opportunity'}! Track it in My Bids.`);
           loadOpportunities();
         }}
       />

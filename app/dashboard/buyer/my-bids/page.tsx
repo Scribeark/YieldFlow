@@ -35,8 +35,7 @@ export default function BuyerMyBidsPage() {
   const load = useCallback(async () => {
     if (!profile) return;
     setLoading(true);
-    // harvest_bids.buyer_id references public.users.id, not auth.uid()
-    const { data, error } = await getMyBids(supabase, profile.id);
+    const { data, error } = await getMyBids(supabase);
     if (error) setPageError('Failed to load your bids.');
     else setBids(data || []);
     setLoading(false);
@@ -101,6 +100,11 @@ export default function BuyerMyBidsPage() {
     const effectiveQty = bid.accepted_quantity ?? bid.desired_quantity;
     const effectiveTotal = effectiveQty * Number(bid.offered_price_per_unit);
 
+    // Safely format the converted location requiring both fields
+    const convertedLocation = opp.farm_name && opp.farm_physical_address
+      ? `${opp.farm_name} - ${opp.farm_physical_address}`
+      : 'Location hidden until trade conversion';
+
     return (
       <Card key={bid.id} className={`border-l-4 ${bid.bid_status === 'PENDING' ? 'border-l-yellow-500' : bid.bid_status === 'CONVERTED_TO_TRADE' ? 'border-l-purple-500' : 'border-l-[var(--agri-primary)]'} transition-all`}>
         {/* Action feedback for this specific bid */}
@@ -134,11 +138,11 @@ export default function BuyerMyBidsPage() {
             </div>
 
             <h3 className="text-lg font-bold mb-1">
-              {opp.farm_crop_allocations?.crop_type || opp.farms?.crop_type || 'Unknown Crop'}
+              {opp.crop_type || 'Unknown Crop'}
             </h3>
             <div className="text-sm opacity-70 flex items-center mb-2">
               <MapPin size={13} className="mr-1 flex-shrink-0" />
-              {opp.farms?.physical_address || 'Location hidden until trade conversion'}
+              {convertedLocation}
             </div>
 
             {/* Lifecycle note */}

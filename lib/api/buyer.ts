@@ -66,12 +66,8 @@ export async function confirmOrder(
   }
 }
 
-export async function getMyBids(supabase: SupabaseClient<any>, userId: string) {
-  const { data, error } = await supabase
-    .from('harvest_bids')
-    .select('*, harvest_predictions(*, farms(name, physical_address), farm_crop_allocations(crop_type))')
-    .eq('buyer_id', userId)
-    .order('created_at', { ascending: false });
+export async function getMyBids(supabase: SupabaseClient<any>) {
+  const { data, error } = await supabase.rpc('rpc_get_buyer_my_bids');
   return { data, error };
 }
 
@@ -110,45 +106,8 @@ export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bi
 }
 
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
-  const { data, error } = await supabase
-    .from('harvest_predictions')
-    .select('*, farms(name, physical_address, latitude, longitude, iot_devices(last_seen_at)), farm_crop_allocations(crop_type)')
-    .eq('bidding_status', 'OPEN')
-    .order('created_at', { ascending: false });
-
-  if (error || !data) return { data, error };
-
-  // Defensive filtering for IoT origin
-  const validData = data.filter((row: any) => {
-    if (row.bidding_origin === 'IOT') {
-      const farm = row.farms;
-      if (!farm) return false;
-      
-      const alloc = row.farm_crop_allocations;
-      
-      // 1. Business Data completeness
-      const cropType = alloc?.crop_type || farm.crop_type; // Fallback for legacy data
-      if (!cropType || cropType === 'Unknown Crop' || cropType.trim() === '') return false;
-      if (!row.expected_quantity_min || row.expected_quantity_min <= 0) return false;
-      if (!row.expected_quantity_max || row.expected_quantity_max < row.expected_quantity_min) return false;
-
-      // 2. Freshness check (data must be <= 3 hours old for IoT readiness to remain valid)
-      const devices = farm.iot_devices || [];
-      const latestSeen = devices.reduce((latest: Date | null, d: any) => {
-        if (!d.last_seen_at) return latest;
-        const dDate = new Date(d.last_seen_at);
-        return !latest || dDate > latest ? dDate : latest;
-      }, null);
-      
-      if (!latestSeen) return false;
-      
-      const diffHours = (new Date().getTime() - latestSeen.getTime()) / (1000 * 60 * 60);
-      if (diffHours > 3) return false; // Stale data hides it from marketplace
-    }
-    return true;
-  });
-
-  return { data: validData, error };
+  const { data, error } = await supabase.rpc('rpc_get_buyer_harvest_opportunities');
+  return { data, error };
 }
 
 export async function requestEvidence(
