@@ -310,7 +310,9 @@ export async function recordFarmActivity(
     p_recorded_at: params.recordedAt,
     p_payload: params.payload
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to record activity') };
+  return { data, error: null };
 }
 
 export async function getBuyerFarmActivitySummary(
@@ -320,7 +322,10 @@ export async function getBuyerFarmActivitySummary(
   const { data, error } = await supabase.rpc('rpc_get_buyer_farm_activity_summary', {
     p_prediction_id: predictionId
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to load activity summary') };
+  const arr = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+  return { data: arr, error: null };
 }
 
 // ── V6 Negotiation RPCs ─────────────────────────────────────────────────────
@@ -340,7 +345,9 @@ export async function placeHarvestBid(
     p_offered_price_per_unit: params.offeredPricePerUnit,
     p_buyer_message: params.buyerMessage || null
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to place bid') };
+  return { data, error: null };
 }
 
 export async function counterHarvestBid(
@@ -358,33 +365,44 @@ export async function counterHarvestBid(
     p_counter_quantity: params.counterQuantity,
     p_message: params.message || null
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to counter bid') };
+  return { data, error: null };
 }
 
 export async function acceptOffer(supabase: SupabaseClient<any>, bidId: string) {
   const { data, error } = await supabase.rpc('rpc_accept_offer', {
     p_bid_id: bidId
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to accept offer') };
+  return { data, error: null };
 }
 
 export async function rejectOffer(supabase: SupabaseClient<any>, bidId: string) {
   const { data, error } = await supabase.rpc('rpc_reject_offer', {
     p_bid_id: bidId
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to reject offer') };
+  return { data, error: null };
 }
 
 export async function withdrawOffer(supabase: SupabaseClient<any>, bidId: string) {
   const { data, error } = await supabase.rpc('rpc_withdraw_offer', {
     p_bid_id: bidId
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to withdraw offer') };
+  return { data, error: null };
 }
 
 export async function getBidNegotiationEvents(supabase: SupabaseClient<any>, bidId: string) {
   const { data, error } = await supabase.rpc('rpc_get_bid_negotiation_events', {
     p_bid_id: bidId
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to load events') };
+  const arr = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+  return { data: arr, error: null };
 }

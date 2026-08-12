@@ -16,10 +16,22 @@ export function NegotiationHistory({ bidId }: { bidId: string }) {
     let mounted = true;
     const fetchHistory = async () => {
       setLoading(true);
-      const { data, error } = await getBidNegotiationEvents(supabase, bidId);
+      const { data: payload, error } = await getBidNegotiationEvents(supabase, bidId);
       if (mounted) {
-        if (error) setError(error.message);
-        else setEvents(data || []);
+        if (error) {
+          setError(error.message);
+          setEvents([]);
+        } else if (payload?.success === false) {
+          setError(payload.error || 'Unable to load negotiation history.');
+          setEvents([]);
+        } else {
+          const extractedEvents = Array.isArray(payload)
+            ? payload
+            : Array.isArray(payload?.data)
+              ? payload.data
+              : [];
+          setEvents(extractedEvents);
+        }
         setLoading(false);
       }
     };
@@ -35,8 +47,10 @@ export function NegotiationHistory({ bidId }: { bidId: string }) {
     return <div className="text-sm text-red-400 p-2">{error}</div>;
   }
 
-  if (events.length === 0) {
-    return <div className="text-sm opacity-50 p-2">No history available.</div>;
+  const safeEvents = Array.isArray(events) ? events : [];
+
+  if (safeEvents.length === 0) {
+    return <div className="text-sm opacity-50 p-2">No negotiation activity yet.</div>;
   }
 
   return (
@@ -45,7 +59,7 @@ export function NegotiationHistory({ bidId }: { bidId: string }) {
         <History size={14} /> Negotiation History
       </h4>
       <div className="space-y-3">
-        {events.map((evt, idx) => {
+        {safeEvents.map((evt: any, idx: number) => {
           const isBuyer = evt.actor_role === 'BUYER';
           const alignClass = isBuyer ? 'justify-start' : 'justify-end';
           const bgClass = isBuyer ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-purple-500/10 border-purple-500/20';
