@@ -366,7 +366,6 @@ export default function NavigationShell({ children }: { children: React.ReactNod
           onClose={() => setIsNotificationOpen(false)}
           onRefreshCount={fetchUnreadCount}
         />
-      </header>
 
         {/* Mobile Navigation Dropdown */}
         {isMobileMenuOpen && (

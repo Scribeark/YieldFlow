@@ -941,6 +941,8 @@ export default function SellerDeviceReadingsPage() {
                               )}
                             </div>
                           )}
+                          {/* Actions */}
+                          {activePred && ['ALLOCATED', 'HARVEST_CONFIRMED'].includes(activePred.bidding_status) && !isArchived && (
                             <div className="border-t border-white/10 pt-3 flex gap-2">
                               {activePred.bidding_status === 'ALLOCATED' && (
                                 <Button variant="secondary" size="sm" onClick={() => alert("To confirm harvest and setup pickup details, use the Manage Bids view.")}>

@@ -368,6 +368,8 @@ export default function SellerBidManagementPage() {
     if (error) notify(pred?.id || '', error.message, true);
     else { notify(pred?.id || '', 'Counteroffer sent.'); await load(); }
     setProcessingBidId(null);
+  };
+
   const handleCancelProvisional = async (predId: string, bidId: string) => {
     const reason = window.prompt("Reason for cancelling this provisional agreement?", "Cancelled by seller before trade establishment");
     if (reason === null) return;
