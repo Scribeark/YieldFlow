@@ -98,11 +98,14 @@ export async function withdrawHarvestBid(supabase: SupabaseClient<any>, bidId: s
   return { data, error };
 }
 
-export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bidId: string) {
-  const { data, error } = await supabase.rpc('rpc_cancel_accepted_harvest_bid', {
-    p_bid_id: bidId
+export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bidId: string, reason?: string) {
+  const { data, error } = await supabase.rpc('rpc_cancel_provisional_agreement', {
+    p_bid_id: bidId,
+    p_reason: reason || 'Cancelled by buyer before trade establishment'
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to cancel provisional agreement') };
+  return { data, error: null };
 }
 
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {

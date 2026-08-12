@@ -59,32 +59,37 @@ export function NegotiationHistory({ bidId }: { bidId: string }) {
         <History size={14} /> Negotiation History
       </h4>
       <div className="space-y-3">
-        {safeEvents.map((evt: any, idx: number) => {
+        {safeEvents.map((evt: any) => {
           const isBuyer = evt.actor_role === 'BUYER';
-          const alignClass = isBuyer ? 'justify-start' : 'justify-end';
-          const bgClass = isBuyer ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-purple-500/10 border-purple-500/20';
+          const isSystem = !evt.actor_role || evt.actor_role === 'SYSTEM';
+          const alignClass = isSystem ? 'justify-center' : isBuyer ? 'justify-start' : 'justify-end';
+          const bgClass = isSystem 
+            ? 'bg-blue-500/10 border-blue-500/20 text-blue-300' 
+            : isBuyer 
+              ? 'bg-yellow-500/10 border-yellow-500/20' 
+              : 'bg-purple-500/10 border-purple-500/20';
           
           return (
             <div key={evt.id} className={`flex w-full ${alignClass}`}>
               <Card className={`p-3 max-w-[85%] sm:max-w-[70%] border ${bgClass}`}>
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-xs font-bold">{evt.actor_role}</span>
+                <div className="flex justify-between items-center mb-1 gap-2">
+                  <span className="text-xs font-bold uppercase">{evt.actor_role || 'SYSTEM'}</span>
                   <span className="text-[10px] opacity-60">{new Date(evt.created_at).toLocaleString()}</span>
                 </div>
                 
                 <div className="text-sm font-medium mb-1">{(evt?.event_type || 'UNKNOWN').replace(/_/g, ' ')}</div>
                 
-                {(evt.offered_price_per_unit || evt.offered_quantity) && (
+                {(evt.offered_price_per_unit || evt.offered_quantity) ? (
                   <div className="text-xs opacity-80 grid grid-cols-2 gap-2 mt-2 bg-black/20 p-2 rounded">
-                    <div><span className="opacity-50">Price:</span> ₦{evt.offered_price_per_unit}</div>
-                    <div><span className="opacity-50">Qty:</span> {evt.offered_quantity}</div>
+                    {evt.offered_price_per_unit ? <div><span className="opacity-50">Price:</span> ₦{Number(evt.offered_price_per_unit).toLocaleString()}</div> : <div />}
+                    {evt.offered_quantity ? <div><span className="opacity-50">Qty:</span> {evt.offered_quantity}</div> : <div />}
                   </div>
-                )}
+                ) : null}
                 
                 {evt.message && (
                   <div className="text-xs mt-2 italic opacity-90 flex items-start gap-1">
-                    <MessageSquare size={12} className="mt-0.5" />
-                    "{evt.message}"
+                    <MessageSquare size={12} className="mt-0.5 flex-shrink-0" />
+                    &ldquo;{evt.message}&rdquo;
                   </div>
                 )}
               </Card>

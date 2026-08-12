@@ -120,14 +120,12 @@ export async function deleteBid(
   supabase: SupabaseClient<any>,
   bidId: string
 ) {
-  // Deletes a bid that is in a terminal disposable state (REJECTED, WITHDRAWN, CANCELLED, EXPIRED).
-  // Uses direct delete — server RLS ensures the buyer owns the row.
-  const { error } = await supabase
-    .from('harvest_bids')
-    .delete()
-    .eq('id', bidId)
-    .in('bid_status', ['REJECTED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED']);
+  // Hides a bid record from the participant's active view using SECURITY DEFINER RPC
+  const { data, error } = await supabase.rpc('rpc_hide_or_delete_bid_record', {
+    p_bid_id: bidId
+  });
   if (error) return { error };
+  if (data?.success === false) return { error: new Error(data.error || 'Failed to hide bid record') };
   return { error: null };
 }
 
@@ -434,4 +432,32 @@ export async function getBidNegotiationEvents(supabase: SupabaseClient<any>, bid
   if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to load events') };
   const arr = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
   return { data: arr, error: null };
+}
+
+export async function confirmCropReadiness(supabase: SupabaseClient<any>, predictionId: string) {
+  const { data, error } = await supabase.rpc('rpc_confirm_crop_readiness', {
+    p_prediction_id: predictionId
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to confirm crop readiness') };
+  return { data, error: null };
+}
+
+export async function cancelProvisionalAgreement(supabase: SupabaseClient<any>, bidId: string, reason?: string) {
+  const { data, error } = await supabase.rpc('rpc_cancel_provisional_agreement', {
+    p_bid_id: bidId,
+    p_reason: reason || 'Cancelled by participant before trade establishment'
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to cancel provisional agreement') };
+  return { data, error: null };
+}
+
+export async function closeCropAllocationBidding(supabase: SupabaseClient<any>, cropAllocationId: string) {
+  const { data, error } = await supabase.rpc('rpc_close_crop_allocation_bidding', {
+    p_crop_allocation_id: cropAllocationId
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to close crop listing') };
+  return { data, error: null };
 }

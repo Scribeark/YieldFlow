@@ -18,7 +18,9 @@ import {
   counterHarvestBid,
   confirmPredictedHarvest,
   convertBidsToTrades,
-  closeCropAllocationBidding
+  closeCropAllocationBidding,
+  cancelProvisionalAgreement,
+  deleteBid
 } from '@/lib/api/farms';
 import {
   Activity, Layers, RefreshCw, Loader2, CheckCircle, XCircle,
@@ -366,9 +368,23 @@ export default function SellerBidManagementPage() {
     if (error) notify(pred?.id || '', error.message, true);
     else { notify(pred?.id || '', 'Counteroffer sent.'); await load(); }
     setProcessingBidId(null);
+  const handleCancelProvisional = async (predId: string, bidId: string) => {
+    const reason = window.prompt("Reason for cancelling this provisional agreement?", "Cancelled by seller before trade establishment");
+    if (reason === null) return;
+    setProcessingBidId(bidId);
+    const { error } = await cancelProvisionalAgreement(supabase, bidId, reason);
+    if (error) notify(predId, error.message, true);
+    else { notify(predId, 'Provisional agreement cancelled.'); await load(); }
+    setProcessingBidId(null);
   };
 
-  
+  const handleHideBid = async (predId: string, bidId: string) => {
+    setProcessingBidId(bidId);
+    const { error } = await deleteBid(supabase, bidId);
+    if (error) notify(predId, error.message, true);
+    else { notify(predId, 'Bid record hidden.'); await load(); }
+    setProcessingBidId(null);
+  };
 
   const handleConfirmHarvest = async (params: any) => {
     setConfirmModal(null);
@@ -445,7 +461,7 @@ export default function SellerBidManagementPage() {
                         <h2 className="text-lg font-bold">{pred.farms?.name || 'Farm'} — {pred.farm_crop_allocations?.crop_type || 'Crop'}</h2>
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${biddingColor}`}>{pred.bidding_status}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${isIoT ? 'bg-green-500/10 text-green-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                          {isIoT ? 'Predicted Harvest' : 'Manual Listing'}
+                          {isIoT ? 'Upcoming Harvest' : 'Manual Listing'}
                         </span>
                       </div>
                       <p className="text-sm opacity-60 mt-0.5">{bids.length} bid(s) · {new Date(pred.created_at).toLocaleDateString()}</p>
@@ -526,7 +542,7 @@ export default function SellerBidManagementPage() {
                           className="text-red-400 bg-red-500/10 hover:bg-red-500/20"
                         >
                           {isClosingListing === pred.id ? <Loader2 className="animate-spin mr-1" size={14} /> : <XCircle size={14} className="mr-1" />}
-                          Close Pre-Harvest Listing
+                          Close Listing
                         </Button>
                       )}
                     </div>
@@ -588,22 +604,35 @@ export default function SellerBidManagementPage() {
 
                     {acceptedBids.length > 0 && (
                       <div>
-                        <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 mb-2">Accepted Bids ({acceptedBids.length})</h3>
+                        <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 mb-2">Provisional Agreements ({acceptedBids.length})</h3>
                         <div className="space-y-2">
                           {acceptedBids.map((bid: any) => (
                             <div key={bid.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
                               <div>
-                                <div className="font-medium">{bid?.buyer_profile?.full_name || 'Buyer'}</div>
+                                <div className="font-medium flex items-center gap-2">
+                                  <span>{bid?.buyer_profile?.full_name || 'Buyer'}</span>
+                                  <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-bold uppercase border border-green-500/30">
+                                    Provisional Agreement Accepted
+                                  </span>
+                                </div>
                                 {bid?.id && <NegotiationHistory bidId={bid.id} />}
-                                <div className="text-sm opacity-70">
+                                <div className="text-sm opacity-70 mt-1">
                                   Accepted: <strong className="text-green-400">{bid.accepted_quantity} {unit}</strong>
                                   {bid.bid_status === 'PARTIALLY_ACCEPTED' && <span className="text-xs text-yellow-400 ml-2">(Partial — requested {bid.desired_quantity})</span>}
                                   {' '}· ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}
                                 </div>
                               </div>
-                              <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${BID_STATUS_STYLES[bid?.bid_status || 'UNKNOWN'] || ''}`}>
-                                {(bid?.bid_status || 'UNKNOWN').replace(/_/g, ' ')}
-                              </span>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  disabled={processingBidId === bid.id}
+                                  onClick={() => handleCancelProvisional(pred.id, bid.id)}
+                                  className="text-red-400 bg-red-500/10 hover:bg-red-500/20 text-xs"
+                                >
+                                  {processingBidId === bid.id ? <Loader2 size={12} className="animate-spin" /> : 'Cancel Agreement'}
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -615,13 +644,24 @@ export default function SellerBidManagementPage() {
                         <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 mb-2">Closed Bids ({closedBids.length})</h3>
                         <div className="space-y-2">
                           {closedBids.map((bid: any) => (
-                            <div key={bid.id} className="flex items-center justify-between p-3 bg-black/20 border border-white/5 rounded-lg opacity-60">
+                            <div key={bid.id} className="flex items-center justify-between p-3 bg-black/20 border border-white/5 rounded-lg opacity-80">
                               <div>
                                 <div className="text-sm font-medium">{bid.buyer_profile?.full_name || 'Buyer'} · {bid.desired_quantity} {unit}</div>
                               </div>
-                              <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${BID_STATUS_STYLES[bid?.bid_status || 'UNKNOWN'] || 'bg-gray-500/20'}`}>
-                                {(bid?.bid_status || 'UNKNOWN').replace(/_/g, ' ')}
-                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${BID_STATUS_STYLES[bid?.bid_status || 'UNKNOWN'] || 'bg-gray-500/20'}`}>
+                                  {(bid?.bid_status || 'UNKNOWN').replace(/_/g, ' ')}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={processingBidId === bid.id}
+                                  onClick={() => handleHideBid(pred.id, bid.id)}
+                                  className="text-xs opacity-60 hover:opacity-100 h-6 px-2"
+                                >
+                                  Hide Record
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>

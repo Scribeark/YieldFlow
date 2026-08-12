@@ -120,7 +120,7 @@ export default function BuyerHarvestOpportunitiesPage() {
     }
     return (
       <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded font-bold uppercase tracking-wider flex items-center">
-        <Activity size={12} className="mr-1" /> Predicted Harvest
+        <Activity size={12} className="mr-1" /> Upcoming Harvest
       </span>
     );
   };

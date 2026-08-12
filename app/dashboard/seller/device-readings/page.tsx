@@ -8,11 +8,11 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding, closeCropAllocationBidding, archiveCropAllocation, deleteCropAllocation } from '@/lib/api/farms';
+import { getSellerFarms, getDeviceReadings, confirmPredictedHarvest, convertBidsToTrades, archiveFarm, openCropAllocationBidding, closeCropAllocationBidding, archiveCropAllocation, deleteCropAllocation, confirmCropReadiness } from '@/lib/api/farms';
 import { 
   Thermometer, Droplets, CloudRain, Activity, MapPin, Plus, Cpu, 
   RefreshCw, BarChart2, CheckCircle, AlertTriangle, Loader2, ArrowRight,
-  TrendingUp, Wifi, Target, Sprout, ShoppingCart, Truck, Leaf, XCircle, Trash2, Archive
+  TrendingUp, Wifi, Target, Sprout, ShoppingCart, Truck, Leaf, XCircle, Trash2, Archive, Calendar
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { RegisterFarmModal } from '@/components/seller/RegisterFarmModal';
@@ -198,7 +198,7 @@ export default function SellerDeviceReadingsPage() {
 
   const [isClosingBidding, setIsClosingBidding] = useState<string | null>(null);
   const handleCloseBidding = async (allocId: string) => {
-    if (!window.confirm("Close this crop plot's bidding? This will cancel the prediction cycle. Ensure no pending bids or trades exist.")) return;
+    if (!window.confirm("Close this crop plot's bidding? Ensure no active bids or provisional agreements exist.")) return;
     setIsClosingBidding(allocId);
     setActionError('');
     try {
@@ -212,6 +212,25 @@ export default function SellerDeviceReadingsPage() {
       setActionError(err.message || 'Failed to close bidding.');
     } finally {
       setIsClosingBidding(null);
+    }
+  };
+
+  const [isConfirmingReadiness, setIsConfirmingReadiness] = useState<string | null>(null);
+  const handleConfirmReadiness = async (predId: string) => {
+    if (!window.confirm("Confirm that this crop is physically ready for harvest?")) return;
+    setIsConfirmingReadiness(predId);
+    setActionError('');
+    try {
+      const { data, error } = await confirmCropReadiness(supabase, predId);
+      if (error) throw new Error(error.message);
+      if (data && data.success === false) throw new Error(data.error);
+      setActionSuccess('Crop physical readiness confirmed! Buyer harvest evidence stage is unlocked.');
+      loadFarms();
+    } catch (err: any) {
+      console.error(err);
+      setActionError(err.message || 'Failed to confirm readiness.');
+    } finally {
+      setIsConfirmingReadiness(null);
     }
   };
 
@@ -324,7 +343,7 @@ export default function SellerDeviceReadingsPage() {
       </div>
 
       {/* B. Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         <Card className="p-4 bg-white/5 border border-white/10 flex flex-col justify-center items-center text-center">
           <div className="text-2xl font-bold">{totalFarms}</div>
           <div className="text-xs opacity-70 uppercase tracking-wider mt-1">Total Farms</div>
@@ -332,10 +351,6 @@ export default function SellerDeviceReadingsPage() {
         <Card className="p-4 bg-white/5 border border-white/10 flex flex-col justify-center items-center text-center">
           <div className="text-2xl font-bold text-blue-400">{connectedDevices}</div>
           <div className="text-xs opacity-70 uppercase tracking-wider mt-1">Connected Devices</div>
-        </Card>
-        <Card className="p-4 bg-white/5 border border-white/10 flex flex-col justify-center items-center text-center">
-          <div className="text-2xl font-bold text-green-400">{activeReadings}</div>
-          <div className="text-xs opacity-70 uppercase tracking-wider mt-1">Active Readings</div>
         </Card>
         <Card className="p-4 bg-white/5 border border-white/10 flex flex-col justify-center items-center text-center">
           <div className="text-2xl font-bold text-yellow-400">{readyFarms}</div>
@@ -867,8 +882,65 @@ export default function SellerDeviceReadingsPage() {
                             </div>
                           </div>
                           
-                          {/* Actions */}
-                          {activePred && ['ALLOCATED', 'HARVEST_CONFIRMED'].includes(activePred.bidding_status) && !isArchived && (
+                          {/* Maturity & Readiness Action Bar */}
+                          {activePred && !isArchived && (
+                            <div className="border-t border-white/10 pt-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-black/10 p-3 rounded-lg">
+                              <div className="flex-1 w-full">
+                                <div className="flex justify-between items-center text-xs mb-1">
+                                  <span className="opacity-70 font-medium">Crop Maturity Progress</span>
+                                  <span className="font-bold text-[var(--agri-primary)]">{(() => {
+                                    const plantDate = alloc.planting_date ? new Date(alloc.planting_date) : null;
+                                    const totalMaturityDays = alloc.expected_maturity_days || 90;
+                                    const elapsedDays = plantDate ? Math.max(0, Math.floor((new Date().getTime() - plantDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+                                    return Math.min(100, Math.max(0, Math.round((elapsedDays / totalMaturityDays) * 100)));
+                                  })()}%</span>
+                                </div>
+                                <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                                  <div
+                                    className="bg-[var(--agri-primary)] h-full transition-all duration-300"
+                                    style={{
+                                      width: `${(() => {
+                                        const plantDate = alloc.planting_date ? new Date(alloc.planting_date) : null;
+                                        const totalMaturityDays = alloc.expected_maturity_days || 90;
+                                        const elapsedDays = plantDate ? Math.max(0, Math.floor((new Date().getTime() - plantDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+                                        return Math.min(100, Math.max(0, Math.round((elapsedDays / totalMaturityDays) * 100)));
+                                      })()}%`
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              {activePred.seller_confirmed_readiness ? (
+                                <div className="flex items-center text-xs font-bold text-green-400 bg-green-500/10 px-3 py-1.5 rounded-lg border border-green-500/30 shrink-0">
+                                  <CheckCircle size={14} className="mr-1.5" /> Readiness Confirmed
+                                </div>
+                              ) : (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  disabled={
+                                    isConfirmingReadiness === activePred.id ||
+                                    (() => {
+                                      const plantDate = alloc.planting_date ? new Date(alloc.planting_date) : null;
+                                      const totalMaturityDays = alloc.expected_maturity_days || 90;
+                                      const elapsedDays = plantDate ? Math.max(0, Math.floor((new Date().getTime() - plantDate.getTime()) / (1000 * 60 * 60 * 24))) : 0;
+                                      const pct = Math.min(100, Math.max(0, Math.round((elapsedDays / totalMaturityDays) * 100)));
+                                      return pct < 80;
+                                    })()
+                                  }
+                                  onClick={() => handleConfirmReadiness(activePred.id)}
+                                  className="shrink-0 text-xs"
+                                >
+                                  {isConfirmingReadiness === activePred.id ? (
+                                    <Loader2 size={14} className="animate-spin mr-1" />
+                                  ) : (
+                                    <CheckCircle size={14} className="mr-1" />
+                                  )}
+                                  Confirm Crop Readiness
+                                </Button>
+                              )}
+                            </div>
+                          )}
                             <div className="border-t border-white/10 pt-3 flex gap-2">
                               {activePred.bidding_status === 'ALLOCATED' && (
                                 <Button variant="secondary" size="sm" onClick={() => alert("To confirm harvest and setup pickup details, use the Manage Bids view.")}>

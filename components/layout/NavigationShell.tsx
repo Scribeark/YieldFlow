@@ -7,7 +7,10 @@ import { useAuthStore } from '../../store/authStore';
 import { ROLES, ROLE_ROUTES } from '../../lib/constants';
 import { ThemeToggle } from '../ui/ThemeToggle';
 import { Button } from '../ui/Button';
-import { Menu, X, ChevronDown, User, Settings, LogOut, Trash2 } from 'lucide-react';
+import { Menu, X, ChevronDown, User, Settings, LogOut, Trash2, Bell } from 'lucide-react';
+import { NotificationDrawer } from '../shared/NotificationDrawer';
+import { getNotifications } from '@/lib/api/notifications';
+import { createClient } from '@/lib/supabase/client';
 
 const PUBLIC_ROUTES = ['/', '/login', '/signup', '/unauthorized'];
 
@@ -136,11 +139,28 @@ export default function NavigationShell({ children }: { children: React.ReactNod
   const { profile, isLoading, isInitialized, initialize, signOut } = useAuthStore();
   const pathname = usePathname();
   const router = useRouter();
+  const supabase = createClient();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = async () => {
+    if (!profile) return;
+    const { data } = await getNotifications(supabase);
+    if (data) {
+      setUnreadCount(data.filter((n) => !n.is_read).length);
+    }
+  };
 
   useEffect(() => {
     initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    if (profile) {
+      fetchUnreadCount();
+    }
+  }, [profile, pathname]);
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -296,6 +316,20 @@ export default function NavigationShell({ children }: { children: React.ReactNod
 
               <div className="flex items-center space-x-4 border-l border-white/20 pl-4">
                 <ThemeToggle />
+                {profile && (
+                  <button
+                    onClick={() => setIsNotificationOpen(true)}
+                    className="relative p-2 bg-white/10 rounded-lg hover:bg-white/20 transition text-white"
+                    title="Notifications"
+                  >
+                    <Bell size={18} />
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                )}
                 {profile && <UserProfileDropdown profile={profile} onSignOut={signOut} />}
               </div>
             </div>
@@ -303,6 +337,20 @@ export default function NavigationShell({ children }: { children: React.ReactNod
             {/* Mobile Menu Toggle */}
             <div className="md:hidden flex items-center space-x-4">
               <ThemeToggle />
+              {profile && (
+                <button
+                  onClick={() => setIsNotificationOpen(true)}
+                  className="relative p-2 bg-white/10 rounded hover:bg-white/20 transition text-white"
+                  title="Notifications"
+                >
+                  <Bell size={18} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+              )}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                 className="p-2 bg-white/10 rounded hover:bg-white/20 transition"
@@ -312,6 +360,13 @@ export default function NavigationShell({ children }: { children: React.ReactNod
             </div>
           </div>
         </div>
+
+        <NotificationDrawer
+          isOpen={isNotificationOpen}
+          onClose={() => setIsNotificationOpen(false)}
+          onRefreshCount={fetchUnreadCount}
+        />
+      </header>
 
         {/* Mobile Navigation Dropdown */}
         {isMobileMenuOpen && (

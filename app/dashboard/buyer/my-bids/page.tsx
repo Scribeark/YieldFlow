@@ -16,7 +16,7 @@ import { HandCoins, MapPin, Loader2, CalendarDays, Activity, Layers, RefreshCw, 
 
 const STATUS_STYLES: Record<string, { badge: string; label: string }> = {
   PENDING:           { badge: 'bg-yellow-500/20 text-yellow-400',  label: 'Pending' },
-  ACCEPTED:          { badge: 'bg-green-500/20 text-green-400',    label: 'Accepted' },
+  ACCEPTED:          { badge: 'bg-green-500/20 text-green-400',    label: 'Provisional Agreement Accepted' },
   PARTIALLY_ACCEPTED:{ badge: 'bg-blue-500/20 text-blue-400',      label: 'Partial Accept' },
   REJECTED:          { badge: 'bg-red-500/20 text-red-400',        label: 'Rejected' },
   WITHDRAWN:         { badge: 'bg-gray-500/20 text-gray-400',      label: 'Withdrawn' },
@@ -193,24 +193,22 @@ export default function BuyerMyBidsPage() {
   };
 
   const handleCancelAccepted = async (bid: any) => {
-    if (!window.confirm(
-      `Cancel your accepted bid for ${bid.accepted_quantity || bid.desired_quantity} ${bid.harvest_predictions?.expected_quantity_unit}? ` +
-      `The quantity will be returned to the seller's pool.`
-    )) return;
+    const reason = window.prompt("Reason for cancelling this provisional agreement?", "Cancelled by buyer before trade establishment");
+    if (reason === null) return;
     setActionState({ id: bid.id, status: 'loading', msg: '' });
-    const { error } = await cancelAcceptedHarvestBid(supabase, bid.id);
+    const { error } = await cancelAcceptedHarvestBid(supabase, bid.id, reason);
     if (error) notify(bid.id, error.message, true);
-    else { notify(bid.id, 'Bid cancelled. Quantity returned to seller pool.'); await load(); }
+    else { notify(bid.id, 'Provisional agreement cancelled.'); await load(); }
   };
 
   const handleDeleteBid = async (bid: any) => {
     if (!window.confirm(
-      `Permanently delete this ${bid.bid_status.toLowerCase()} bid record? This cannot be undone.`
+      `Remove this ${bid.bid_status.toLowerCase()} bid record from your view?`
     )) return;
     setActionState({ id: bid.id, status: 'loading', msg: '' });
     const { error } = await deleteBid(supabase, bid.id);
     if (error) notify(bid.id, error.message, true);
-    else { notify(bid.id, 'Bid record deleted.'); await load(); }
+    else { notify(bid.id, 'Bid record hidden.'); await load(); }
   };
 
   const getLifecycleNote = (bid: any) => {
@@ -274,7 +272,7 @@ export default function BuyerMyBidsPage() {
               </span>
               {isIoT ? (
                 <span className="bg-green-500/10 text-green-400 text-xs px-2 py-1 rounded font-bold flex items-center">
-                  <Activity size={11} className="mr-1" /> Predicted Harvest
+                  <Activity size={11} className="mr-1" /> Upcoming Harvest
                 </span>
               ) : (
                 <span className="bg-purple-500/10 text-purple-400 text-xs px-2 py-1 rounded font-bold flex items-center">
@@ -389,7 +387,7 @@ export default function BuyerMyBidsPage() {
                 onClick={() => handleCancelAccepted(bid)}
               >
                 {isActioning ? <Loader2 size={14} className="animate-spin mr-1" /> : <XCircle size={14} className="mr-1" />}
-                Cancel Bid
+                Cancel Agreement
               </Button>
             )}
 
