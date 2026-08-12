@@ -91,8 +91,13 @@ export async function updateProfile(data: {
 
 /**
  * Securely deletes a user account server-side.
- * Validates session, re-authenticates password, deletes storage assets & DB data,
- * anonymizes statutory records if required, and deletes the Auth user.
+ * 
+ * SERVER-ACTION EXECUTION ORDER:
+ * 1. Reauthenticate current user with password (if provided).
+ * 2. Delete owned Storage objects (harvest-photos, vehicle-photos, vehicle-documents).
+ * 3. Call rpc_delete_user_account to purge/anonymize DB data.
+ * 4. Delete matching Supabase Auth user via server-only Admin API.
+ * 5. Return structured result for client-side signout & redirect to landing page.
  */
 export async function deleteUserAccount(data: {
   confirmationText: string;
@@ -109,6 +114,7 @@ export async function deleteUserAccount(data: {
     return { error: 'Please type DELETE MY ACCOUNT exactly as shown.' };
   }
 
+  // Authoritative session verification
   const supabaseAuth = await getAuthSupabase();
   const {
     data: { user },
@@ -119,7 +125,7 @@ export async function deleteUserAccount(data: {
     return { error: 'Authentication required. Please log in and try again.' };
   }
 
-  // Re-authenticate password if provided
+  // STEP 1: Re-authenticate current user if password supplied
   if (currentPassword && user.email) {
     const { error: authError } = await supabaseAuth.auth.signInWithPassword({
       email: user.email,
@@ -133,10 +139,10 @@ export async function deleteUserAccount(data: {
 
   const supabaseAdmin = getAdminSupabase();
 
-  // 1. Resolve application user profile
+  // Resolve application user profile ID using users.auth_uid = auth.uid()
   const { data: appUser, error: appUserErr } = await supabaseAdmin
     .from('users')
-    .select('id, declared_profession')
+    .select('id')
     .eq('auth_uid', user.id)
     .single();
 
@@ -146,16 +152,7 @@ export async function deleteUserAccount(data: {
 
   const userId = appUser.id;
 
-  // 2. Check for protected completed commercial history
-  const { data: protectedBids } = await supabaseAdmin
-    .from('harvest_bids')
-    .select('id')
-    .or(`buyer_id.eq.${userId}`)
-    .in('bid_status', ['CONVERTED_TO_TRADE']);
-
-  const hasProtectedTrades = protectedBids && protectedBids.length > 0;
-
-  // 3. Delete Supabase Storage objects owned by user
+  // STEP 2: Delete owned Supabase Storage objects
   try {
     const buckets = ['harvest-photos', 'vehicle-photos', 'vehicle-documents'];
     for (const bucket of buckets) {
@@ -169,132 +166,34 @@ export async function deleteUserAccount(data: {
     // Non-blocking storage removal
   }
 
-  // 4. Foreign-key safe database deletion order
-  try {
-    // a. Owned farms
-    const { data: farms } = await supabaseAdmin
-      .from('farms')
-      .select('id')
-      .eq('user_id', userId);
-    const farmIds = (farms || []).map((f) => f.id);
+  // STEP 3: Execute RPC rpc_delete_user_account for authoritative DB cleanup / anonymization
+  let rpcMetrics: any = null;
+  let retainedReason: string | undefined;
 
-    // b. Crop allocations
-    let cropIds: string[] = [];
-    if (farmIds.length > 0) {
-      const { data: crops } = await supabaseAdmin
-        .from('farm_crop_allocations')
-        .select('id')
-        .in('farm_id', farmIds);
-      cropIds = (crops || []).map((c) => c.id);
-    }
+  const { data: rpcRes, error: rpcErr } = await (supabaseAdmin as any).rpc('rpc_delete_user_account', {
+    p_user_id: userId,
+  });
 
-    // c. Harvest predictions
-    let predictionIds: string[] = [];
-    if (farmIds.length > 0) {
-      const { data: preds } = await supabaseAdmin
-        .from('harvest_predictions')
-        .select('id')
-        .in('farm_id', farmIds);
-      predictionIds = (preds || []).map((p) => p.id);
-    }
-
-    // d. Harvest bids (buyer or on seller predictions)
-    const { data: buyerBids } = await supabaseAdmin
-      .from('harvest_bids')
-      .select('id')
-      .eq('buyer_id', userId);
-    let bidIds = (buyerBids || []).map((b) => b.id);
-
-    if (predictionIds.length > 0) {
-      const { data: predBids } = await supabaseAdmin
-        .from('harvest_bids')
-        .select('id')
-        .in('prediction_id', predictionIds);
-      if (predBids) {
-        bidIds = Array.from(new Set([...bidIds, ...predBids.map((b) => b.id)]));
-      }
-    }
-
-    // e. Bid negotiation events
-    if (bidIds.length > 0) {
-      await supabaseAdmin.from('bid_negotiation_events').delete().in('bid_id', bidIds);
-    }
-    await supabaseAdmin.from('bid_negotiation_events').delete().eq('actor_id', userId);
-
-    // f. Trade requests (disposable)
-    if (predictionIds.length > 0) {
-      await supabaseAdmin.from('trade_requests').delete().in('harvest_prediction_id', predictionIds);
-    }
-    await supabaseAdmin.from('trade_requests').delete().eq('user_id', userId);
-
-    // g. Harvest bids
-    if (bidIds.length > 0) {
-      await supabaseAdmin.from('harvest_bids').delete().in('id', bidIds);
-    }
-
-    // h. Harvest predictions
-    if (predictionIds.length > 0) {
-      await supabaseAdmin.from('harvest_predictions').delete().in('id', predictionIds);
-    }
-
-    // i. Farm activity logs
-    if (farmIds.length > 0) {
-      await supabaseAdmin.from('farm_activity_logs').delete().in('farm_id', farmIds);
-    }
-
-    // j. Telemetry / Devices
-    const { data: userDevices } = await supabaseAdmin
-      .from('iot_devices')
-      .select('id')
-      .eq('user_id', userId);
-    const deviceIds = (userDevices || []).map((d) => d.id);
-
-    if (deviceIds.length > 0) {
-      try {
-        await supabaseAdmin.from('iot_sensor_streams').delete().in('device_id', deviceIds);
-      } catch (e) {}
-    }
-
-    await supabaseAdmin.from('iot_devices').delete().eq('user_id', userId);
-    if (farmIds.length > 0) {
-      await supabaseAdmin.from('iot_devices').delete().in('farm_id', farmIds);
-    }
-
-    // k. Crop allocations & Farms
-    if (cropIds.length > 0) {
-      await supabaseAdmin.from('farm_crop_allocations').delete().in('id', cropIds);
-    }
-    if (farmIds.length > 0) {
-      await supabaseAdmin.from('farms').delete().in('id', farmIds);
-    }
-
-    // l. Public profile handling
-    let retainedReason: string | undefined;
-    if (hasProtectedTrades) {
-      retainedReason =
-        'Completed trade records were retained for statutory financial compliance, but your personal profile identifiers have been anonymized and account access revoked.';
-      await (supabaseAdmin as any)
-        .from('users')
-        .update({
-          full_name: 'Anonymized User',
-          phone_number: '0000000000',
-          verification_status: 'deleted',
-          business_latitude: null,
-          business_longitude: null,
-        })
-        .eq('id', userId);
-    } else {
-      await supabaseAdmin.from('users').delete().eq('id', userId);
-    }
-
-    // 5. Delete Supabase Auth account using Server Admin API
-    const { error: deleteAuthErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
-    if (deleteAuthErr) {
-      console.error('Failed to delete Auth account:', deleteAuthErr);
-    }
-
-    return { success: true, retainedReason };
-  } catch (err: any) {
-    return { error: err.message || 'An unexpected error occurred during database cleanup.' };
+  if (rpcErr) {
+    return { error: `Database account cleanup failed: ${rpcErr.message}` };
   }
+
+  rpcMetrics = rpcRes?.metrics;
+  if (rpcRes?.retained_and_anonymized) {
+    retainedReason =
+      'Completed commercial trade records were retained for statutory financial compliance, but your personal identifiers have been anonymized and account access revoked.';
+  }
+
+  // STEP 4: Delete matching Supabase Auth user via server-only Admin API
+  const { error: deleteAuthErr } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+  if (deleteAuthErr) {
+    return { error: `Failed to remove authentication access: ${deleteAuthErr.message}` };
+  }
+
+  // STEP 5: Return structured result for client signout & redirect
+  return {
+    success: true,
+    retainedReason,
+    metrics: rpcMetrics,
+  };
 }
