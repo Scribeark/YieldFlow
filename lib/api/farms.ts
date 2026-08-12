@@ -99,7 +99,36 @@ export async function deleteCropAllocation(
   const { data, error } = await supabase.rpc('rpc_delete_crop_allocation', {
     p_crop_allocation_id: allocationId,
   });
-  return { data, error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to delete crop allocation') };
+  return { data, error: null };
+}
+
+export async function deleteFarm(
+  supabase: SupabaseClient<any>,
+  farmId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_delete_farm', {
+    p_farm_id: farmId,
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to delete farm') };
+  return { data, error: null };
+}
+
+export async function deleteBid(
+  supabase: SupabaseClient<any>,
+  bidId: string
+) {
+  // Deletes a bid that is in a terminal disposable state (REJECTED, WITHDRAWN, CANCELLED, EXPIRED).
+  // Uses direct delete — server RLS ensures the buyer owns the row.
+  const { error } = await supabase
+    .from('harvest_bids')
+    .delete()
+    .eq('id', bidId)
+    .in('bid_status', ['REJECTED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED']);
+  if (error) return { error };
+  return { error: null };
 }
 
 export async function createSellerFarm(

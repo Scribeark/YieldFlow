@@ -9,8 +9,8 @@ import { Select } from '@/components/ui/Select';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, recordFarmActivity } from '@/lib/api/farms';
-import { Loader2, Plus, FileText, CheckCircle, Activity, Camera, Droplets, Bug, Sprout, List } from 'lucide-react';
+import { getSellerFarms, recordFarmActivity, deleteFarm, deleteCropAllocation } from '@/lib/api/farms';
+import { Loader2, Plus, FileText, CheckCircle, Activity, List, Trash2, AlertTriangle, X } from 'lucide-react';
 
 const ACTIVITY_TYPES = [
   'Irrigation', 'Fertiliser application', 'Weeding', 'Pest inspection',
@@ -18,6 +18,50 @@ const ACTIVITY_TYPES = [
   'Soil inspection', 'Crop growth inspection', 'Harvest preparation',
   'General farm inspection', 'Other'
 ];
+
+// ── Confirm Delete Modal ─────────────────────────────────────────────────────
+
+function ConfirmDeleteModal({
+  title,
+  description,
+  onConfirm,
+  onClose,
+  deleting,
+}: {
+  title: string;
+  description: string;
+  onConfirm: () => void;
+  onClose: () => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4">
+      <Card className="w-full max-w-md">
+        <div className="flex items-start gap-3 mb-4">
+          <AlertTriangle size={22} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h2 className="text-lg font-bold text-red-300">{title}</h2>
+            <p className="text-sm opacity-80 mt-1">{description}</p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <Button variant="ghost" onClick={onClose} disabled={deleting}>
+            <X size={14} className="mr-1" /> Cancel
+          </Button>
+          <Button
+            variant="primary"
+            className="bg-red-600 hover:bg-red-700 border-red-600"
+            onClick={onConfirm}
+            disabled={deleting}
+          >
+            {deleting ? <Loader2 size={14} className="animate-spin mr-1" /> : <Trash2 size={14} className="mr-1" />}
+            Confirm Delete
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 export default function FarmRecordsPage() {
   const { profile } = useAuthStore();
@@ -28,11 +72,19 @@ export default function FarmRecordsPage() {
   const [selectedFarmId, setSelectedFarmId] = useState<string>('');
   const [selectedCropId, setSelectedCropId] = useState<string>('');
   const [activities, setActivities] = useState<any[]>([]);
-  
+
   const [showLogForm, setShowLogForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Deletion state
+  const [deleteModal, setDeleteModal] = useState<{
+    type: 'farm' | 'crop';
+    id: string;
+    label: string;
+  } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Form State
   const [activityType, setActivityType] = useState(ACTIVITY_TYPES[0]);
@@ -47,7 +99,7 @@ export default function FarmRecordsPage() {
       setError(error.message);
     } else if (data) {
       setFarms(data);
-      if (data.length > 0) {
+      if (data.length > 0 && !selectedFarmId) {
         setSelectedFarmId(data[0].id);
       }
     }
@@ -64,9 +116,8 @@ export default function FarmRecordsPage() {
       .eq('farm_id', selectedFarmId)
       .order('recorded_at', { ascending: false })
       .limit(50);
-    
+
     if (!error && data) {
-      // Filter by crop allocation if one is selected
       if (selectedCropId) {
         setActivities(data.filter(a => a.crop_allocation_id === selectedCropId || !a.crop_allocation_id));
       } else {
@@ -84,10 +135,10 @@ export default function FarmRecordsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFarmId) return setError('Please select a farm');
-    
+
     setSubmitting(true);
     setError('');
-    
+
     const { error: submitError } = await recordFarmActivity(supabase, {
       farmId: selectedFarmId,
       cropAllocationId: selectedCropId || undefined,
@@ -108,16 +159,54 @@ export default function FarmRecordsPage() {
     setSubmitting(false);
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    setError('');
+
+    let deleteError: Error | null = null;
+
+    if (deleteModal.type === 'farm') {
+      const { error } = await deleteFarm(supabase, deleteModal.id);
+      deleteError = error as Error | null;
+    } else {
+      const { error } = await deleteCropAllocation(supabase, deleteModal.id);
+      deleteError = error as Error | null;
+    }
+
+    setDeleting(false);
+    setDeleteModal(null);
+
+    if (deleteError) {
+      setError(deleteError.message);
+    } else {
+      const label = deleteModal.type === 'farm' ? 'Farm' : 'Crop allocation';
+      setSuccessMsg(`${label} deleted successfully.`);
+      // Clear selection if the deleted item was selected
+      if (deleteModal.type === 'farm' && selectedFarmId === deleteModal.id) {
+        setSelectedFarmId('');
+        setSelectedCropId('');
+        setActivities([]);
+      } else if (deleteModal.type === 'crop' && selectedCropId === deleteModal.id) {
+        setSelectedCropId('');
+      }
+      // Refresh from Supabase
+      await loadFarms();
+      await loadActivities();
+      setTimeout(() => setSuccessMsg(''), 4000);
+    }
+  };
+
   const selectedFarm = farms.find(f => f.id === selectedFarmId);
   const cropAllocations = selectedFarm?.farm_crop_allocations || [];
-  
-  // Calculate IoT independent readiness
+
   const recentActivities = activities.slice(0, 10);
   const readinessScore = Math.min(100, (recentActivities.length * 10) + (cropAllocations.length * 10));
-  const hasIoT = (selectedFarm?.iot_devices || []).length > 0;
+  const hasSensors = (selectedFarm?.iot_devices || []).length > 0;
 
   return (
     <PageContainer>
+      {/* ── Header ── */}
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold">Farm Condition & Digital Records</h1>
@@ -131,13 +220,14 @@ export default function FarmRecordsPage() {
       {error && <Alert variant="error" className="mb-4">{error}</Alert>}
       {successMsg && <Alert variant="success" className="mb-4">{successMsg}</Alert>}
 
+      {/* ── Farm & Crop Selectors ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <Card className="col-span-1 md:col-span-2">
           <h2 className="text-lg font-bold mb-4">Select Farm & Crop</h2>
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-4 mb-4">
             <div className="flex-1">
               <label className="text-sm font-medium mb-1 block">Farm</label>
-              <Select value={selectedFarmId} onChange={(e: any) => setSelectedFarmId(e.target.value)}>
+              <Select value={selectedFarmId} onChange={(e: any) => { setSelectedFarmId(e.target.value); setSelectedCropId(''); }}>
                 <option value="">-- Select Farm --</option>
                 {farms.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
               </Select>
@@ -150,8 +240,37 @@ export default function FarmRecordsPage() {
               </Select>
             </div>
           </div>
+
+          {/* ── Delete Controls ── */}
+          {selectedFarmId && (
+            <div className="flex flex-wrap gap-2 pt-3 border-t border-white/10">
+              {selectedCropId && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-400 hover:bg-red-500/10 border border-red-400/20"
+                  onClick={() => {
+                    const crop = cropAllocations.find((c: any) => c.id === selectedCropId);
+                    setDeleteModal({ type: 'crop', id: selectedCropId, label: crop?.crop_type || 'this crop allocation' });
+                  }}
+                >
+                  <Trash2 size={13} className="mr-1" /> Delete Selected Crop
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:bg-red-500/10 border border-red-500/20"
+                onClick={() => {
+                  setDeleteModal({ type: 'farm', id: selectedFarmId, label: selectedFarm?.name || 'this farm' });
+                }}
+              >
+                <Trash2 size={13} className="mr-1" /> Delete Farm
+              </Button>
+            </div>
+          )}
         </Card>
-        
+
         <Card className="col-span-1 bg-black/20">
           <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
             <Activity size={18} className="text-blue-400" /> Farm Readiness
@@ -166,11 +285,11 @@ export default function FarmRecordsPage() {
             </div>
           </div>
           <p className="text-xs opacity-60">Based on recent activity logs and digital records. Visible to buyers as condition evidence.</p>
-          
-          {hasIoT && (
+
+          {hasSensors && (
             <div className="mt-4 pt-4 border-t border-white/10">
               <h3 className="text-sm font-bold flex items-center gap-2 text-green-400">
-                <Activity size={14} /> Live IoT Sensors Active
+                <Activity size={14} /> Live Sensors Active
               </h3>
               <p className="text-xs opacity-60 mt-1">Providing real-time condition data to buyers.</p>
             </div>
@@ -178,6 +297,7 @@ export default function FarmRecordsPage() {
         </Card>
       </div>
 
+      {/* ── Log Form ── */}
       {showLogForm && (
         <Card className="mb-8 border-primary/30">
           <h2 className="text-xl font-bold mb-4">Log New Activity</h2>
@@ -195,7 +315,6 @@ export default function FarmRecordsPage() {
               </div>
             </div>
 
-            {/* Dynamic Fields based on Type */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-4 border-t border-white/10">
               {(activityType.includes('inspection') || activityType.includes('Harvest')) && (
                 <>
@@ -268,7 +387,7 @@ export default function FarmRecordsPage() {
 
             <div className="pt-4 border-t border-white/10">
               <label className="text-sm font-medium mb-1 block">Notes / Action Taken</label>
-              <textarea 
+              <textarea
                 className="w-full bg-white/5 border border-white/10 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
                 rows={3}
                 value={payload.notes || ''}
@@ -287,11 +406,11 @@ export default function FarmRecordsPage() {
         </Card>
       )}
 
-      {/* Timeline */}
+      {/* ── Activity Timeline ── */}
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
         <List size={20} className="text-primary" /> Activity Timeline
       </h2>
-      
+
       {loading ? (
         <div className="flex justify-center p-12"><Loader2 className="animate-spin text-primary" size={32} /></div>
       ) : activities.length === 0 ? (
@@ -310,7 +429,7 @@ export default function FarmRecordsPage() {
                     {new Date(act.recorded_at).toLocaleString()}
                   </span>
                 </div>
-                
+
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm mt-3 opacity-80">
                   {act.crop_condition && <div><span className="opacity-60 text-xs block">Crop Condition</span> {act.crop_condition}</div>}
                   {act.soil_condition && <div><span className="opacity-60 text-xs block">Soil Condition</span> {act.soil_condition}</div>}
@@ -319,16 +438,31 @@ export default function FarmRecordsPage() {
                   {act.input_name && <div><span className="opacity-60 text-xs block">Input Applied</span> {act.input_name} {act.input_quantity ? `(${act.input_quantity})` : ''}</div>}
                   {act.pest_issue && <div><span className="opacity-60 text-xs block">Pest/Disease</span> {act.pest_issue} ({act.pest_severity})</div>}
                 </div>
-                
+
                 {act.notes && (
                   <div className="mt-4 p-3 bg-black/20 rounded text-sm italic border-l-2 border-white/20">
-                    "{act.notes}"
+                    &ldquo;{act.notes}&rdquo;
                   </div>
                 )}
               </div>
             </Card>
           ))}
         </div>
+      )}
+
+      {/* ── Confirm Delete Modal ── */}
+      {deleteModal && (
+        <ConfirmDeleteModal
+          title={deleteModal.type === 'farm' ? `Delete Farm: ${deleteModal.label}` : `Delete Crop: ${deleteModal.label}`}
+          description={
+            deleteModal.type === 'farm'
+              ? `This will permanently remove the farm "${deleteModal.label}" and all its disposable crop allocations, predictions, bids, negotiation history and activity logs. Devices will be preserved but detached. This cannot be undone.`
+              : `This will permanently remove the crop allocation "${deleteModal.label}" and all its disposable predictions, bids, negotiation events and activity logs. Devices will be detached. This cannot be undone.`
+          }
+          onConfirm={handleDeleteConfirm}
+          onClose={() => setDeleteModal(null)}
+          deleting={deleting}
+        />
       )}
     </PageContainer>
   );

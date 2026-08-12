@@ -11,8 +11,8 @@ import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { getMyBids, cancelAcceptedHarvestBid } from '@/lib/api/buyer';
-import { withdrawOffer, acceptOffer, rejectOffer, counterHarvestBid } from '@/lib/api/farms';
-import { HandCoins, MapPin, Loader2, CalendarDays, Activity, Layers, RefreshCw, CheckCircle, XCircle, ArrowRight, Info, MessageSquare } from 'lucide-react';
+import { withdrawOffer, acceptOffer, rejectOffer, counterHarvestBid, deleteBid } from '@/lib/api/farms';
+import { HandCoins, MapPin, Loader2, CalendarDays, Activity, Layers, RefreshCw, CheckCircle, XCircle, ArrowRight, Info, MessageSquare, Trash2 } from 'lucide-react';
 
 const STATUS_STYLES: Record<string, { badge: string; label: string }> = {
   PENDING:           { badge: 'bg-yellow-500/20 text-yellow-400',  label: 'Pending' },
@@ -203,6 +203,16 @@ export default function BuyerMyBidsPage() {
     else { notify(bid.id, 'Bid cancelled. Quantity returned to seller pool.'); await load(); }
   };
 
+  const handleDeleteBid = async (bid: any) => {
+    if (!window.confirm(
+      `Permanently delete this ${bid.bid_status.toLowerCase()} bid record? This cannot be undone.`
+    )) return;
+    setActionState({ id: bid.id, status: 'loading', msg: '' });
+    const { error } = await deleteBid(supabase, bid.id);
+    if (error) notify(bid.id, error.message, true);
+    else { notify(bid.id, 'Bid record deleted.'); await load(); }
+  };
+
   const getLifecycleNote = (bid: any) => {
     switch (bid.bid_status) {
       case 'PENDING':
@@ -278,6 +288,9 @@ export default function BuyerMyBidsPage() {
 
             <h3 className="text-lg font-bold mb-1">
               {opp.crop_type || 'Unknown Crop'}
+              <span className="text-sm font-normal opacity-70 ml-2">
+                by {bid?.seller?.full_name || bid?.seller_profile?.full_name || opp.farm_name || 'Seller'} {bid?.seller?.role ? `(${bid.seller.role})` : ''}
+              </span>
             </h3>
             <div className="text-sm opacity-70 flex items-center mb-2">
               <MapPin size={13} className="mr-1 flex-shrink-0" />
@@ -386,6 +399,18 @@ export default function BuyerMyBidsPage() {
                   <ArrowRight size={14} className="mr-1" /> View Order
                 </Button>
               </Link>
+            )}
+
+            {['REJECTED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'].includes(bid.bid_status) && (
+              <Button
+                variant="ghost" size="sm"
+                className="text-red-400 hover:bg-red-500/10 border border-red-400/20 w-full"
+                disabled={isActioning}
+                onClick={() => handleDeleteBid(bid)}
+              >
+                {isActioning ? <Loader2 size={14} className="animate-spin mr-1" /> : <Trash2 size={14} className="mr-1" />}
+                Delete Record
+              </Button>
             )}
           </div>
         </div>
