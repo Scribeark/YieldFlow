@@ -456,8 +456,8 @@ export default function FarmRecordsPage() {
           title={deleteModal.type === 'farm' ? `Delete Farm: ${deleteModal.label}` : `Delete Crop: ${deleteModal.label}`}
           description={
             deleteModal.type === 'farm'
-              ? `This will permanently remove the farm "${deleteModal.label}" and all its disposable crop allocations, predictions, bids, negotiation history and activity logs. Devices will be preserved but detached. This cannot be undone.`
-              : `This will permanently remove the crop allocation "${deleteModal.label}" and all its disposable predictions, bids, negotiation events and activity logs. Devices will be detached. This cannot be undone.`
+              ? `This will permanently remove the farm "${deleteModal.label}", its registered devices, crop allocations, predictions, bids, negotiation history, and activity logs. This cannot be undone.`
+              : `This will permanently remove the crop allocation "${deleteModal.label}" and all its disposable predictions, bids, negotiation events, and activity logs. Linked devices will be detached. This cannot be undone.`
           }
           onConfirm={handleDeleteConfirm}
           onClose={() => setDeleteModal(null)}
