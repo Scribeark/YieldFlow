@@ -779,7 +779,7 @@ export default function SellerDeviceReadingsPage() {
                           {/* Prediction / Bidding Status */}
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="bg-black/20 p-3 rounded-lg border border-white/5">
-                              <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold">IoT Readiness</div>
+                              <div className="text-xs opacity-50 uppercase tracking-wider mb-2 font-bold">Farm Readiness</div>
                               {activePred ? (
                                 <div className="space-y-2 text-sm">
                                   <div className="flex justify-between"><span>Score:</span> <span className="font-mono font-bold">{activePred.readiness_score?.toFixed(1) || '0.0'} / 100</span></div>
@@ -912,7 +912,7 @@ export default function SellerDeviceReadingsPage() {
                   <div className="text-center py-8 bg-black/20 border-dashed border-white/10 rounded-lg">
                     <Sprout size={32} className="mx-auto mb-3 opacity-30" />
                     <p className="text-sm font-bold opacity-80 mb-1">No crop production has been registered for this farm yet.</p>
-                    <p className="text-xs opacity-50 mb-4">Declare a crop plot to start IoT tracking and open buyer bidding.</p>
+                    <p className="text-xs opacity-50 mb-4">Declare a crop plot to start sensor tracking and open buyer bidding.</p>
                     <Button variant="primary" size="sm" onClick={() => setShowCreateAllocation(true)}>
                       <Plus size={16} className="mr-2" />
                       Add Crop Plot

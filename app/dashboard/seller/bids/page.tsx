@@ -445,7 +445,7 @@ export default function SellerBidManagementPage() {
                         <h2 className="text-lg font-bold">{pred.farms?.name || 'Farm'} — {pred.farm_crop_allocations?.crop_type || 'Crop'}</h2>
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${biddingColor}`}>{pred.bidding_status}</span>
                         <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${isIoT ? 'bg-green-500/10 text-green-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                          {isIoT ? 'IoT Predicted' : 'Manual Listing'}
+                          {isIoT ? 'Predicted Harvest' : 'Manual Listing'}
                         </span>
                       </div>
                       <p className="text-sm opacity-60 mt-0.5">{bids.length} bid(s) · {new Date(pred.created_at).toLocaleDateString()}</p>
@@ -542,36 +542,43 @@ export default function SellerBidManagementPage() {
                           {pendingBids.map((bid: any) => (
                             <div key={bid.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
                               <div className="flex-1">
-                                <div className="font-medium">{bid?.buyer_profile?.full_name || 'Buyer'}</div>
+                                <div className="font-medium">{bid?.buyer?.full_name || bid?.buyer_profile?.full_name || 'Buyer'} {bid?.buyer?.role ? `(${bid.buyer.role})` : ''}</div>
                                 {bid?.id && <NegotiationHistory bidId={bid.id} />}
                                 <div className="text-sm opacity-70">
                                   Wants: <strong>{bid.desired_quantity} {unit}</strong> · Offers: <strong>₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}</strong>
                                   {' '}· Total: <strong>₦{Number(bid.total_offer_value).toLocaleString()}</strong>
                                 </div>
+                                {bid.bid_status === 'SELLER_COUNTERED' && (
+                                  <div className="text-xs text-yellow-400 mt-1">Waiting for buyer to review your counteroffer.</div>
+                                )}
                               </div>
                               <div className="flex gap-2">
-                                <Button
-                                  size="sm" variant="primary"
-                                  disabled={processingBidId === bid.id || stats.remaining <= 0}
-                                  onClick={() => setAcceptModal({ bid, unit })}
-                                >
-                                  {processingBidId === bid.id ? <Loader2 size={14} className="animate-spin" /> : 'Accept'}
-                                </Button>
-                                <Button
-                                  size="sm" variant="secondary"
-                                  disabled={processingBidId === bid.id || stats.remaining <= 0}
-                                  onClick={() => setCounterModal({ bid, remaining: stats.remaining, unit })}
-                                >
-                                  Counter
-                                </Button>
-                                <Button
-                                  size="sm" variant="danger"
-                                  disabled={processingBidId === bid.id}
-                                  onClick={() => handleReject(pred.id, bid.id)}
-                                  className="text-red-400 hover:bg-red-500/10 bg-transparent border border-red-400/30"
-                                >
-                                  Reject
-                                </Button>
+                                {(bid.bid_status === 'PENDING' || bid.bid_status === 'BUYER_COUNTERED') && (
+                                  <>
+                                    <Button
+                                      size="sm" variant="primary"
+                                      disabled={processingBidId === bid.id || stats.remaining <= 0}
+                                      onClick={() => setAcceptModal({ bid, unit })}
+                                    >
+                                      {processingBidId === bid.id ? <Loader2 size={14} className="animate-spin" /> : 'Accept'}
+                                    </Button>
+                                    <Button
+                                      size="sm" variant="secondary"
+                                      disabled={processingBidId === bid.id || stats.remaining <= 0}
+                                      onClick={() => setCounterModal({ bid, remaining: stats.remaining, unit })}
+                                    >
+                                      Counter
+                                    </Button>
+                                    <Button
+                                      size="sm" variant="danger"
+                                      disabled={processingBidId === bid.id}
+                                      onClick={() => handleReject(pred.id, bid.id)}
+                                      className="text-red-400 hover:bg-red-500/10 bg-transparent border border-red-400/30"
+                                    >
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
                               </div>
                             </div>
                           ))}

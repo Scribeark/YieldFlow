@@ -206,7 +206,10 @@ export default function BuyerMyBidsPage() {
   const getLifecycleNote = (bid: any) => {
     switch (bid.bid_status) {
       case 'PENDING':
-        return 'Waiting for the seller to review and accept your bid.';
+      case 'BUYER_COUNTERED':
+        return 'Waiting for the seller to review your bid.';
+      case 'SELLER_COUNTERED':
+        return 'Seller has sent a counteroffer. Please review.';
       case 'ACCEPTED':
       case 'PARTIALLY_ACCEPTED':
         return 'Seller has accepted your bid. Awaiting harvest confirmation and conversion to a trade request.';
@@ -221,8 +224,8 @@ export default function BuyerMyBidsPage() {
     }
   };
 
-  const activeBids = bids.filter((b) => ['PENDING', 'ACCEPTED', 'PARTIALLY_ACCEPTED', 'CONVERTED_TO_TRADE'].includes(b.bid_status));
-  const closedBids = bids.filter((b) => ['REJECTED', 'WITHDRAWN', 'EXPIRED'].includes(b.bid_status));
+  const activeBids = bids.filter((b) => ['PENDING', 'SELLER_COUNTERED', 'BUYER_COUNTERED', 'ACCEPTED', 'PARTIALLY_ACCEPTED', 'CONVERTED_TO_TRADE'].includes(b.bid_status));
+  const closedBids = bids.filter((b) => ['REJECTED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'].includes(b.bid_status));
 
   const renderBid = (bid: any) => {
     const opp = bid.harvest_predictions;
@@ -261,7 +264,7 @@ export default function BuyerMyBidsPage() {
               </span>
               {isIoT ? (
                 <span className="bg-green-500/10 text-green-400 text-xs px-2 py-1 rounded font-bold flex items-center">
-                  <Activity size={11} className="mr-1" /> IoT Predicted Harvest
+                  <Activity size={11} className="mr-1" /> Predicted Harvest
                 </span>
               ) : (
                 <span className="bg-purple-500/10 text-purple-400 text-xs px-2 py-1 rounded font-bold flex items-center">
@@ -314,7 +317,21 @@ export default function BuyerMyBidsPage() {
 
           {/* Right: Actions */}
           <div className="flex flex-col gap-2 min-w-[140px]">
-            {bid.bid_status === 'PENDING' && (
+            {/* BUYER_COUNTERED or PENDING: Only withdraw allowed */}
+            {(bid.bid_status === 'PENDING' || bid.bid_status === 'BUYER_COUNTERED') && (
+              <Button
+                variant="ghost" size="sm"
+                className="text-red-400 hover:bg-red-500/10 border border-red-400/20 w-full"
+                disabled={isActioning}
+                onClick={() => handleWithdraw(bid)}
+              >
+                {isActioning ? <Loader2 size={14} className="animate-spin mr-1" /> : <XCircle size={14} className="mr-1" />}
+                Withdraw Bid
+              </Button>
+            )}
+
+            {/* SELLER_COUNTERED: Buyer can Accept, Reject, Counter, Withdraw */}
+            {bid.bid_status === 'SELLER_COUNTERED' && (
               <>
                 <Button
                   variant="primary" size="sm" className="w-full"

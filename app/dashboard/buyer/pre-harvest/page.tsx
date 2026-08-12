@@ -120,7 +120,7 @@ export default function BuyerHarvestOpportunitiesPage() {
     }
     return (
       <span className="bg-green-500/20 text-green-400 text-xs px-2 py-1 rounded font-bold uppercase tracking-wider flex items-center">
-        <Activity size={12} className="mr-1" /> IoT Predicted Harvest
+        <Activity size={12} className="mr-1" /> Predicted Harvest
       </span>
     );
   };
@@ -130,7 +130,7 @@ export default function BuyerHarvestOpportunitiesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>Upcoming Harvests</h1>
-          <p className="opacity-70 mt-1">Browse IoT-predicted and seller-listed harvest opportunities open for bidding.</p>
+          <p className="opacity-70 mt-1">Browse sensor-predicted and seller-listed harvest opportunities open for bidding.</p>
         </div>
         <Button variant="ghost" size="sm" onClick={loadOpportunities} disabled={loading}>
           <RefreshCw size={14} className="mr-1" /> Refresh
