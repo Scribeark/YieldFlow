@@ -94,9 +94,9 @@ export async function updateProfile(data: {
  * 
  * SERVER-ACTION EXECUTION ORDER:
  * 1. Reauthenticate current user with password (if provided).
- * 2. Delete owned Storage objects (harvest-photos, vehicle-photos, vehicle-documents).
- * 3. Call rpc_delete_user_account to purge/anonymize DB data.
- * 4. Delete matching Supabase Auth user via server-only Admin API.
+ * 2. Delete owned Storage objects (harvest-photos, vehicle-photos, vehicle-documents) using admin client.
+ * 3. Call rpc_delete_user_account() via AUTHENTICATED Supabase client (supabaseAuth) using user JWT context.
+ * 4. If RPC succeeds, delete matching Supabase Auth user via server-only Admin API.
  * 5. Return structured result for client-side signout & redirect to landing page.
  */
 export async function deleteUserAccount(data: {
@@ -139,47 +139,45 @@ export async function deleteUserAccount(data: {
 
   const supabaseAdmin = getAdminSupabase();
 
-  // Resolve application user profile ID using users.auth_uid = auth.uid()
-  const { data: appUser, error: appUserErr } = await supabaseAdmin
+  // Resolve application user profile ID for storage path resolution
+  const { data: appUser } = await (supabaseAuth as any)
     .from('users')
     .select('id')
     .eq('auth_uid', user.id)
     .single();
 
-  if (appUserErr || !appUser) {
-    return { error: 'Application user profile not found.' };
-  }
+  const userId = appUser?.id;
 
-  const userId = appUser.id;
-
-  // STEP 2: Delete owned Supabase Storage objects
-  try {
-    const buckets = ['harvest-photos', 'vehicle-photos', 'vehicle-documents'];
-    for (const bucket of buckets) {
-      const { data: files } = await supabaseAdmin.storage.from(bucket).list(userId);
-      if (files && files.length > 0) {
-        const filePaths = files.map((f) => `${userId}/${f.name}`);
-        await supabaseAdmin.storage.from(bucket).remove(filePaths);
+  // STEP 2: Delete owned Supabase Storage objects (requires admin client for storage bucket deletion)
+  if (userId) {
+    try {
+      const buckets = ['harvest-photos', 'vehicle-photos', 'vehicle-documents'];
+      for (const bucket of buckets) {
+        const { data: files } = await supabaseAdmin.storage.from(bucket).list(userId);
+        if (files && files.length > 0) {
+          const filePaths = files.map((f) => `${userId}/${f.name}`);
+          await supabaseAdmin.storage.from(bucket).remove(filePaths);
+        }
       }
+    } catch (err) {
+      // Non-blocking storage removal
     }
-  } catch (err) {
-    // Non-blocking storage removal
   }
 
-  // STEP 3: Execute RPC rpc_delete_user_account for authoritative DB cleanup / anonymization
-  let rpcMetrics: any = null;
-  let retainedReason: string | undefined;
-
-  const { data: rpcRes, error: rpcErr } = await (supabaseAdmin as any).rpc('rpc_delete_user_account', {
-    p_user_id: userId,
-  });
+  // STEP 3: Execute RPC rpc_delete_user_account() through AUTHENTICATED client (passes user JWT context)
+  const { data: rpcRes, error: rpcErr } = await (supabaseAuth as any).rpc('rpc_delete_user_account');
 
   if (rpcErr) {
     return { error: `Database account cleanup failed: ${rpcErr.message}` };
   }
 
-  rpcMetrics = rpcRes?.metrics;
-  if (rpcRes?.retained_and_anonymized) {
+  const profileStatus = rpcRes?.profile_status;
+  const recordsDeleted = rpcRes?.records_deleted;
+  const recordsRetained = rpcRes?.records_retained;
+  const recordsAnonymized = rpcRes?.records_anonymized;
+
+  let retainedReason: string | undefined;
+  if (profileStatus === 'anonymized') {
     retainedReason =
       'Completed commercial trade records were retained for statutory financial compliance, but your personal identifiers have been anonymized and account access revoked.';
   }
@@ -193,7 +191,10 @@ export async function deleteUserAccount(data: {
   // STEP 5: Return structured result for client signout & redirect
   return {
     success: true,
+    profileStatus,
     retainedReason,
-    metrics: rpcMetrics,
+    recordsDeleted,
+    recordsRetained,
+    recordsAnonymized,
   };
 }
