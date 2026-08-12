@@ -25,10 +25,33 @@ import {
   ChevronDown, ChevronUp, MapPin, AlertTriangle, ArrowRight, Package
 } from 'lucide-react';
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Card className="border-red-500/30 bg-red-500/5 m-4">
+          <h2 className="text-xl font-bold text-red-400 mb-2 flex items-center gap-2"><AlertTriangle /> Something went wrong rendering this section</h2>
+          <p className="text-sm opacity-80">{this.state.error?.message}</p>
+          <Button variant="secondary" className="mt-4" onClick={() => this.setState({ hasError: false, error: null })}>Try Again</Button>
+        </Card>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function calcStats(prediction: any) {
-  const bids: any[] = prediction.harvest_bids || [];
+  const bids: any[] = Array.isArray(prediction?.harvest_bids) ? prediction.harvest_bids : [];
   const max = prediction.expected_quantity_max || prediction.expected_quantity_volume || 0;
   const min = prediction.expected_quantity_min || null;
   const total = max;
@@ -406,10 +429,11 @@ export default function SellerBidManagementPage() {
             const canConvert = pred.bidding_status === 'HARVEST_CONFIRMED';
 
             return (
-              <Card key={pred.id} className="overflow-hidden">
-                {/* Header */}
-                <div
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer"
+            <ErrorBoundary key={pred.id}>
+              <Card className={`border-l-4 ${pred.bidding_status === 'OPEN' ? 'border-l-green-500' : 'border-l-blue-500'}`}>
+                {/* Header section */}
+                <div 
+                  className="flex flex-col md:flex-row justify-between items-start md:items-center cursor-pointer p-2 hover:bg-white/5 rounded transition-colors"
                   onClick={() => setExpandedId(isExpanded ? null : pred.id)}
                 >
                   <div className="flex items-center gap-3">
@@ -518,8 +542,8 @@ export default function SellerBidManagementPage() {
                           {pendingBids.map((bid: any) => (
                             <div key={bid.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
                               <div className="flex-1">
-                                <div className="font-medium">{bid.buyer_profile?.full_name || 'Buyer'}</div>
-  <NegotiationHistory bidId={bid.id} />
+                                <div className="font-medium">{bid?.buyer_profile?.full_name || 'Buyer'}</div>
+                                {bid?.id && <NegotiationHistory bidId={bid.id} />}
                                 <div className="text-sm opacity-70">
                                   Wants: <strong>{bid.desired_quantity} {unit}</strong> · Offers: <strong>₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}</strong>
                                   {' '}· Total: <strong>₦{Number(bid.total_offer_value).toLocaleString()}</strong>
@@ -562,15 +586,17 @@ export default function SellerBidManagementPage() {
                           {acceptedBids.map((bid: any) => (
                             <div key={bid.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
                               <div>
-                                <div className="font-medium">{bid.buyer_profile?.full_name || 'Buyer'}</div>
-  <NegotiationHistory bidId={bid.id} />
+                                <div className="font-medium">{bid?.buyer_profile?.full_name || 'Buyer'}</div>
+                                {bid?.id && <NegotiationHistory bidId={bid.id} />}
                                 <div className="text-sm opacity-70">
                                   Accepted: <strong className="text-green-400">{bid.accepted_quantity} {unit}</strong>
                                   {bid.bid_status === 'PARTIALLY_ACCEPTED' && <span className="text-xs text-yellow-400 ml-2">(Partial — requested {bid.desired_quantity})</span>}
                                   {' '}· ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}
                                 </div>
                               </div>
-                              <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${BID_STATUS_STYLES[bid.bid_status] || ''}`}>{bid.bid_status.replace('_', ' ')}</span>
+                              <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${BID_STATUS_STYLES[bid?.bid_status || 'UNKNOWN'] || ''}`}>
+                                {(bid?.bid_status || 'UNKNOWN').replace(/_/g, ' ')}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -586,7 +612,9 @@ export default function SellerBidManagementPage() {
                               <div>
                                 <div className="text-sm font-medium">{bid.buyer_profile?.full_name || 'Buyer'} · {bid.desired_quantity} {unit}</div>
                               </div>
-                              <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${BID_STATUS_STYLES[bid.bid_status] || ''}`}>{bid.bid_status.replace('_', ' ')}</span>
+                              <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${BID_STATUS_STYLES[bid?.bid_status || 'UNKNOWN'] || 'bg-gray-500/20'}`}>
+                                {(bid?.bid_status || 'UNKNOWN').replace(/_/g, ' ')}
+                              </span>
                             </div>
                           ))}
                         </div>
@@ -595,6 +623,7 @@ export default function SellerBidManagementPage() {
                   </div>
                 )}
               </Card>
+            </ErrorBoundary>
             );
           })}
         </div>

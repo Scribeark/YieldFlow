@@ -228,14 +228,6 @@ export default function SellerDeviceReadingsPage() {
       
       setActionSuccess('Crop plot deleted permanently.');
       
-      // Remove from selectedFarm immediately for instant UI update
-      setSelectedFarm((prev: any) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          farm_crop_allocations: prev.farm_crop_allocations?.filter((a: any) => a.id !== allocId)
-        };
-      });
       loadFarms();
     } catch (err: any) {
       console.error(err);

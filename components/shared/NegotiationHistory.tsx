@@ -58,7 +58,7 @@ export function NegotiationHistory({ bidId }: { bidId: string }) {
                   <span className="text-[10px] opacity-60">{new Date(evt.created_at).toLocaleString()}</span>
                 </div>
                 
-                <div className="text-sm font-medium mb-1">{evt.event_type.replace(/_/g, ' ')}</div>
+                <div className="text-sm font-medium mb-1">{(evt?.event_type || 'UNKNOWN').replace(/_/g, ' ')}</div>
                 
                 {(evt.offered_price_per_unit || evt.offered_quantity) && (
                   <div className="text-xs opacity-80 grid grid-cols-2 gap-2 mt-2 bg-black/20 p-2 rounded">
