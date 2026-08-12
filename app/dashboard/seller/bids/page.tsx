@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
+import { NegotiationHistory } from '@/components/shared/NegotiationHistory';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -12,8 +13,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import {
   getSellerBidListings,
-  rejectHarvestBid,
-  allocateHarvestBid,
+  rejectOffer,
+  acceptOffer,
+  counterHarvestBid,
   confirmPredictedHarvest,
   convertBidsToTrades,
   closeCropAllocationBidding
@@ -64,56 +66,107 @@ const BIDDING_STATUS_COLOR: Record<string, string> = {
 
 function AcceptModal({
   bid,
-  remaining,
   unit,
   onAccept,
   onClose,
 }: {
   bid: any;
-  remaining: number;
   unit: string;
-  onAccept: (bidId: string, qty: number) => Promise<void>;
+  onAccept: (bidId: string) => Promise<void>;
   onClose: () => void;
 }) {
-  const max = Math.min(bid.desired_quantity, remaining);
-  const [qty, setQty] = useState(String(bid.desired_quantity));
   const [submitting, setSubmitting] = useState(false);
-  const [err, setErr] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const num = parseInt(qty);
-    if (!num || num <= 0 || num > max) {
-      setErr(`Enter a quantity between 1 and ${max} ${unit}.`);
-      return;
-    }
     setSubmitting(true);
-    await onAccept(bid.id, num);
+    await onAccept(bid.id);
     setSubmitting(false);
   };
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 sm:p-6">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h2 className="text-xl font-bold mb-4">Accept Bid</h2>
+        <h2 className="text-xl font-bold mb-4">Accept Offer</h2>
         <p className="text-sm opacity-80 mb-4">
-          Buyer requested <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.<br />
-          Max you can accept: <strong>{max} {unit}</strong> (remaining pool).
+          You are accepting the current terms: <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button variant="primary" type="submit" disabled={submitting}>
+              Confirm Accept
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+// ── Counteroffer Modal ────────────────────────────────────────────────────────
+
+function CounterofferModal({
+  bid,
+  remaining,
+  unit,
+  onCounter,
+  onClose,
+}: {
+  bid: any;
+  remaining: number;
+  unit: string;
+  onCounter: (bidId: string, qty: number, price: number, msg: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [qty, setQty] = useState(String(bid.desired_quantity));
+  const [price, setPrice] = useState(String(bid.offered_price_per_unit));
+  const [msg, setMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numQty = parseInt(qty);
+    const numPrice = parseFloat(price);
+    if (!numQty || numQty <= 0 || numQty > remaining) {
+      setErr(`Enter a quantity between 1 and ${remaining} ${unit}.`);
+      return;
+    }
+    if (!numPrice || numPrice <= 0) {
+      setErr('Enter a valid price.');
+      return;
+    }
+    setSubmitting(true);
+    await onCounter(bid.id, numQty, numPrice, msg);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 sm:p-6">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">Make Counteroffer</h2>
+        <p className="text-sm opacity-80 mb-4">
+          Buyer current terms: <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.
         </p>
         {err && <Alert variant="error" className="mb-3">{err}</Alert>}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium mb-1 block">Accepted Quantity ({unit})</label>
-            <Input type="number" min="1" max={max} value={qty} onChange={(e) => setQty(e.target.value)} />
-            {parseInt(qty) < bid.desired_quantity && parseInt(qty) > 0 && (
-              <p className="text-xs text-yellow-400 mt-1">Partial acceptance — bid will be marked PARTIALLY_ACCEPTED.</p>
-            )}
+            <label className="text-sm font-medium mb-1 block">Counter Quantity ({unit}) (Max {remaining})</label>
+            <Input type="number" min="1" max={remaining} value={qty} onChange={(e: any) => setQty(e.target.value)} />
           </div>
-          <div className="flex justify-end gap-2">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Counter Price (₦/{unit})</label>
+            <Input type="number" step="0.01" min="1" value={price} onChange={(e: any) => setPrice(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Message to Buyer</label>
+            <Input value={msg} onChange={(e: any) => setMsg(e.target.value)} placeholder="e.g., I can only provide 500 units right now." />
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
             <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>Cancel</Button>
             <Button variant="primary" type="submit" disabled={submitting}>
-              {submitting ? <Loader2 className="animate-spin mr-2" size={16} /> : null}
-              Confirm Accept
+              Send Counteroffer
             </Button>
           </div>
         </form>
@@ -209,7 +262,8 @@ export default function SellerBidManagementPage() {
   const [processingBidId, setProcessingBidId] = useState<string | null>(null);
 
   // Modal states
-  const [acceptModal, setAcceptModal] = useState<{ bid: any; remaining: number; unit: string } | null>(null);
+  const [acceptModal, setAcceptModal] = useState<{ bid: any; unit: string } | null>(null);
+  const [counterModal, setCounterModal] = useState<{ bid: any; remaining: number; unit: string } | null>(null);
   const [confirmModal, setConfirmModal] = useState<any | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
 
@@ -263,23 +317,35 @@ export default function SellerBidManagementPage() {
   };
 
   const handleReject = async (predId: string, bidId: string) => {
-    if (!window.confirm('Reject this bid? The buyer will be notified.')) return;
+    if (!window.confirm('Reject this offer?')) return;
     setProcessingBidId(bidId);
-    const { error } = await rejectHarvestBid(supabase, bidId);
+    const { error } = await rejectOffer(supabase, bidId);
     if (error) notify(predId, error.message, true);
-    else { notify(predId, 'Bid rejected.'); await load(); }
+    else { notify(predId, 'Offer rejected.'); await load(); }
     setProcessingBidId(null);
   };
 
-  const handleAccept = async (bidId: string, qty: number) => {
+  const handleAccept = async (bidId: string) => {
     const pred = listings.find((l) => l.harvest_bids?.some((b: any) => b.id === bidId));
     setAcceptModal(null);
     setProcessingBidId(bidId);
-    const { error } = await allocateHarvestBid(supabase, bidId, qty);
+    const { error } = await acceptOffer(supabase, bidId);
     if (error) notify(pred?.id || '', error.message, true);
-    else { notify(pred?.id || '', `Bid accepted: ${qty} ${pred?.expected_quantity_unit}.`); await load(); }
+    else { notify(pred?.id || '', 'Offer accepted!'); await load(); }
     setProcessingBidId(null);
   };
+
+  const handleCounter = async (bidId: string, qty: number, price: number, msg: string) => {
+    const pred = listings.find((l) => l.harvest_bids?.some((b: any) => b.id === bidId));
+    setCounterModal(null);
+    setProcessingBidId(bidId);
+    const { error } = await counterHarvestBid(supabase, { bidId, counterPrice: price, counterQuantity: qty, message: msg });
+    if (error) notify(pred?.id || '', error.message, true);
+    else { notify(pred?.id || '', 'Counteroffer sent.'); await load(); }
+    setProcessingBidId(null);
+  };
+
+  
 
   const handleConfirmHarvest = async (params: any) => {
     setConfirmModal(null);
@@ -453,6 +519,7 @@ export default function SellerBidManagementPage() {
                             <div key={bid.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
                               <div className="flex-1">
                                 <div className="font-medium">{bid.buyer_profile?.full_name || 'Buyer'}</div>
+  <NegotiationHistory bidId={bid.id} />
                                 <div className="text-sm opacity-70">
                                   Wants: <strong>{bid.desired_quantity} {unit}</strong> · Offers: <strong>₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}</strong>
                                   {' '}· Total: <strong>₦{Number(bid.total_offer_value).toLocaleString()}</strong>
@@ -462,9 +529,16 @@ export default function SellerBidManagementPage() {
                                 <Button
                                   size="sm" variant="primary"
                                   disabled={processingBidId === bid.id || stats.remaining <= 0}
-                                  onClick={() => setAcceptModal({ bid, remaining: stats.remaining, unit })}
+                                  onClick={() => setAcceptModal({ bid, unit })}
                                 >
                                   {processingBidId === bid.id ? <Loader2 size={14} className="animate-spin" /> : 'Accept'}
+                                </Button>
+                                <Button
+                                  size="sm" variant="secondary"
+                                  disabled={processingBidId === bid.id || stats.remaining <= 0}
+                                  onClick={() => setCounterModal({ bid, remaining: stats.remaining, unit })}
+                                >
+                                  Counter
                                 </Button>
                                 <Button
                                   size="sm" variant="danger"
@@ -489,6 +563,7 @@ export default function SellerBidManagementPage() {
                             <div key={bid.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-green-500/5 border border-green-500/20 rounded-lg">
                               <div>
                                 <div className="font-medium">{bid.buyer_profile?.full_name || 'Buyer'}</div>
+  <NegotiationHistory bidId={bid.id} />
                                 <div className="text-sm opacity-70">
                                   Accepted: <strong className="text-green-400">{bid.accepted_quantity} {unit}</strong>
                                   {bid.bid_status === 'PARTIALLY_ACCEPTED' && <span className="text-xs text-yellow-400 ml-2">(Partial — requested {bid.desired_quantity})</span>}
@@ -529,10 +604,18 @@ export default function SellerBidManagementPage() {
       {acceptModal && (
         <AcceptModal
           bid={acceptModal.bid}
-          remaining={acceptModal.remaining}
           unit={acceptModal.unit}
           onAccept={handleAccept}
           onClose={() => setAcceptModal(null)}
+        />
+      )}
+      {counterModal && (
+        <CounterofferModal
+          bid={counterModal.bid}
+          remaining={counterModal.remaining}
+          unit={counterModal.unit}
+          onCounter={handleCounter}
+          onClose={() => setCounterModal(null)}
         />
       )}
 

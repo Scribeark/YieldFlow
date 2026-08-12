@@ -290,3 +290,101 @@ export async function convertBidsToTrades(
   });
   return { data, error };
 }
+
+// ── Farm Activity Logging ───────────────────────────────────────────────────
+
+export async function recordFarmActivity(
+  supabase: SupabaseClient<any>,
+  params: {
+    farmId: string;
+    cropAllocationId?: string;
+    activityType: string;
+    recordedAt: string;
+    payload: any;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_record_farm_activity', {
+    p_farm_id: params.farmId,
+    p_crop_allocation_id: params.cropAllocationId || null,
+    p_activity_type: params.activityType,
+    p_recorded_at: params.recordedAt,
+    p_payload: params.payload
+  });
+  return { data, error };
+}
+
+export async function getBuyerFarmActivitySummary(
+  supabase: SupabaseClient<any>,
+  predictionId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_get_buyer_farm_activity_summary', {
+    p_prediction_id: predictionId
+  });
+  return { data, error };
+}
+
+// ── V6 Negotiation RPCs ─────────────────────────────────────────────────────
+
+export async function placeHarvestBid(
+  supabase: SupabaseClient<any>,
+  params: {
+    predictionId: string;
+    desiredQuantity: number;
+    offeredPricePerUnit: number;
+    buyerMessage?: string;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
+    p_prediction_id: params.predictionId,
+    p_desired_quantity: params.desiredQuantity,
+    p_offered_price_per_unit: params.offeredPricePerUnit,
+    p_buyer_message: params.buyerMessage || null
+  });
+  return { data, error };
+}
+
+export async function counterHarvestBid(
+  supabase: SupabaseClient<any>,
+  params: {
+    bidId: string;
+    counterPrice: number;
+    counterQuantity: number;
+    message?: string;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_counter_harvest_bid', {
+    p_bid_id: params.bidId,
+    p_counter_price: params.counterPrice,
+    p_counter_quantity: params.counterQuantity,
+    p_message: params.message || null
+  });
+  return { data, error };
+}
+
+export async function acceptOffer(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_accept_offer', {
+    p_bid_id: bidId
+  });
+  return { data, error };
+}
+
+export async function rejectOffer(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_reject_offer', {
+    p_bid_id: bidId
+  });
+  return { data, error };
+}
+
+export async function withdrawOffer(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_withdraw_offer', {
+    p_bid_id: bidId
+  });
+  return { data, error };
+}
+
+export async function getBidNegotiationEvents(supabase: SupabaseClient<any>, bidId: string) {
+  const { data, error } = await supabase.rpc('rpc_get_bid_negotiation_events', {
+    p_bid_id: bidId
+  });
+  return { data, error };
+}

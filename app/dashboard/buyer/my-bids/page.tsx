@@ -2,17 +2,17 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { NegotiationHistory } from '@/components/shared/NegotiationHistory';
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getMyBids, withdrawHarvestBid, cancelAcceptedHarvestBid } from '@/lib/api/buyer';
-import {
-  HandCoins, MapPin, Loader2, CalendarDays, Activity, Layers,
-  RefreshCw, CheckCircle, XCircle, ArrowRight, Info
-} from 'lucide-react';
+import { getMyBids, cancelAcceptedHarvestBid } from '@/lib/api/buyer';
+import { withdrawOffer, acceptOffer, rejectOffer, counterHarvestBid } from '@/lib/api/farms';
+import { HandCoins, MapPin, Loader2, CalendarDays, Activity, Layers, RefreshCw, CheckCircle, XCircle, ArrowRight, Info, MessageSquare } from 'lucide-react';
 
 const STATUS_STYLES: Record<string, { badge: string; label: string }> = {
   PENDING:           { badge: 'bg-yellow-500/20 text-yellow-400',  label: 'Pending' },
@@ -24,6 +24,116 @@ const STATUS_STYLES: Record<string, { badge: string; label: string }> = {
   EXPIRED:           { badge: 'bg-gray-500/20 text-gray-400',      label: 'Expired' },
 };
 
+
+// ── Modals ──────────────────────────────────────────────────────────────────
+
+function AcceptModal({
+  bid,
+  unit,
+  onAccept,
+  onClose,
+}: {
+  bid: any;
+  unit: string;
+  onAccept: (bidId: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    await onAccept(bid.id);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 sm:p-6">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">Accept Counteroffer</h2>
+        <p className="text-sm opacity-80 mb-4">
+          You are accepting the current terms: <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.
+        </p>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button variant="primary" type="submit" disabled={submitting}>
+              Confirm Accept
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
+function CounterofferModal({
+  bid,
+  unit,
+  onCounter,
+  onClose,
+}: {
+  bid: any;
+  unit: string;
+  onCounter: (bidId: string, qty: number, price: number, msg: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [qty, setQty] = useState(String(bid.desired_quantity));
+  const [price, setPrice] = useState(String(bid.offered_price_per_unit));
+  const [msg, setMsg] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const numQty = parseInt(qty);
+    const numPrice = parseFloat(price);
+    if (!numQty || numQty <= 0) {
+      setErr(`Enter a valid quantity.`);
+      return;
+    }
+    if (!numPrice || numPrice <= 0) {
+      setErr('Enter a valid price.');
+      return;
+    }
+    setSubmitting(true);
+    await onCounter(bid.id, numQty, numPrice, msg);
+    setSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 sm:p-6">
+      <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
+        <h2 className="text-xl font-bold mb-4">Make Counteroffer</h2>
+        <p className="text-sm opacity-80 mb-4">
+          Current terms: <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.
+        </p>
+        {err && <Alert variant="error" className="mb-3">{err}</Alert>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-1 block">Counter Quantity ({unit})</label>
+            <Input type="number" min="1" value={qty} onChange={(e: any) => setQty(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Counter Price (₦/{unit})</label>
+            <Input type="number" step="0.01" min="1" value={price} onChange={(e: any) => setPrice(e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-1 block">Message to Seller</label>
+            <Input value={msg} onChange={(e: any) => setMsg(e.target.value)} placeholder="e.g., This is my final offer." />
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>Cancel</Button>
+            <Button variant="primary" type="submit" disabled={submitting}>
+              Send Counteroffer
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  );
+}
+
 export default function BuyerMyBidsPage() {
   const { profile } = useAuthStore();
   const supabase = createClient();
@@ -31,6 +141,8 @@ export default function BuyerMyBidsPage() {
   const [bids, setBids] = useState<any[]>([]);
   const [pageError, setPageError] = useState('');
   const [actionState, setActionState] = useState<{ id: string; status: 'loading' | 'error' | 'success'; msg: string } | null>(null);
+  const [acceptModal, setAcceptModal] = useState<{ bid: any; unit: string } | null>(null);
+  const [counterModal, setCounterModal] = useState<{ bid: any; unit: string } | null>(null);
 
   const load = useCallback(async () => {
     if (!profile) return;
@@ -49,11 +161,35 @@ export default function BuyerMyBidsPage() {
   };
 
   const handleWithdraw = async (bid: any) => {
-    if (!window.confirm('Withdraw this PENDING bid? This cannot be undone.')) return;
+    if (!window.confirm('Withdraw this bid? This cannot be undone.')) return;
     setActionState({ id: bid.id, status: 'loading', msg: '' });
-    const { error } = await withdrawHarvestBid(supabase, bid.id);
+    const { error } = await withdrawOffer(supabase, bid.id);
     if (error) notify(bid.id, error.message, true);
     else { notify(bid.id, 'Bid withdrawn successfully.'); await load(); }
+  };
+
+  const handleAccept = async (bidId: string) => {
+    setAcceptModal(null);
+    setActionState({ id: bidId, status: 'loading', msg: '' });
+    const { error } = await acceptOffer(supabase, bidId);
+    if (error) notify(bidId, error.message, true);
+    else { notify(bidId, 'Offer accepted!'); await load(); }
+  };
+
+  const handleReject = async (bidId: string) => {
+    if (!window.confirm('Reject this offer?')) return;
+    setActionState({ id: bidId, status: 'loading', msg: '' });
+    const { error } = await rejectOffer(supabase, bidId);
+    if (error) notify(bidId, error.message, true);
+    else { notify(bidId, 'Offer rejected.'); await load(); }
+  };
+
+  const handleCounter = async (bidId: string, qty: number, price: number, msg: string) => {
+    setCounterModal(null);
+    setActionState({ id: bidId, status: 'loading', msg: '' });
+    const { error } = await counterHarvestBid(supabase, { bidId, counterPrice: price, counterQuantity: qty, message: msg });
+    if (error) notify(bidId, error.message, true);
+    else { notify(bidId, 'Counteroffer sent.'); await load(); }
   };
 
   const handleCancelAccepted = async (bid: any) => {
@@ -179,16 +315,39 @@ export default function BuyerMyBidsPage() {
           {/* Right: Actions */}
           <div className="flex flex-col gap-2 min-w-[140px]">
             {bid.bid_status === 'PENDING' && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-red-400 hover:bg-red-500/10 border border-red-400/20 w-full"
-                disabled={isActioning}
-                onClick={() => handleWithdraw(bid)}
-              >
-                {isActioning ? <Loader2 size={14} className="animate-spin mr-1" /> : <XCircle size={14} className="mr-1" />}
-                Withdraw Bid
-              </Button>
+              <>
+                <Button
+                  variant="primary" size="sm" className="w-full"
+                  disabled={isActioning}
+                  onClick={() => setAcceptModal({ bid, unit })}
+                >
+                  <CheckCircle size={14} className="mr-1" /> Accept
+                </Button>
+                <Button
+                  variant="accent" size="sm" className="w-full"
+                  disabled={isActioning}
+                  onClick={() => setCounterModal({ bid, unit })}
+                >
+                  <MessageSquare size={14} className="mr-1" /> Counter
+                </Button>
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-orange-400 hover:bg-orange-500/10 border border-orange-400/20 w-full"
+                  disabled={isActioning}
+                  onClick={() => handleReject(bid.id)}
+                >
+                  <XCircle size={14} className="mr-1" /> Reject
+                </Button>
+                <Button
+                  variant="ghost" size="sm"
+                  className="text-red-400 hover:bg-red-500/10 border border-red-400/20 w-full"
+                  disabled={isActioning}
+                  onClick={() => handleWithdraw(bid)}
+                >
+                  {isActioning ? <Loader2 size={14} className="animate-spin mr-1" /> : <XCircle size={14} className="mr-1" />}
+                  Withdraw Bid
+                </Button>
+              </>
             )}
 
             {(bid.bid_status === 'ACCEPTED' || bid.bid_status === 'PARTIALLY_ACCEPTED') && (
@@ -212,6 +371,9 @@ export default function BuyerMyBidsPage() {
               </Link>
             )}
           </div>
+        </div>
+        <div className="mt-4 border-t border-white/10 pt-4">
+          <NegotiationHistory bidId={bid.id} />
         </div>
       </Card>
     );
@@ -268,6 +430,22 @@ export default function BuyerMyBidsPage() {
             </section>
           )}
         </div>
+      )}
+      {acceptModal && (
+        <AcceptModal
+          bid={acceptModal.bid}
+          unit={acceptModal.unit}
+          onAccept={handleAccept}
+          onClose={() => setAcceptModal(null)}
+        />
+      )}
+      {counterModal && (
+        <CounterofferModal
+          bid={counterModal.bid}
+          unit={counterModal.unit}
+          onCounter={handleCounter}
+          onClose={() => setCounterModal(null)}
+        />
       )}
     </PageContainer>
   );

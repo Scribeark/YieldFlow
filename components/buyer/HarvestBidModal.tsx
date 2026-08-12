@@ -39,11 +39,7 @@ export function HarvestBidModal({ isOpen, onClose, onSuccess, opportunity }: Har
       setError(`Quantity must be between 1 and ${availableQty} ${unit}`);
       return;
     }
-    
-    if (minPrice > 0 && priceNum < minPrice) {
-      setError(`Bid price cannot be lower than the minimum price (₦${minPrice})`);
-      return;
-    }
+
 
     setSubmitting(true);
     const { error: apiError } = await placeHarvestBid(supabase, {
@@ -102,11 +98,11 @@ export function HarvestBidModal({ isOpen, onClose, onSuccess, opportunity }: Har
             <Input 
               type="number" 
               required 
-              min={minPrice > 0 ? minPrice : 1} 
+              min="1" 
               step="0.01"
               value={price} 
               onChange={(e) => setPrice(e.target.value)} 
-              placeholder={`Min: ₦${minPrice}`}
+              placeholder={minPrice > 0 ? `Target: ₦${minPrice}` : 'Negotiable'}
             />
           </div>
           

@@ -9,6 +9,90 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      
+      farm_activity_logs: {
+        Row: {
+          id: string
+          farm_id: string
+          activity_type: string
+          recorded_at: string
+          crop_allocation_id: string | null
+          crop_condition: string | null
+          soil_condition: string | null
+          growth_stage: string | null
+          pest_issue: string | null
+          input_name: string | null
+          input_quantity: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          farm_id: string
+          activity_type: string
+          recorded_at?: string
+          crop_allocation_id?: string | null
+          crop_condition?: string | null
+          soil_condition?: string | null
+          growth_stage?: string | null
+          pest_issue?: string | null
+          input_name?: string | null
+          input_quantity?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['farm_activity_logs']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: "farm_activity_logs_farm_id_fkey"
+            columns: ["farm_id"]
+            isOneToOne: false
+            referencedRelation: "farms"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      bid_negotiation_events: {
+        Row: {
+          id: string
+          bid_id: string
+          actor_id: string
+          actor_role: string
+          event_type: string
+          proposed_quantity: number | null
+          proposed_price_per_unit: number | null
+          message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          bid_id: string
+          actor_id: string
+          actor_role: string
+          event_type: string
+          proposed_quantity?: number | null
+          proposed_price_per_unit?: number | null
+          message?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['bid_negotiation_events']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: "bid_negotiation_events_bid_id_fkey"
+            columns: ["bid_id"]
+            isOneToOne: false
+            referencedRelation: "harvest_bids"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bid_negotiation_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       farms: {
         Row: {
           id: string
