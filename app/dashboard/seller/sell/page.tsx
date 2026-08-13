@@ -165,6 +165,7 @@ export default function SellerSellPage() {
     if (!bulkQuantity || parseInt(bulkQuantity) <= 0) { setError('Expected quantity must be greater than 0.'); return; }
     if (!bulkAskingPrice || parseFloat(bulkAskingPrice) <= 0) { setError('Asking price must be greater than 0.'); return; }
 
+    if (!sellerMaturityAt) { setError('Expected harvest date is required.'); return; }
     if (plantingDate && sellerMaturityAt && new Date(sellerMaturityAt) <= new Date(plantingDate)) {
       setError('Expected harvest date must be after the planting date.'); return;
     }
@@ -175,11 +176,11 @@ export default function SellerSellPage() {
     if (!finalFarmId) {
       const { data: newFarm, error: farmError } = await (supabase as any).from('farms').insert({
         user_id: profile.id,
-        name: `Farm – ${bulkAddress.split(',')[0]}`,
+        name: `Farm – ${(bulkAddress || 'Default').split(',')[0]}`,
         crop_type: finalCommodity,
-        physical_address: bulkAddress,
-        latitude: typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat,
-        longitude: typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng
+        physical_address: bulkAddress || 'Default Address',
+        latitude: typeof bulkLat === 'string' ? parseFloat(bulkLat) : (bulkLat || 0),
+        longitude: typeof bulkLng === 'string' ? parseFloat(bulkLng) : (bulkLng || 0)
       }).select('id').single();
 
       if (farmError) {
@@ -190,9 +191,43 @@ export default function SellerSellPage() {
       finalFarmId = newFarm.id;
     }
 
+    let finalAllocId = bulkAllocId;
+    if (!finalAllocId) {
+      const { data: existingAlloc } = await (supabase as any)
+        .from('farm_crop_allocations')
+        .select('id')
+        .eq('farm_id', finalFarmId)
+        .eq('crop_type', finalCommodity)
+        .eq('allocation_status', 'ACTIVE')
+        .maybeSingle();
+
+      if (existingAlloc?.id) {
+        finalAllocId = existingAlloc.id;
+      } else {
+        const { data: newAlloc, error: allocErr } = await (supabase as any)
+          .from('farm_crop_allocations')
+          .insert({
+            farm_id: finalFarmId,
+            crop_type: finalCommodity,
+            expected_harvest_unit: bulkUnit,
+            expected_harvest_max: parseInt(bulkQuantity),
+            allocation_status: 'ACTIVE'
+          })
+          .select('id')
+          .single();
+
+        if (allocErr) {
+          setError('Failed to create crop allocation: ' + allocErr.message);
+          setSubmitting(false);
+          return;
+        }
+        finalAllocId = newAlloc.id;
+      }
+    }
+
     const { error: apiError } = await saveBulkSale(supabase, {
       farmId: finalFarmId,
-      cropAllocationId: bulkAllocId || undefined,
+      cropAllocationId: finalAllocId,
       cropType: finalCommodity,
       expectedQuantityVolume: parseInt(bulkQuantity),
       expectedQuantityUnit: bulkUnit,
@@ -200,7 +235,7 @@ export default function SellerSellPage() {
       pickupAddress: bulkAddress || undefined,
       pickupLatitude: bulkLat ? (typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat) : undefined,
       pickupLongitude: bulkLng ? (typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng) : undefined,
-      sellerMaturityAt: toISO(sellerMaturityAt),
+      sellerMaturityAt: toISO(sellerMaturityAt)!,
       sellerNote: [
         plantingDate ? `Planting Date: ${plantingDate}` : null,
         sellerNote.trim() || null
@@ -416,8 +451,9 @@ export default function SellerSellPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Expected Harvest Date (optional)</Label>
+                      <Label>Expected Harvest Date <span className="text-red-400">*</span></Label>
                       <Input
+                        required
                         type="date"
                         value={sellerMaturityAt}
                         onChange={(e) => setSellerMaturityAt(e.target.value)}

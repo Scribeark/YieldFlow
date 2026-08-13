@@ -485,16 +485,24 @@ export default function SellerBulkBiddingSalePage() {
                       <div className="flex flex-wrap gap-2">
                         {/* Declare Harvest Available Action */}
                         {!harvestReady && !isTerminal && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleDeclareHarvestAvailable(pred.id)}
-                            disabled={isLocked}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-white"
-                          >
-                            {isLocked ? <Loader2 className="animate-spin mr-1" size={14} /> : <Sprout size={14} className="mr-1" />}
-                            Declare Harvest Available
-                          </Button>
+                          <div className="flex flex-col gap-1">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => handleDeclareHarvestAvailable(pred.id)}
+                              disabled={isLocked || acceptedBids.length === 0}
+                              className="bg-emerald-600 hover:bg-emerald-500 text-white disabled:opacity-50"
+                              title={acceptedBids.length === 0 ? 'Accept a provisional agreement first to declare harvest availability.' : undefined}
+                            >
+                              {isLocked ? <Loader2 className="animate-spin mr-1" size={14} /> : <Sprout size={14} className="mr-1" />}
+                              Declare Harvest Available
+                            </Button>
+                            {acceptedBids.length === 0 && (
+                              <span className="text-[11px] opacity-60 text-yellow-400">
+                                Accept a bid first to enable declaration.
+                              </span>
+                            )}
+                          </div>
                         )}
 
                         {/* Convert to Trade Requests */}

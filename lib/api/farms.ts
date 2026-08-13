@@ -203,6 +203,7 @@ export async function createManualBiddingSale(
   supabase: SupabaseClient<any>,
   params: {
     farmId: string;
+    cropAllocationId?: string;
     cropType: string;
     totalQuantity: number;
     quantityUnit: string;
@@ -210,10 +211,41 @@ export async function createManualBiddingSale(
     pickupAddress: string;
     pickupLatitude: number;
     pickupLongitude: number;
+    sellerMaturityAt?: string;
   }
 ) {
+  let allocId: string = params.cropAllocationId || '';
+  if (!allocId) {
+    const { data: existingAlloc } = await (supabase as any)
+      .from('farm_crop_allocations')
+      .select('id')
+      .eq('farm_id', params.farmId)
+      .eq('crop_type', params.cropType)
+      .eq('allocation_status', 'ACTIVE')
+      .maybeSingle();
+
+    if (existingAlloc?.id) {
+      allocId = existingAlloc.id;
+    } else {
+      const { data: newAlloc } = await (supabase as any)
+        .from('farm_crop_allocations')
+        .insert({
+          farm_id: params.farmId,
+          crop_type: params.cropType,
+          expected_harvest_unit: params.quantityUnit,
+          expected_harvest_max: params.totalQuantity,
+          allocation_status: 'ACTIVE'
+        })
+        .select('id')
+        .single();
+
+      allocId = newAlloc?.id || '';
+    }
+  }
+
   return saveBulkSale(supabase, {
     farmId: params.farmId,
+    cropAllocationId: allocId,
     cropType: params.cropType,
     expectedQuantityVolume: params.totalQuantity,
     expectedQuantityUnit: params.quantityUnit,
@@ -221,15 +253,15 @@ export async function createManualBiddingSale(
     pickupAddress: params.pickupAddress,
     pickupLatitude: params.pickupLatitude,
     pickupLongitude: params.pickupLongitude,
+    sellerMaturityAt: params.sellerMaturityAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   });
 }
 
-/** Creates a new Bulk Bidding Sale via the installed rpc_save_bulk_sale. */
 export async function saveBulkSale(
   supabase: SupabaseClient<any>,
   params: {
     farmId: string;
-    cropAllocationId?: string;
+    cropAllocationId: string;
     cropType: string;
     expectedQuantityVolume: number;
     expectedQuantityUnit: string;
@@ -239,23 +271,23 @@ export async function saveBulkSale(
     pickupLongitude?: number;
     saleOpenAt?: string | null;
     saleCloseAt?: string | null;
-    sellerMaturityAt?: string | null;
+    sellerMaturityAt: string;
     sellerNote?: string | null;
   }
 ) {
   const { data, error } = await supabase.rpc('rpc_save_bulk_sale', {
-    p_farm_id: params.farmId,
-    p_crop_allocation_id: params.cropAllocationId || null,
-    p_crop_type: params.cropType,
-    p_expected_quantity_volume: params.expectedQuantityVolume,
-    p_expected_quantity_unit: params.expectedQuantityUnit,
     p_asking_price_per_unit: params.askingPricePerUnit,
+    p_crop_allocation_id: params.cropAllocationId,
+    p_crop_type: params.cropType,
+    p_expected_quantity: params.expectedQuantityVolume,
+    p_expected_quantity_unit: params.expectedQuantityUnit,
+    p_farm_id: params.farmId,
     p_pickup_address: params.pickupAddress || null,
     p_pickup_latitude: params.pickupLatitude || null,
     p_pickup_longitude: params.pickupLongitude || null,
-    p_sale_open_at: params.saleOpenAt || null,
     p_sale_close_at: params.saleCloseAt || null,
-    p_seller_maturity_at: params.sellerMaturityAt || null,
+    p_sale_open_at: params.saleOpenAt || null,
+    p_seller_maturity_at: params.sellerMaturityAt,
     p_seller_note: params.sellerNote || null,
   });
   if (error) return { data: null, error };
@@ -514,27 +546,9 @@ export async function declareHarvestAvailable(supabase: SupabaseClient<any>, pre
   const { data, error } = await supabase.rpc('rpc_declare_harvest_available', {
     p_prediction_id: predictionId
   });
-  if (!error && data?.success !== false) {
-    return { data, error: null };
-  }
-  // Fallback: direct update if RPC is pending execution in remote DB
-  const { error: updateError } = await supabase
-    .from('harvest_predictions')
-    .update({
-      harvest_available_at: new Date().toISOString(),
-      availability_source: 'SELLER_DECLARATION',
-      bidding_status: 'HARVEST_CONFIRMED'
-    })
-    .eq('id', predictionId);
-
-  if (updateError) {
-    const { data: legacyData, error: legacyError } = await supabase.rpc('rpc_confirm_crop_readiness', {
-      p_prediction_id: predictionId
-    });
-    if (legacyError) return { data: null, error: legacyError };
-    return { data: legacyData, error: null };
-  }
-  return { data: { success: true, message: 'Harvest declared available' }, error: null };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to declare harvest available') };
+  return { data, error: null };
 }
 
 export async function confirmCropReadiness(supabase: SupabaseClient<any>, predictionId: string) {
