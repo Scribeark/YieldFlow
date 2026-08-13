@@ -228,6 +228,39 @@ export async function createManualBiddingSale(
   });
 }
 
+/** Publishes a standalone Bulk Bidding Sale via installed rpc_publish_bulk_bidding_sale V8 RPC. */
+export async function publishBulkBiddingSale(
+  supabase: SupabaseClient<any>,
+  params: {
+    cropType: string;
+    expectedQuantityVolume: number;
+    expectedQuantityUnit: string;
+    askingPricePerUnit: number;
+    plantingDate?: string | null;
+    sellerMaturityAt: string;
+    pickupAddress?: string | null;
+    pickupLatitude?: number | null;
+    pickupLongitude?: number | null;
+    sellerNote?: string | null;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_publish_bulk_bidding_sale', {
+    p_asking_price_per_unit: params.askingPricePerUnit,
+    p_crop_type: params.cropType,
+    p_expected_harvest_date: params.sellerMaturityAt,
+    p_expected_quantity: params.expectedQuantityVolume,
+    p_expected_quantity_unit: params.expectedQuantityUnit,
+    p_pickup_address: params.pickupAddress || null,
+    p_pickup_latitude: params.pickupLatitude || null,
+    p_pickup_longitude: params.pickupLongitude || null,
+    p_planting_date: params.plantingDate || null,
+    p_seller_note: params.sellerNote || null,
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to publish bulk bidding sale') };
+  return { data, error: null };
+}
+
 export async function saveBulkSale(
   supabase: SupabaseClient<any>,
   params: {

@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/Label';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, saveBulkSale } from '@/lib/api/farms';
+import { getSellerFarms, publishBulkBiddingSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
 import { LocationPicker } from '@/components/shared/LocationPicker';
 import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar } from 'lucide-react';
@@ -55,10 +55,7 @@ export default function SellerSellPage() {
   const [stdLat, setStdLat] = useState<number | string>('');
   const [stdLng, setStdLng] = useState<number | string>('');
 
-  // ── Bulk Sale fields ──────────────────────────────────────────────────────
-  const [bulkFarmId, setBulkFarmId] = useState('');
-  const [bulkAllocId, setBulkAllocId] = useState('');
-  const [bulkAllocations, setBulkAllocations] = useState<any[]>([]);
+  // ── Bulk Sale standalone fields ───────────────────────────────────────────
   const [bulkCommoditySelect, setBulkCommoditySelect] = useState('Maize');
   const [bulkCommodityCustom, setBulkCommodityCustom] = useState('');
   const [bulkQuantity, setBulkQuantity] = useState('');
@@ -68,7 +65,7 @@ export default function SellerSellPage() {
   const [bulkLat, setBulkLat] = useState<number | string>('');
   const [bulkLng, setBulkLng] = useState<number | string>('');
 
-  // Simplified Harvest Dates
+  // Standalone Harvest Dates
   const [plantingDate, setPlantingDate] = useState('');
   const [sellerMaturityAt, setSellerMaturityAt] = useState('');
   const [sellerNote, setSellerNote] = useState('');
@@ -84,7 +81,6 @@ export default function SellerSellPage() {
     setFarms(farmList);
     if (farmList.length > 0) {
       selectFarmForStandard(farmList[0].id, farmList);
-      selectFarmForBulk(farmList[0].id, farmList);
     }
     setLoading(false);
   };
@@ -104,50 +100,6 @@ export default function SellerSellPage() {
       setStdAddress(farm.physical_address || '');
       setStdLat(farm.latitude || '');
       setStdLng(farm.longitude || '');
-    }
-  };
-
-  const selectFarmForBulk = (fId: string, source = farms) => {
-    setBulkFarmId(fId);
-    setBulkAllocId('');
-    const farm = source.find((f) => f.id === fId);
-    if (farm) {
-      setBulkAddress(farm.physical_address || '');
-      setBulkLat(farm.latitude || '');
-      setBulkLng(farm.longitude || '');
-      const allocs: any[] = Array.isArray(farm.farm_crop_allocations) ? farm.farm_crop_allocations : [];
-      const activeAllocs = allocs.filter((a) => a.allocation_status !== 'ARCHIVED');
-      setBulkAllocations(activeAllocs);
-      if (activeAllocs.length > 0) {
-        selectCropAllocationForBulk(activeAllocs[0].id, activeAllocs);
-      }
-    } else {
-      setBulkAllocations([]);
-    }
-  };
-
-  const selectCropAllocationForBulk = (allocId: string, sourceAllocs = bulkAllocations) => {
-    setBulkAllocId(allocId);
-    const alloc = sourceAllocs.find((a) => a.id === allocId);
-    if (alloc) {
-      if (alloc.crop_type) {
-        setBulkCommoditySelect(getCommodityValue(alloc.crop_type));
-        if (getCommodityValue(alloc.crop_type) === 'Other') {
-          setBulkCommodityCustom(alloc.crop_type);
-        }
-      }
-      if (alloc.expected_harvest_unit) {
-        setBulkUnit(alloc.expected_harvest_unit);
-      }
-      if (alloc.expected_harvest_max || alloc.expected_harvest_min) {
-        setBulkQuantity(String(alloc.expected_harvest_max || alloc.expected_harvest_min));
-      }
-      if (alloc.planting_date) {
-        setPlantingDate(alloc.planting_date);
-      }
-      if (alloc.expected_harvest_date) {
-        setSellerMaturityAt(alloc.expected_harvest_date);
-      }
     }
   };
 
@@ -186,11 +138,8 @@ export default function SellerSellPage() {
     setError(''); setSuccess('');
     if (!profile) { setError('Profile not loaded.'); return; }
 
-    if (!bulkFarmId) { setError('Please select a farm.'); return; }
-    if (!bulkAllocId) { setError('A crop allocation is required. Please select an existing crop allocation.'); return; }
-
     const finalCommodity = bulkCommoditySelect === 'Other' ? bulkCommodityCustom.trim() : bulkCommoditySelect;
-    if (!finalCommodity) { setError('Commodity type is required.'); return; }
+    if (!finalCommodity) { setError('Commodity / crop type is required.'); return; }
     if (!bulkQuantity || parseInt(bulkQuantity) <= 0) { setError('Expected quantity must be greater than 0.'); return; }
     if (!bulkAskingPrice || parseFloat(bulkAskingPrice) <= 0) { setError('Asking price must be greater than 0.'); return; }
     if (!sellerMaturityAt) { setError('Expected harvest date is required.'); return; }
@@ -200,26 +149,22 @@ export default function SellerSellPage() {
     }
 
     setSubmitting(true);
-    const { error: apiError } = await saveBulkSale(supabase, {
-      farmId: bulkFarmId,
-      cropAllocationId: bulkAllocId,
+    const { error: apiError } = await publishBulkBiddingSale(supabase, {
       cropType: finalCommodity,
       expectedQuantityVolume: parseInt(bulkQuantity),
       expectedQuantityUnit: bulkUnit,
       askingPricePerUnit: parseFloat(bulkAskingPrice),
-      pickupAddress: bulkAddress || undefined,
-      pickupLatitude: bulkLat ? (typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat) : undefined,
-      pickupLongitude: bulkLng ? (typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng) : undefined,
+      plantingDate: toISO(plantingDate),
       sellerMaturityAt: toISO(sellerMaturityAt)!,
-      sellerNote: [
-        plantingDate ? `Planting Date: ${plantingDate}` : null,
-        sellerNote.trim() || null
-      ].filter(Boolean).join(' | ') || null,
+      pickupAddress: bulkAddress || null,
+      pickupLatitude: bulkLat ? (typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat) : null,
+      pickupLongitude: bulkLng ? (typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng) : null,
+      sellerNote: sellerNote.trim() || null,
     });
     setSubmitting(false);
 
     if (apiError) {
-      setError(apiError.message || 'Failed to create bulk bidding sale.');
+      setError(apiError.message || 'Failed to publish bulk bidding sale.');
     } else {
       setSuccess('Bulk Bidding Sale created and open for buyer bids!');
       setSuccessId('');
@@ -267,7 +212,7 @@ export default function SellerSellPage() {
               </>
             ) : (
               <>
-                <strong>Bulk Bidding Sale:</strong> Select your farm and existing crop allocation, set your expected quantity and asking price. Buyers submit bids for portions. Accepted bids become provisional agreements.
+                <strong>Bulk Bidding Sale:</strong> Set your expected harvest quantity and asking price. Buyers submit bids for portions of your supply. Bidding opens immediately.
               </>
             )}
           </Alert>
@@ -349,7 +294,7 @@ export default function SellerSellPage() {
             </Card>
           )}
 
-          {/* ── BULK BIDDING SALE FORM ─────────────────────────────────────── */}
+          {/* ── STANDALONE BULK BIDDING SALE FORM ───────────────────────────── */}
           {mode === 'bulk' && (
             <Card>
               <h2 className="text-xl font-bold mb-6 flex items-center border-b border-white/10 pb-4">
@@ -357,52 +302,10 @@ export default function SellerSellPage() {
               </h2>
               <form onSubmit={handleBulkSubmit} className="space-y-5">
 
-                {/* Farm + Required Crop Allocation */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="space-y-2">
-                    <Label>Farm <span className="text-red-400">*</span></Label>
-                    <select required className={selectStyle} value={bulkFarmId} onChange={(e) => selectFarmForBulk(e.target.value)}>
-                      <option value="" className="bg-[#1a1f2e]">— Select Farm —</option>
-                      {farms.map((f) => (
-                        <option key={f.id} value={f.id} className="bg-[#1a1f2e]">{f.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Crop Allocation <span className="text-red-400">*</span></Label>
-                    <select
-                      required
-                      className={selectStyle}
-                      value={bulkAllocId}
-                      onChange={(e) => selectCropAllocationForBulk(e.target.value)}
-                      disabled={!bulkFarmId || bulkAllocations.length === 0}
-                    >
-                      <option value="" className="bg-[#1a1f2e]">
-                        {!bulkFarmId
-                          ? '— Select Farm First —'
-                          : bulkAllocations.length === 0
-                            ? '— No Active Crop Allocations —'
-                            : '— Select Crop Allocation —'}
-                      </option>
-                      {bulkAllocations.map((a) => (
-                        <option key={a.id} value={a.id} className="bg-[#1a1f2e]">
-                          {a.crop_type} {a.expected_harvest_max ? `(${a.expected_harvest_max} ${a.expected_harvest_unit || 'units'})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {bulkFarmId && bulkAllocations.length === 0 && (
-                  <Alert variant="info" className="my-3">
-                    No active crop allocations were found for this farm. A crop allocation is required to create a Bulk Bidding Sale.
-                  </Alert>
-                )}
-
                 {/* Commodity + Quantity */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
-                    <Label>Commodity / Crop Type</Label>
+                    <Label>Commodity / Crop Type <span className="text-red-400">*</span></Label>
                     <select className={selectStyle} value={bulkCommoditySelect} onChange={(e) => setBulkCommoditySelect(e.target.value)}>
                       {COMMODITY_OPTIONS.map((c) => <option key={c} value={c} className="bg-[#1a1f2e]">{c}</option>)}
                     </select>
@@ -411,7 +314,7 @@ export default function SellerSellPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Expected Quantity</Label>
+                    <Label>Expected Quantity <span className="text-red-400">*</span></Label>
                     <div className="flex space-x-2">
                       <Input required type="number" min="1" className="flex-1" value={bulkQuantity} onChange={(e) => setBulkQuantity(e.target.value)} placeholder="e.g. 500" />
                       <select className="w-28 bg-black/20 border border-white/20 rounded-md p-2 text-white outline-none focus:border-[var(--agri-primary)] transition-colors" value={bulkUnit} onChange={(e) => setBulkUnit(e.target.value)}>
@@ -421,7 +324,7 @@ export default function SellerSellPage() {
                     <p className="text-xs opacity-50 flex items-center"><Info size={11} className="mr-1" />Buyers will bid in <strong className="mx-1">{bulkUnit}</strong>.</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Asking or Reference Price per {bulkUnit} (₦)</Label>
+                    <Label>Asking or Reference Price per {bulkUnit} (₦) <span className="text-red-400">*</span></Label>
                     <Input required type="number" min="1" step="0.01" value={bulkAskingPrice} onChange={(e) => setBulkAskingPrice(e.target.value)} placeholder="e.g. 2500" />
                   </div>
                 </div>
@@ -454,7 +357,7 @@ export default function SellerSellPage() {
                   </div>
                 </div>
 
-                {/* Pickup location */}
+                {/* Pickup / Farm Location */}
                 <div className="space-y-2 border-t border-white/10 pt-5">
                   <LocationPicker
                     apiKey={mapsApiKey}
@@ -497,7 +400,7 @@ export default function SellerSellPage() {
                     type="submit"
                     variant="primary"
                     size="lg"
-                    disabled={submitting || !bulkFarmId || !bulkAllocId || !sellerMaturityAt}
+                    disabled={submitting || !bulkQuantity || !bulkAskingPrice || !sellerMaturityAt}
                     className="w-full md:w-auto"
                   >
                     {submitting ? <><Loader2 className="animate-spin mr-2" size={18} />Publishing...</> : <>Publish Bulk Bidding Sale <ArrowRight size={16} className="ml-2" /></>}
