@@ -11,10 +11,10 @@ import { Label } from '@/components/ui/Label';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, createManualBiddingSale } from '@/lib/api/farms';
+import { getSellerFarms, saveBulkSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
 import { LocationPicker } from '@/components/shared/LocationPicker';
-import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info } from 'lucide-react';
+import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar, Clock } from 'lucide-react';
 import { useMapsKey } from '@/components/providers/MapsProvider';
 
 type ListingMode = 'standard' | 'bulk';
@@ -25,6 +25,18 @@ const COMMODITY_OPTIONS = [
   'Maize', 'Rice', 'Cassava', 'Yam', 'Sorghum', 'Millet', 'Groundnut',
   'Soybean', 'Cowpea', 'Sesame', 'Tomato', 'Onion', 'Pepper', 'Other'
 ];
+
+/** Format a JS Date to the value string required by <input type="datetime-local"> */
+function toDatetimeLocal(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Parse a datetime-local string to an ISO string (local → UTC). Returns null if blank. */
+function toISO(dtLocal: string): string | null {
+  if (!dtLocal) return null;
+  return new Date(dtLocal).toISOString();
+}
 
 export default function SellerSellPage() {
   const { user, profile } = useAuthStore();
@@ -49,16 +61,24 @@ export default function SellerSellPage() {
   const [stdLat, setStdLat] = useState<number | string>('');
   const [stdLng, setStdLng] = useState<number | string>('');
 
-  // ── Bulk Bidding fields ───────────────────────────────────────────────────
+  // ── Bulk Sale fields ──────────────────────────────────────────────────────
   const [bulkFarmId, setBulkFarmId] = useState('');
+  const [bulkAllocId, setBulkAllocId] = useState('');
+  const [bulkAllocations, setBulkAllocations] = useState<any[]>([]);
   const [bulkCommoditySelect, setBulkCommoditySelect] = useState('Maize');
   const [bulkCommodityCustom, setBulkCommodityCustom] = useState('');
   const [bulkQuantity, setBulkQuantity] = useState('');
   const [bulkUnit, setBulkUnit] = useState('kg');
-  const [bulkMinPrice, setBulkMinPrice] = useState('');
+  const [bulkAskingPrice, setBulkAskingPrice] = useState('');
   const [bulkAddress, setBulkAddress] = useState('');
   const [bulkLat, setBulkLat] = useState<number | string>('');
   const [bulkLng, setBulkLng] = useState<number | string>('');
+
+  // Schedule fields
+  const [saleOpenAt, setSaleOpenAt] = useState('');
+  const [saleCloseAt, setSaleCloseAt] = useState('');
+  const [sellerMaturityAt, setSellerMaturityAt] = useState('');
+  const [sellerNote, setSellerNote] = useState('');
 
   useEffect(() => {
     if (user) loadFarms();
@@ -96,6 +116,7 @@ export default function SellerSellPage() {
 
   const selectFarmForBulk = (fId: string, source = farms) => {
     setBulkFarmId(fId);
+    setBulkAllocId('');
     const farm = source.find((f) => f.id === fId);
     if (farm) {
       const crop = farm.crop_type || 'Maize';
@@ -104,6 +125,11 @@ export default function SellerSellPage() {
       setBulkAddress(farm.physical_address || '');
       setBulkLat(farm.latitude || '');
       setBulkLng(farm.longitude || '');
+      // Populate allocations dropdown from pre-loaded farm data
+      const allocs: any[] = Array.isArray(farm.farm_crop_allocations) ? farm.farm_crop_allocations : [];
+      setBulkAllocations(allocs.filter((a) => a.allocation_status !== 'ARCHIVED'));
+    } else {
+      setBulkAllocations([]);
     }
   };
 
@@ -111,7 +137,7 @@ export default function SellerSellPage() {
     e.preventDefault();
     setError(''); setSuccess('');
     if (!profile) { setError('Profile not loaded.'); return; }
-    
+
     const finalCommodity = stdCommoditySelect === 'Other' ? stdCommodityCustom.trim() : stdCommoditySelect;
     if (!finalCommodity) { setError('Commodity type is required.'); return; }
     if (!stdAddress.trim()) { setError('Pickup address is required.'); return; }
@@ -141,19 +167,28 @@ export default function SellerSellPage() {
     e.preventDefault();
     setError(''); setSuccess('');
     if (!profile) { setError('Profile not loaded.'); return; }
-    
+
     const finalCommodity = bulkCommoditySelect === 'Other' ? bulkCommodityCustom.trim() : bulkCommoditySelect;
     if (!finalCommodity) { setError('Commodity type is required.'); return; }
-    if (!bulkAddress.trim()) { setError('Pickup address is required.'); return; }
+    if (!bulkQuantity || parseInt(bulkQuantity) <= 0) { setError('Expected quantity must be greater than 0.'); return; }
+    if (!bulkAskingPrice || parseFloat(bulkAskingPrice) <= 0) { setError('Asking price must be greater than 0.'); return; }
 
-    setSubmitting(true);
+    // Validate schedule ordering if both provided
+    if (saleOpenAt && saleCloseAt && new Date(saleCloseAt) <= new Date(saleOpenAt)) {
+      setError('Bidding close date must be after the opening date.'); return;
+    }
+    if (saleCloseAt && sellerMaturityAt && new Date(sellerMaturityAt) <= new Date(saleCloseAt)) {
+      setError('Expected maturity must be after the bidding close date.'); return;
+    }
+
     let finalFarmId = bulkFarmId;
+    setSubmitting(true);
 
-    // If no farm was selected, we create one inline to satisfy the schema/RPC
+    // If no farm was selected, create one inline to satisfy the schema
     if (!finalFarmId) {
       const { data: newFarm, error: farmError } = await (supabase as any).from('farms').insert({
         user_id: profile.id,
-        name: `Farm - ${bulkAddress.split(',')[0]}`,
+        name: `Farm – ${bulkAddress.split(',')[0]}`,
         crop_type: finalCommodity,
         physical_address: bulkAddress,
         latitude: typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat,
@@ -161,33 +196,45 @@ export default function SellerSellPage() {
       }).select('id').single();
 
       if (farmError) {
-        setError('Failed to create internal farm record: ' + farmError.message);
+        setError('Failed to create farm record: ' + farmError.message);
         setSubmitting(false);
         return;
       }
       finalFarmId = newFarm.id;
     }
 
-    const { error: apiError } = await createManualBiddingSale(supabase, {
+    const { error: apiError } = await saveBulkSale(supabase, {
       farmId: finalFarmId,
+      cropAllocationId: bulkAllocId || undefined,
       cropType: finalCommodity,
-      totalQuantity: parseInt(bulkQuantity),
-      quantityUnit: bulkUnit,
-      minPricePerUnit: parseFloat(bulkMinPrice),
-      pickupAddress: bulkAddress,
-      pickupLatitude: typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat,
-      pickupLongitude: typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng
+      expectedQuantityVolume: parseInt(bulkQuantity),
+      expectedQuantityUnit: bulkUnit,
+      askingPricePerUnit: parseFloat(bulkAskingPrice),
+      pickupAddress: bulkAddress || undefined,
+      pickupLatitude: bulkLat ? (typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat) : undefined,
+      pickupLongitude: bulkLng ? (typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng) : undefined,
+      saleOpenAt: toISO(saleOpenAt),
+      saleCloseAt: toISO(saleCloseAt),
+      sellerMaturityAt: toISO(sellerMaturityAt),
+      sellerNote: sellerNote.trim() || null,
     });
     setSubmitting(false);
 
     if (apiError) {
       setError(apiError.message || 'Failed to create bulk bidding sale.');
     } else {
-      setSuccess(`Bulk bidding opportunity published! Buyers can now place bids in ${bulkUnit}.`);
+      const openMsg = saleOpenAt
+        ? `opens ${new Date(saleOpenAt).toLocaleString()}`
+        : 'is now open for bids';
+      setSuccess(`Bulk Bidding Sale created and ${openMsg}.`);
       setSuccessId('');
       setBulkQuantity('');
-      setBulkMinPrice('');
-      if (!bulkFarmId) loadFarms(); // reload if we created one inline
+      setBulkAskingPrice('');
+      setSaleOpenAt('');
+      setSaleCloseAt('');
+      setSellerMaturityAt('');
+      setSellerNote('');
+      if (!bulkFarmId) loadFarms();
     }
   };
 
@@ -228,7 +275,7 @@ export default function SellerSellPage() {
               </>
             ) : (
               <>
-                <strong>Bulk Bidding Sale:</strong> Sellers list a total quantity. Multiple buyers bid for portions (e.g. 10kg of 500kg). You review bids, accept or reject them, then confirm the harvest to convert accepted bids into trade requests. No IoT device required.
+                <strong>Bulk Bidding Sale:</strong> Set an expected quantity and asking price. Buyers bid for portions. You review bids, accept or reject them, then convert accepted bids to trade requests. Optionally schedule when bidding opens and closes.
               </>
             )}
           </Alert>
@@ -317,18 +364,34 @@ export default function SellerSellPage() {
                 <Layers className="mr-2 text-[var(--agri-primary)]" /> Bulk Bidding Sale Details
               </h2>
               <form onSubmit={handleBulkSubmit} className="space-y-5">
+
+                {/* Farm + Crop Allocation */}
                 {farms.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Source Farm (optional — auto-fills location)</Label>
-                    <select className={selectStyle} value={bulkFarmId} onChange={(e) => selectFarmForBulk(e.target.value)}>
-                      <option value="" className="bg-[#1a1f2e]">— Enter location manually —</option>
-                      {farms.map((f) => (
-                        <option key={f.id} value={f.id} className="bg-[#1a1f2e]">{f.name} ({f.crop_type})</option>
-                      ))}
-                    </select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <Label>Farm</Label>
+                      <select className={selectStyle} value={bulkFarmId} onChange={(e) => selectFarmForBulk(e.target.value)}>
+                        <option value="" className="bg-[#1a1f2e]">— Enter location manually —</option>
+                        {farms.map((f) => (
+                          <option key={f.id} value={f.id} className="bg-[#1a1f2e]">{f.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {bulkAllocations.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Crop Allocation (optional)</Label>
+                        <select className={selectStyle} value={bulkAllocId} onChange={(e) => setBulkAllocId(e.target.value)}>
+                          <option value="" className="bg-[#1a1f2e]">— None —</option>
+                          {bulkAllocations.map((a) => (
+                            <option key={a.id} value={a.id} className="bg-[#1a1f2e]">{a.crop_type} {a.expected_harvest_max ? `(${a.expected_harvest_max} ${a.expected_harvest_unit})` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 )}
 
+                {/* Commodity + Quantity */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label>Commodity / Crop Type</Label>
@@ -340,21 +403,60 @@ export default function SellerSellPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label>Total Available Quantity</Label>
+                    <Label>Expected Quantity</Label>
                     <div className="flex space-x-2">
                       <Input required type="number" min="1" className="flex-1" value={bulkQuantity} onChange={(e) => setBulkQuantity(e.target.value)} placeholder="e.g. 500" />
                       <select className="w-28 bg-black/20 border border-white/20 rounded-md p-2 text-white outline-none focus:border-[var(--agri-primary)] transition-colors" value={bulkUnit} onChange={(e) => setBulkUnit(e.target.value)}>
                         {UNITS.map((u) => <option key={u} value={u} className="bg-[#1a1f2e]">{u}</option>)}
                       </select>
                     </div>
-                    <p className="text-xs opacity-50 flex items-center"><Info size={11} className="mr-1" />All buyers will bid in <strong className="mx-1">{bulkUnit}</strong>.</p>
+                    <p className="text-xs opacity-50 flex items-center"><Info size={11} className="mr-1" />Buyers will bid in <strong className="mx-1">{bulkUnit}</strong>.</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Minimum Price per {bulkUnit} (₦)</Label>
-                    <Input required type="number" min="1" step="0.01" value={bulkMinPrice} onChange={(e) => setBulkMinPrice(e.target.value)} placeholder="e.g. 2500" />
+                    <Label>Asking Price per {bulkUnit} (₦)</Label>
+                    <Input required type="number" min="1" step="0.01" value={bulkAskingPrice} onChange={(e) => setBulkAskingPrice(e.target.value)} placeholder="e.g. 2500" />
                   </div>
                 </div>
 
+                {/* Schedule fields */}
+                <div className="border-t border-white/10 pt-5">
+                  <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 mb-4 flex items-center gap-2">
+                    <Calendar size={14} /> Bidding Schedule <span className="text-xs font-normal opacity-70 normal-case">(all optional — leave blank to open immediately)</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1"><Clock size={13} /> Bidding Opens At</Label>
+                      <Input
+                        type="datetime-local"
+                        value={saleOpenAt}
+                        onChange={(e) => setSaleOpenAt(e.target.value)}
+                      />
+                      <p className="text-xs opacity-50">Leave blank to open immediately on publish.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1"><Clock size={13} /> Bidding Closes At</Label>
+                      <Input
+                        type="datetime-local"
+                        value={saleCloseAt}
+                        onChange={(e) => setSaleCloseAt(e.target.value)}
+                        min={saleOpenAt || undefined}
+                      />
+                      <p className="text-xs opacity-50">Leave blank for no automatic close.</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1"><Calendar size={13} /> Expected Maturity At</Label>
+                      <Input
+                        type="datetime-local"
+                        value={sellerMaturityAt}
+                        onChange={(e) => setSellerMaturityAt(e.target.value)}
+                        min={saleCloseAt || saleOpenAt || undefined}
+                      />
+                      <p className="text-xs opacity-50">When you expect the crop to be ready.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pickup location */}
                 <div className="space-y-2 border-t border-white/10 pt-5">
                   <LocationPicker
                     apiKey={mapsApiKey}
@@ -364,23 +466,42 @@ export default function SellerSellPage() {
                     onAddressChange={setBulkAddress}
                     onLatChange={setBulkLat}
                     onLngChange={setBulkLng}
-                    label="Pickup / Farm Location"
+                    label="Pickup / Farm Location (optional)"
                     hideAdvancedCoordinates={true}
                   />
                 </div>
 
+                {/* Seller note */}
+                <div className="space-y-2">
+                  <Label>Seller Note (optional)</Label>
+                  <textarea
+                    className="w-full bg-black/20 border border-white/20 rounded-md p-3 text-white outline-none focus:border-[var(--agri-primary)] transition-colors text-sm resize-none"
+                    rows={3}
+                    value={sellerNote}
+                    onChange={(e) => setSellerNote(e.target.value)}
+                    placeholder="Any additional information for buyers — e.g. quality notes, pickup instructions, expected harvest conditions."
+                  />
+                </div>
+
+                {/* How it works summary */}
                 <div className="bg-black/20 p-4 rounded-lg text-sm opacity-80 border border-white/10">
                   <strong>How bulk bidding works:</strong>
                   <ol className="list-decimal list-inside mt-2 space-y-1">
-                    <li>Buyers bid for portions of your {bulkQuantity || '—'} {bulkUnit} at or above ₦{bulkMinPrice || '—'}/{bulkUnit}.</li>
-                    <li>You review bids in Bid Management and accept or reject each one.</li>
-                    <li>When ready, confirm the harvest and convert accepted bids into trade requests.</li>
+                    <li>Buyers bid for portions of your {bulkQuantity || '—'} {bulkUnit} at or above ₦{bulkAskingPrice || '—'}/{bulkUnit}.</li>
+                    <li>
+                      {saleOpenAt
+                        ? `Bidding opens automatically at ${new Date(saleOpenAt).toLocaleString()}.`
+                        : 'Bidding opens immediately when you publish.'}
+                    </li>
+                    {saleCloseAt && <li>Bidding closes automatically at {new Date(saleCloseAt).toLocaleString()}.</li>}
+                    <li>You review bids in Bulk Bidding Sale and accept or reject each one.</li>
+                    <li>Convert accepted bids into trade requests when you're ready to deliver.</li>
                   </ol>
                 </div>
 
                 <div className="flex justify-end pt-2">
                   <Button type="submit" variant="primary" size="lg" disabled={submitting} className="w-full md:w-auto">
-                    {submitting ? <><Loader2 className="animate-spin mr-2" size={18} />Publishing...</> : <>Publish Bulk Bidding Opportunity <ArrowRight size={16} className="ml-2" /></>}
+                    {submitting ? <><Loader2 className="animate-spin mr-2" size={18} />Publishing...</> : <>Publish Bulk Bidding Sale <ArrowRight size={16} className="ml-2" /></>}
                   </Button>
                 </div>
               </form>

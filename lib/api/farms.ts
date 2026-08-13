@@ -212,17 +212,103 @@ export async function createManualBiddingSale(
     pickupLongitude: number;
   }
 ) {
-  const { data, error } = await supabase.rpc('rpc_create_manual_bidding_sale', {
-    p_farm_id: params.farmId,
-    p_crop_type: params.cropType,
-    p_total_quantity: params.totalQuantity,
-    p_quantity_unit: params.quantityUnit,
-    p_min_price_per_unit: params.minPricePerUnit,
-    p_pickup_address: params.pickupAddress,
-    p_pickup_latitude: params.pickupLatitude,
-    p_pickup_longitude: params.pickupLongitude
+  return saveBulkSale(supabase, {
+    farmId: params.farmId,
+    cropType: params.cropType,
+    expectedQuantityVolume: params.totalQuantity,
+    expectedQuantityUnit: params.quantityUnit,
+    askingPricePerUnit: params.minPricePerUnit,
+    pickupAddress: params.pickupAddress,
+    pickupLatitude: params.pickupLatitude,
+    pickupLongitude: params.pickupLongitude,
   });
-  return { data, error };
+}
+
+/** Creates a new Bulk Bidding Sale via the installed rpc_save_bulk_sale. */
+export async function saveBulkSale(
+  supabase: SupabaseClient<any>,
+  params: {
+    farmId: string;
+    cropAllocationId?: string;
+    cropType: string;
+    expectedQuantityVolume: number;
+    expectedQuantityUnit: string;
+    askingPricePerUnit: number;
+    pickupAddress?: string;
+    pickupLatitude?: number;
+    pickupLongitude?: number;
+    saleOpenAt?: string | null;
+    saleCloseAt?: string | null;
+    sellerMaturityAt?: string | null;
+    sellerNote?: string | null;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_save_bulk_sale', {
+    p_farm_id: params.farmId,
+    p_crop_allocation_id: params.cropAllocationId || null,
+    p_crop_type: params.cropType,
+    p_expected_quantity_volume: params.expectedQuantityVolume,
+    p_expected_quantity_unit: params.expectedQuantityUnit,
+    p_asking_price_per_unit: params.askingPricePerUnit,
+    p_pickup_address: params.pickupAddress || null,
+    p_pickup_latitude: params.pickupLatitude || null,
+    p_pickup_longitude: params.pickupLongitude || null,
+    p_sale_open_at: params.saleOpenAt || null,
+    p_sale_close_at: params.saleCloseAt || null,
+    p_seller_maturity_at: params.sellerMaturityAt || null,
+    p_seller_note: params.sellerNote || null,
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to create bulk sale') };
+  return { data, error: null };
+}
+
+/** Updates schedule fields on an existing Bulk Bidding Sale. */
+export async function updateBulkSaleSchedule(
+  supabase: SupabaseClient<any>,
+  params: {
+    predictionId: string;
+    saleOpenAt?: string | null;
+    saleCloseAt?: string | null;
+    sellerMaturityAt?: string | null;
+    sellerNote?: string | null;
+  }
+) {
+  const { data, error } = await supabase.rpc('rpc_update_bulk_sale_schedule', {
+    p_prediction_id: params.predictionId,
+    p_sale_open_at: params.saleOpenAt || null,
+    p_sale_close_at: params.saleCloseAt || null,
+    p_seller_maturity_at: params.sellerMaturityAt || null,
+    p_seller_note: params.sellerNote || null,
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to update schedule') };
+  return { data, error: null };
+}
+
+/** Cancels a Bulk Bidding Sale listing. */
+export async function cancelBulkSale(
+  supabase: SupabaseClient<any>,
+  predictionId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_cancel_bulk_sale', {
+    p_prediction_id: predictionId,
+  });
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to cancel bulk sale') };
+  return { data, error: null };
+}
+
+/** Returns the effective sale status, resolving scheduled → open / open → closed transitions. */
+export async function getEffectiveSaleStatus(
+  supabase: SupabaseClient<any>,
+  predictionId: string
+) {
+  const { data, error } = await supabase.rpc('rpc_get_effective_sale_status', {
+    p_prediction_id: predictionId,
+  });
+  if (error) return { data: null, error };
+  return { data, error: null };
 }
 
 // ── Bid Management ────────────────────────────────────────────────────────────
@@ -249,7 +335,7 @@ export async function getSellerBidListings(
     .from('harvest_predictions')
     .select('*, farms(id, name, physical_address, latitude, longitude, user_id), farm_crop_allocations(crop_type), harvest_bids(*, buyer_profile:buyer_id(full_name, phone_number))')
     .in('farm_id', farmIds)
-    .in('bidding_status', ['OPEN', 'SELLER_REVIEWING', 'ALLOCATED', 'HARVEST_CONFIRMED', 'CONVERTED_TO_TRADE'])
+    .in('bidding_status', ['SCHEDULED', 'OPEN', 'SELLER_REVIEWING', 'ALLOCATED', 'HARVEST_CONFIRMED', 'CONVERTED_TO_TRADE', 'CLOSED', 'CANCELLED'])
     .order('created_at', { ascending: false });
 
   return { data, error };
