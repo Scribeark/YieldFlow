@@ -203,7 +203,7 @@ export async function createManualBiddingSale(
   supabase: SupabaseClient<any>,
   params: {
     farmId: string;
-    cropAllocationId?: string;
+    cropAllocationId: string;
     cropType: string;
     totalQuantity: number;
     quantityUnit: string;
@@ -211,41 +211,12 @@ export async function createManualBiddingSale(
     pickupAddress: string;
     pickupLatitude: number;
     pickupLongitude: number;
-    sellerMaturityAt?: string;
+    sellerMaturityAt: string;
   }
 ) {
-  let allocId: string = params.cropAllocationId || '';
-  if (!allocId) {
-    const { data: existingAlloc } = await (supabase as any)
-      .from('farm_crop_allocations')
-      .select('id')
-      .eq('farm_id', params.farmId)
-      .eq('crop_type', params.cropType)
-      .eq('allocation_status', 'ACTIVE')
-      .maybeSingle();
-
-    if (existingAlloc?.id) {
-      allocId = existingAlloc.id;
-    } else {
-      const { data: newAlloc } = await (supabase as any)
-        .from('farm_crop_allocations')
-        .insert({
-          farm_id: params.farmId,
-          crop_type: params.cropType,
-          expected_harvest_unit: params.quantityUnit,
-          expected_harvest_max: params.totalQuantity,
-          allocation_status: 'ACTIVE'
-        })
-        .select('id')
-        .single();
-
-      allocId = newAlloc?.id || '';
-    }
-  }
-
   return saveBulkSale(supabase, {
     farmId: params.farmId,
-    cropAllocationId: allocId,
+    cropAllocationId: params.cropAllocationId,
     cropType: params.cropType,
     expectedQuantityVolume: params.totalQuantity,
     expectedQuantityUnit: params.quantityUnit,
@@ -253,7 +224,7 @@ export async function createManualBiddingSale(
     pickupAddress: params.pickupAddress,
     pickupLatitude: params.pickupLatitude,
     pickupLongitude: params.pickupLongitude,
-    sellerMaturityAt: params.sellerMaturityAt || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    sellerMaturityAt: params.sellerMaturityAt,
   });
 }
 
