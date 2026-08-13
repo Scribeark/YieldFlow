@@ -259,7 +259,6 @@ export default function ProfileSettingsPage() {
                 <li>Your personal profile and registered user records</li>
                 <li>All registered farms and crop allocations</li>
                 <li>Farm activity logs, predictions, and digital journal records</li>
-                <li>Owned IoT devices and telemetry data</li>
                 <li>Bids placed or received and negotiation history</li>
                 <li>Disposable trade requests and logistics history</li>
                 <li>Supabase Authentication access and credentials</li>

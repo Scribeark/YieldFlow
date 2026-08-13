@@ -14,7 +14,7 @@ import { useAuthStore } from '@/store/authStore';
 import { getSellerFarms, saveBulkSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
 import { LocationPicker } from '@/components/shared/LocationPicker';
-import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar, Clock } from 'lucide-react';
+import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar } from 'lucide-react';
 import { useMapsKey } from '@/components/providers/MapsProvider';
 
 type ListingMode = 'standard' | 'bulk';
@@ -26,13 +26,7 @@ const COMMODITY_OPTIONS = [
   'Soybean', 'Cowpea', 'Sesame', 'Tomato', 'Onion', 'Pepper', 'Other'
 ];
 
-/** Format a JS Date to the value string required by <input type="datetime-local"> */
-function toDatetimeLocal(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/** Parse a datetime-local string to an ISO string (local → UTC). Returns null if blank. */
+/** Parse a date string to ISO string. */
 function toISO(dtLocal: string): string | null {
   if (!dtLocal) return null;
   return new Date(dtLocal).toISOString();
@@ -74,9 +68,8 @@ export default function SellerSellPage() {
   const [bulkLat, setBulkLat] = useState<number | string>('');
   const [bulkLng, setBulkLng] = useState<number | string>('');
 
-  // Schedule fields
-  const [saleOpenAt, setSaleOpenAt] = useState('');
-  const [saleCloseAt, setSaleCloseAt] = useState('');
+  // Simplified Harvest Dates
+  const [plantingDate, setPlantingDate] = useState('');
   const [sellerMaturityAt, setSellerMaturityAt] = useState('');
   const [sellerNote, setSellerNote] = useState('');
 
@@ -121,11 +114,10 @@ export default function SellerSellPage() {
     if (farm) {
       const crop = farm.crop_type || 'Maize';
       setBulkCommoditySelect(getCommodityValue(crop));
-      if (getCommodityValue(crop) === 'Other') setBulkCommodityCustom(crop);
+      if (getCommodityValue(crop) === 'Other') setStdCommodityCustom(crop);
       setBulkAddress(farm.physical_address || '');
       setBulkLat(farm.latitude || '');
       setBulkLng(farm.longitude || '');
-      // Populate allocations dropdown from pre-loaded farm data
       const allocs: any[] = Array.isArray(farm.farm_crop_allocations) ? farm.farm_crop_allocations : [];
       setBulkAllocations(allocs.filter((a) => a.allocation_status !== 'ARCHIVED'));
     } else {
@@ -173,18 +165,13 @@ export default function SellerSellPage() {
     if (!bulkQuantity || parseInt(bulkQuantity) <= 0) { setError('Expected quantity must be greater than 0.'); return; }
     if (!bulkAskingPrice || parseFloat(bulkAskingPrice) <= 0) { setError('Asking price must be greater than 0.'); return; }
 
-    // Validate schedule ordering if both provided
-    if (saleOpenAt && saleCloseAt && new Date(saleCloseAt) <= new Date(saleOpenAt)) {
-      setError('Bidding close date must be after the opening date.'); return;
-    }
-    if (saleCloseAt && sellerMaturityAt && new Date(sellerMaturityAt) <= new Date(saleCloseAt)) {
-      setError('Expected maturity must be after the bidding close date.'); return;
+    if (plantingDate && sellerMaturityAt && new Date(sellerMaturityAt) <= new Date(plantingDate)) {
+      setError('Expected harvest date must be after the planting date.'); return;
     }
 
     let finalFarmId = bulkFarmId;
     setSubmitting(true);
 
-    // If no farm was selected, create one inline to satisfy the schema
     if (!finalFarmId) {
       const { data: newFarm, error: farmError } = await (supabase as any).from('farms').insert({
         user_id: profile.id,
@@ -213,25 +200,22 @@ export default function SellerSellPage() {
       pickupAddress: bulkAddress || undefined,
       pickupLatitude: bulkLat ? (typeof bulkLat === 'string' ? parseFloat(bulkLat) : bulkLat) : undefined,
       pickupLongitude: bulkLng ? (typeof bulkLng === 'string' ? parseFloat(bulkLng) : bulkLng) : undefined,
-      saleOpenAt: toISO(saleOpenAt),
-      saleCloseAt: toISO(saleCloseAt),
       sellerMaturityAt: toISO(sellerMaturityAt),
-      sellerNote: sellerNote.trim() || null,
+      sellerNote: [
+        plantingDate ? `Planting Date: ${plantingDate}` : null,
+        sellerNote.trim() || null
+      ].filter(Boolean).join(' | ') || null,
     });
     setSubmitting(false);
 
     if (apiError) {
       setError(apiError.message || 'Failed to create bulk bidding sale.');
     } else {
-      const openMsg = saleOpenAt
-        ? `opens ${new Date(saleOpenAt).toLocaleString()}`
-        : 'is now open for bids';
-      setSuccess(`Bulk Bidding Sale created and ${openMsg}.`);
+      setSuccess('Bulk Bidding Sale created and open for buyer bids!');
       setSuccessId('');
       setBulkQuantity('');
       setBulkAskingPrice('');
-      setSaleOpenAt('');
-      setSaleCloseAt('');
+      setPlantingDate('');
       setSellerMaturityAt('');
       setSellerNote('');
       if (!bulkFarmId) loadFarms();
@@ -267,15 +251,14 @@ export default function SellerSellPage() {
         <div className="flex justify-center p-12"><Loader2 className="animate-spin text-[var(--agri-primary)]" size={32} /></div>
       ) : (
         <div className="max-w-3xl">
-          {/* Mode descriptions */}
           <Alert variant="info" className="mb-6">
             {mode === 'standard' ? (
               <>
-                <strong>Standard Sale:</strong> Publish a listing at an open price. The first buyer to confirm claims the full quantity and proceeds to the existing trade/logistics flow.
+                <strong>Standard Sale:</strong> Publish a listing at an open price. The first buyer to confirm claims the full quantity and proceeds directly to trade.
               </>
             ) : (
               <>
-                <strong>Bulk Bidding Sale:</strong> Set an expected quantity and asking price. Buyers bid for portions. You review bids, accept or reject them, then convert accepted bids to trade requests. Optionally schedule when bidding opens and closes.
+                <strong>Bulk Bidding Sale:</strong> Set your expected quantity and asking price. Buyers submit bids for portions. Bidding is open immediately. Accepted bids become provisional agreements that wait for harvest availability.
               </>
             )}
           </Alert>
@@ -413,45 +396,34 @@ export default function SellerSellPage() {
                     <p className="text-xs opacity-50 flex items-center"><Info size={11} className="mr-1" />Buyers will bid in <strong className="mx-1">{bulkUnit}</strong>.</p>
                   </div>
                   <div className="space-y-2">
-                    <Label>Asking Price per {bulkUnit} (₦)</Label>
+                    <Label>Asking or Reference Price per {bulkUnit} (₦)</Label>
                     <Input required type="number" min="1" step="0.01" value={bulkAskingPrice} onChange={(e) => setBulkAskingPrice(e.target.value)} placeholder="e.g. 2500" />
                   </div>
                 </div>
 
-                {/* Schedule fields */}
+                {/* Harvest Timeline */}
                 <div className="border-t border-white/10 pt-5">
                   <h3 className="text-sm font-bold uppercase tracking-wider opacity-60 mb-4 flex items-center gap-2">
-                    <Calendar size={14} /> Bidding Schedule <span className="text-xs font-normal opacity-70 normal-case">(all optional — leave blank to open immediately)</span>
+                    <Calendar size={14} /> Harvest Timeline
                   </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-1"><Clock size={13} /> Bidding Opens At</Label>
+                      <Label>Planting Date (optional)</Label>
                       <Input
-                        type="datetime-local"
-                        value={saleOpenAt}
-                        onChange={(e) => setSaleOpenAt(e.target.value)}
+                        type="date"
+                        value={plantingDate}
+                        onChange={(e) => setPlantingDate(e.target.value)}
                       />
-                      <p className="text-xs opacity-50">Leave blank to open immediately on publish.</p>
                     </div>
                     <div className="space-y-2">
-                      <Label className="flex items-center gap-1"><Clock size={13} /> Bidding Closes At</Label>
+                      <Label>Expected Harvest Date (optional)</Label>
                       <Input
-                        type="datetime-local"
-                        value={saleCloseAt}
-                        onChange={(e) => setSaleCloseAt(e.target.value)}
-                        min={saleOpenAt || undefined}
-                      />
-                      <p className="text-xs opacity-50">Leave blank for no automatic close.</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1"><Calendar size={13} /> Expected Maturity At</Label>
-                      <Input
-                        type="datetime-local"
+                        type="date"
                         value={sellerMaturityAt}
                         onChange={(e) => setSellerMaturityAt(e.target.value)}
-                        min={saleCloseAt || saleOpenAt || undefined}
+                        min={plantingDate || undefined}
                       />
-                      <p className="text-xs opacity-50">When you expect the crop to be ready.</p>
+                      <p className="text-xs opacity-50">When you expect the physical harvest to be ready.</p>
                     </div>
                   </div>
                 </div>
@@ -479,23 +451,18 @@ export default function SellerSellPage() {
                     rows={3}
                     value={sellerNote}
                     onChange={(e) => setSellerNote(e.target.value)}
-                    placeholder="Any additional information for buyers — e.g. quality notes, pickup instructions, expected harvest conditions."
+                    placeholder="Any additional information for buyers — e.g. crop quality, pickup directions, harvest conditions."
                   />
                 </div>
 
-                {/* How it works summary */}
+                {/* Flow overview */}
                 <div className="bg-black/20 p-4 rounded-lg text-sm opacity-80 border border-white/10">
                   <strong>How bulk bidding works:</strong>
                   <ol className="list-decimal list-inside mt-2 space-y-1">
-                    <li>Buyers bid for portions of your {bulkQuantity || '—'} {bulkUnit} at or above ₦{bulkAskingPrice || '—'}/{bulkUnit}.</li>
-                    <li>
-                      {saleOpenAt
-                        ? `Bidding opens automatically at ${new Date(saleOpenAt).toLocaleString()}.`
-                        : 'Bidding opens immediately when you publish.'}
-                    </li>
-                    {saleCloseAt && <li>Bidding closes automatically at {new Date(saleCloseAt).toLocaleString()}.</li>}
-                    <li>You review bids in Bulk Bidding Sale and accept or reject each one.</li>
-                    <li>Convert accepted bids into trade requests when you're ready to deliver.</li>
+                    <li>Bidding is open immediately upon publishing. Buyers bid for portions of your harvest.</li>
+                    <li>Accepting a bid creates a provisional agreement.</li>
+                    <li>When expected harvest date arrives (or when you click <em>Declare Harvest Available</em>), accepted bids become eligible for evidence submission & trade conversion.</li>
+                    <li>Submit camera-only harvest evidence to verify the trade and enable carrier logistics.</li>
                   </ol>
                 </div>
 

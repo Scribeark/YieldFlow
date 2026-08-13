@@ -21,11 +21,12 @@ import {
   cancelProvisionalAgreement,
   deleteBid,
   cancelBulkSale,
+  declareHarvestAvailable,
 } from '@/lib/api/farms';
 import {
-  Layers, RefreshCw, Loader2, CheckCircle, XCircle,
-  ChevronDown, ChevronUp, MapPin, AlertTriangle, ArrowRight,
-  Package, Calendar, Clock, Ban,
+  Layers, RefreshCw, Loader2, XCircle,
+  ChevronDown, ChevronUp, AlertTriangle, ArrowRight,
+  Package, Calendar, Ban, CheckCircle2, Sprout,
 } from 'lucide-react';
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
@@ -57,7 +58,6 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 function calcStats(prediction: any) {
   const bids: any[] = Array.isArray(prediction?.harvest_bids) ? prediction.harvest_bids : [];
   const max = prediction.expected_quantity_max || prediction.expected_quantity_volume || 0;
-  const min = prediction.expected_quantity_min || null;
   const total = max;
   const accepted = bids
     .filter((b) => ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'CONVERTED_TO_TRADE'].includes(b.bid_status))
@@ -68,28 +68,19 @@ function calcStats(prediction: any) {
   const converted = bids
     .filter((b) => b.bid_status === 'CONVERTED_TO_TRADE')
     .reduce((sum, b) => sum + (b.accepted_quantity || 0), 0);
-  return { min, max, total, accepted, remaining: Math.max(0, total - accepted), pending, converted };
+  return { total, accepted, remaining: Math.max(0, total - accepted), pending, converted };
 }
 
-/** Format a Date as a readable date-time string. */
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
 }
 
-/** Returns a human-readable countdown like "in 3 days" or "3 days ago". */
-function countdown(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const diff = new Date(iso).getTime() - Date.now();
-  const abs = Math.abs(diff);
-  const mins = Math.floor(abs / 60_000);
-  const hours = Math.floor(abs / 3_600_000);
-  const days = Math.floor(abs / 86_400_000);
-  const label =
-    days > 0 ? `${days}d` :
-    hours > 0 ? `${hours}h` :
-    mins > 0 ? `${mins}m` : 'now';
-  return diff > 0 ? `in ${label}` : `${label} ago`;
+function isHarvestAvailable(pred: any): boolean {
+  if (pred.harvest_available_at) return true;
+  if (pred.bidding_status === 'HARVEST_CONFIRMED' || pred.bidding_status === 'CONVERTED_TO_TRADE') return true;
+  if (pred.seller_maturity_at && new Date(pred.seller_maturity_at).getTime() <= Date.now()) return true;
+  return false;
 }
 
 const BID_STATUS_STYLES: Record<string, string> = {
@@ -103,7 +94,6 @@ const BID_STATUS_STYLES: Record<string, string> = {
 };
 
 const BIDDING_STATUS_COLOR: Record<string, string> = {
-  SCHEDULED: 'text-cyan-400 bg-cyan-500/10',
   OPEN: 'text-green-400 bg-green-500/10',
   ALLOCATED: 'text-blue-400 bg-blue-500/10',
   SELLER_REVIEWING: 'text-yellow-400 bg-yellow-500/10',
@@ -113,36 +103,42 @@ const BIDDING_STATUS_COLOR: Record<string, string> = {
   CANCELLED: 'text-red-400 bg-red-500/10',
 };
 
-// ── Schedule Info Banner ──────────────────────────────────────────────────────
+// ── Harvest Information Banner ───────────────────────────────────────────────
 
-function ScheduleBanner({ pred }: { pred: any }) {
-  const { sale_open_at, sale_close_at, seller_maturity_at, seller_note } = pred;
-  if (!sale_open_at && !sale_close_at && !seller_maturity_at && !seller_note) return null;
+function HarvestInfoBanner({ pred }: { pred: any }) {
+  const { seller_maturity_at, seller_note } = pred;
+  const harvestReady = isHarvestAvailable(pred);
 
   return (
     <div className="mt-3 p-3 bg-black/20 rounded-lg border border-white/10 text-sm space-y-1.5">
-      <div className="text-xs font-bold uppercase tracking-wider opacity-50 flex items-center gap-1 mb-2">
-        <Calendar size={12} /> Sale Schedule
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="text-xs font-bold uppercase tracking-wider opacity-50 flex items-center gap-1">
+          <Calendar size={12} /> Harvest Information
+        </div>
+        <div>
+          {harvestReady ? (
+            <span className="text-xs px-2 py-0.5 rounded font-bold uppercase bg-green-500/20 text-green-400 border border-green-500/30 flex items-center gap-1">
+              <CheckCircle2 size={12} /> Harvest Available
+            </span>
+          ) : (
+            <span className="text-xs px-2 py-0.5 rounded font-bold uppercase bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+              Awaiting Harvest Availability
+            </span>
+          )}
+        </div>
       </div>
-      {sale_open_at && (
-        <div className="flex items-center gap-2">
-          <span className="opacity-60 w-24 flex-shrink-0 flex items-center gap-1"><Clock size={11} /> Opens:</span>
-          <span className="font-medium">{fmtDate(sale_open_at)}</span>
-          <span className="text-xs opacity-50">({countdown(sale_open_at)})</span>
-        </div>
-      )}
-      {sale_close_at && (
-        <div className="flex items-center gap-2">
-          <span className="opacity-60 w-24 flex-shrink-0 flex items-center gap-1"><Clock size={11} /> Closes:</span>
-          <span className="font-medium">{fmtDate(sale_close_at)}</span>
-          <span className="text-xs opacity-50">({countdown(sale_close_at)})</span>
-        </div>
-      )}
+
       {seller_maturity_at && (
         <div className="flex items-center gap-2">
-          <span className="opacity-60 w-24 flex-shrink-0 flex items-center gap-1"><Calendar size={11} /> Maturity:</span>
+          <span className="opacity-60 w-36 flex-shrink-0 flex items-center gap-1"><Calendar size={11} /> Expected Harvest:</span>
           <span className="font-medium">{fmtDate(seller_maturity_at)}</span>
-          <span className="text-xs opacity-50">({countdown(seller_maturity_at)})</span>
+        </div>
+      )}
+      {pred.harvest_available_at && (
+        <div className="flex items-center gap-2 text-xs text-green-400">
+          <span className="opacity-80 w-36 flex-shrink-0 flex items-center gap-1"><CheckCircle2 size={11} /> Availability Declared:</span>
+          <span className="font-medium">{fmtDate(pred.harvest_available_at)}</span>
+          <span className="opacity-60">({pred.availability_source || 'SELLER_DECLARATION'})</span>
         </div>
       )}
       {seller_note && (
@@ -167,7 +163,10 @@ function AcceptModal({ bid, unit, onAccept, onClose }: { bid: any; unit: string;
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
         <h2 className="text-xl font-bold mb-4">Accept Offer</h2>
         <p className="text-sm opacity-80 mb-4">
-          You are accepting: <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.
+          Accepting this offer creates a <strong>provisional agreement</strong> for <strong>{bid.desired_quantity} {unit}</strong> @ ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}.
+        </p>
+        <p className="text-xs opacity-60 mb-4">
+          Note: Provisional agreements wait until harvest availability before trade conversion.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="flex justify-end gap-2 mt-6">
@@ -217,7 +216,7 @@ function CounterofferModal({ bid, remaining, unit, onCounter, onClose }: { bid: 
           </div>
           <div>
             <label className="text-sm font-medium mb-1 block">Message to Buyer</label>
-            <Input value={msg} onChange={(e: any) => setMsg(e.target.value)} placeholder="e.g., I can only provide 500 units right now." />
+            <Input value={msg} onChange={(e: any) => setMsg(e.target.value)} placeholder="e.g., I can provide 500 units at this reference price." />
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="ghost" type="button" onClick={onClose} disabled={submitting}>Cancel</Button>
@@ -244,7 +243,6 @@ export default function SellerBulkBiddingSalePage() {
   const [processingBidId, setProcessingBidId] = useState<string | null>(null);
   const [processingListingId, setProcessingListingId] = useState<string | null>(null);
 
-  // Modal states
   const [acceptModal, setAcceptModal] = useState<{ bid: any; unit: string } | null>(null);
   const [counterModal, setCounterModal] = useState<{ bid: any; remaining: number; unit: string } | null>(null);
   const [convertingId, setConvertingId] = useState<string | null>(null);
@@ -271,7 +269,16 @@ export default function SellerBulkBiddingSalePage() {
     setTimeout(() => { setActionError(null); setActionSuccess(null); }, 5000);
   };
 
-  // ── Bid actions ─────────────────────────────────────────────────────────────
+  // ── Seller actions ──────────────────────────────────────────────────────────
+
+  const handleDeclareHarvestAvailable = async (predId: string) => {
+    if (!window.confirm('Declare physical harvest available now? This allows evidence submission and trade conversion for accepted provisional agreements.')) return;
+    setProcessingListingId(predId);
+    const { error } = await declareHarvestAvailable(supabase, predId);
+    if (error) notify(predId, error.message, true);
+    else { notify(predId, 'Harvest declared available!'); await load(); }
+    setProcessingListingId(null);
+  };
 
   const handleReject = async (predId: string, bidId: string) => {
     if (!window.confirm('Reject this offer?')) return;
@@ -288,7 +295,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingBidId(bidId);
     const { error } = await acceptOffer(supabase, bidId);
     if (error) notify(pred?.id || '', error.message, true);
-    else { notify(pred?.id || '', 'Offer accepted!'); await load(); }
+    else { notify(pred?.id || '', 'Offer accepted as provisional agreement!'); await load(); }
     setProcessingBidId(null);
   };
 
@@ -321,7 +328,7 @@ export default function SellerBulkBiddingSalePage() {
   };
 
   const handleConvert = async (predId: string) => {
-    if (!window.confirm('Convert all accepted bids into trade requests? Buyers will be notified to submit delivery details.')) return;
+    if (!window.confirm('Convert accepted bids into trade requests? Buyers will be requested to provide pickup/delivery details and camera evidence.')) return;
     setConvertingId(predId);
     const { error } = await convertBidsToTrades(supabase, predId);
     if (error) notify(predId, error.message, true);
@@ -331,7 +338,7 @@ export default function SellerBulkBiddingSalePage() {
 
   const handleCloseListing = async (predId: string, allocId: string) => {
     if (!allocId) { alert('Cannot close: Missing allocation ID for this listing.'); return; }
-    if (!window.confirm('Close this listing? This will cancel the bidding cycle.')) return;
+    if (!window.confirm('Close this listing? This will end the bidding cycle.')) return;
     setProcessingListingId(predId);
     const { data, error } = await closeCropAllocationBidding(supabase, allocId);
     if (error) notify(predId, error.message, true);
@@ -341,7 +348,7 @@ export default function SellerBulkBiddingSalePage() {
   };
 
   const handleCancelSale = async (predId: string) => {
-    if (!window.confirm('Cancel this Bulk Bidding Sale? All pending bids will be rejected and the listing will be closed permanently.')) return;
+    if (!window.confirm('Cancel this Bulk Bidding Sale? All pending bids will be rejected and the listing will be closed.')) return;
     setProcessingListingId(predId);
     const { error } = await cancelBulkSale(supabase, predId);
     if (error) notify(predId, error.message, true);
@@ -356,7 +363,7 @@ export default function SellerBulkBiddingSalePage() {
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>Bulk Bidding Sale</h1>
-          <p className="opacity-70 mt-1">Review, accept, and reject buyer bids on your harvest listings.</p>
+          <p className="opacity-70 mt-1">Review buyer bids, manage provisional agreements, and declare harvest availability.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={load} disabled={loading}><RefreshCw size={14} className="mr-1" /> Refresh</Button>
@@ -385,20 +392,19 @@ export default function SellerBulkBiddingSalePage() {
             const bids: any[] = pred.harvest_bids || [];
             const isExpanded = expandedId === pred.id;
             const biddingColor = BIDDING_STATUS_COLOR[pred.bidding_status] || 'text-gray-400 bg-gray-500/10';
+            const harvestReady = isHarvestAvailable(pred);
 
-            const pendingBids = bids.filter((b) => b.bid_status === 'PENDING');
+            const pendingBids = bids.filter((b) => b.bid_status === 'PENDING' || b.bid_status === 'BUYER_COUNTERED' || b.bid_status === 'SELLER_COUNTERED');
             const acceptedBids = bids.filter((b) => ['ACCEPTED', 'PARTIALLY_ACCEPTED'].includes(b.bid_status));
             const closedBids = bids.filter((b) => ['REJECTED', 'WITHDRAWN', 'CONVERTED_TO_TRADE', 'EXPIRED'].includes(b.bid_status));
 
-            const canConvert = pred.bidding_status === 'HARVEST_CONFIRMED' || pred.bidding_status === 'ALLOCATED';
             const isTerminal = ['CANCELLED', 'CLOSED', 'CONVERTED_TO_TRADE'].includes(pred.bidding_status);
             const isLocked = processingListingId === pred.id;
 
             return (
               <ErrorBoundary key={pred.id}>
                 <Card className={`border-l-4 ${
-                  pred.bidding_status === 'OPEN' ? 'border-l-green-500' :
-                  pred.bidding_status === 'SCHEDULED' ? 'border-l-cyan-500' :
+                  harvestReady ? 'border-l-green-500' :
                   pred.bidding_status === 'CANCELLED' ? 'border-l-red-500' :
                   'border-l-blue-500'
                 }`}>
@@ -431,8 +437,8 @@ export default function SellerBulkBiddingSalePage() {
                     </div>
                   </div>
 
-                  {/* Schedule Banner */}
-                  <ScheduleBanner pred={pred} />
+                  {/* Harvest Information Banner */}
+                  <HarvestInfoBanner pred={pred} />
 
                   {/* Quantity Stats */}
                   <div className={`grid gap-3 mt-4 p-4 bg-black/20 rounded-lg text-center ${stats.converted > 0 ? 'grid-cols-2 md:grid-cols-5' : 'grid-cols-2 md:grid-cols-4'}`}>
@@ -477,17 +483,34 @@ export default function SellerBulkBiddingSalePage() {
 
                       {/* Seller action buttons */}
                       <div className="flex flex-wrap gap-2">
-                        {canConvert && !isTerminal && (
+                        {/* Declare Harvest Available Action */}
+                        {!harvestReady && !isTerminal && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleDeclareHarvestAvailable(pred.id)}
+                            disabled={isLocked}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                          >
+                            {isLocked ? <Loader2 className="animate-spin mr-1" size={14} /> : <Sprout size={14} className="mr-1" />}
+                            Declare Harvest Available
+                          </Button>
+                        )}
+
+                        {/* Convert to Trade Requests */}
+                        {harvestReady && acceptedBids.length > 0 && !isTerminal && (
                           <Button variant="primary" size="sm" onClick={() => handleConvert(pred.id)} disabled={convertingId === pred.id}>
                             {convertingId === pred.id ? <Loader2 className="animate-spin mr-1" size={14} /> : <ArrowRight size={14} className="mr-1" />}
                             Convert to Trade Requests
                           </Button>
                         )}
+
                         {pred.bidding_status === 'CONVERTED_TO_TRADE' && (
                           <Link href="/dashboard/seller/requests">
                             <Button variant="secondary" size="sm"><ArrowRight size={14} className="mr-1" /> View in My Requests</Button>
                           </Link>
                         )}
+
                         {pred.bidding_status === 'OPEN' && pred.crop_allocation_id && (
                           <Button
                             variant="secondary" size="sm"
@@ -499,6 +522,7 @@ export default function SellerBulkBiddingSalePage() {
                             Close Bidding
                           </Button>
                         )}
+
                         {!isTerminal && (
                           <Button
                             variant="secondary" size="sm"
@@ -574,6 +598,13 @@ export default function SellerBulkBiddingSalePage() {
                                     Accepted: <strong className="text-green-400">{bid.accepted_quantity} {unit}</strong>
                                     {bid.bid_status === 'PARTIALLY_ACCEPTED' && <span className="text-xs text-yellow-400 ml-2">(Partial — requested {bid.desired_quantity})</span>}
                                     {' '}· ₦{Number(bid.offered_price_per_unit).toLocaleString()}/{unit}
+                                  </div>
+                                  <div className="text-xs opacity-60 mt-1">
+                                    {harvestReady ? (
+                                      <span className="text-green-400 font-medium">Eligible for evidence submission & trade conversion.</span>
+                                    ) : (
+                                      <span>Waiting for expected harvest date or <em>Declare Harvest Available</em>.</span>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="flex gap-2">

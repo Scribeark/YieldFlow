@@ -26,7 +26,7 @@ export default function SellerDashboard() {
           <Button size="lg" className="shadow-md">+ Create Listing</Button>
         </Link>
         <Link href="/dashboard/seller/bids">
-          <Button size="lg" variant="secondary">Manage Bids</Button>
+          <Button size="lg" variant="secondary">Bulk Bidding Sale</Button>
         </Link>
       </div>
 
@@ -34,15 +34,15 @@ export default function SellerDashboard() {
         <Link href="/dashboard/seller/requests" className="block h-full">
           <DashboardCard
             title="My Requests"
-            description="View and track your active trade requests. Upload evidence and manage ongoing orders."
+            description="View and track your active trade requests. Upload camera evidence and manage ongoing orders."
             className="h-full hover:-translate-y-1 transition-transform cursor-pointer"
           />
         </Link>
 
         <Link href="/dashboard/seller/bids" className="block h-full">
           <DashboardCard
-            title="Bid Management"
-            description="Review buyer bids on your harvest opportunities. Accept, partially accept, or reject bids."
+            title="Bulk Bidding Sale"
+            description="Review buyer bids on your harvest opportunities. Accept provisional agreements, negotiate, and declare harvest availability."
             className="h-full hover:-translate-y-1 transition-transform cursor-pointer"
           />
         </Link>
@@ -51,14 +51,6 @@ export default function SellerDashboard() {
           <DashboardCard
             title="Active Buyer Demands"
             description="View incoming requests from buyers and respond with your available harvest supply."
-            className="h-full hover:-translate-y-1 transition-transform cursor-pointer"
-          />
-        </Link>
-
-        <Link href="/dashboard/seller/device-readings" className="block h-full">
-          <DashboardCard
-            title="Farm & IoT Devices"
-            description="Register farms, connect IoT sensors, monitor crop readiness scores, and track telemetry readings."
             className="h-full hover:-translate-y-1 transition-transform cursor-pointer"
           />
         </Link>

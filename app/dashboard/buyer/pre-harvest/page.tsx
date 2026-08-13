@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+
 import { PageContainer } from '@/components/ui/PageContainer';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -10,99 +11,46 @@ import { createClient } from '@/lib/supabase/client';
 import { getHarvestOpportunities } from '@/lib/api/buyer';
 import { HarvestBidModal } from '@/components/buyer/HarvestBidModal';
 import {
-  Sprout, MapPin, Loader2, ArrowRight, Layers, CalendarDays,
-  CheckCircle, RefreshCw, Clock, Calendar, Lock,
+  Sprout, MapPin, Loader2, ArrowRight, Layers,
+  CheckCircle, RefreshCw, Calendar, Lock,
 } from 'lucide-react';
-
-// ── Schedule display helpers ──────────────────────────────────────────────────
 
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
 }
 
-function countdown(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const diff = new Date(iso).getTime() - Date.now();
-  const abs = Math.abs(diff);
-  const mins = Math.floor(abs / 60_000);
-  const hours = Math.floor(abs / 3_600_000);
-  const days = Math.floor(abs / 86_400_000);
-  const label =
-    days > 0 ? `${days}d` :
-    hours > 0 ? `${hours}h` :
-    mins > 0 ? `${mins}m` : 'now';
-  return diff > 0 ? `in ${label}` : `${label} ago`;
-}
-
-/**
- * Returns whether a buyer can currently place a bid based on the schedule
- * embedded in the opportunity.
- */
 function canBidNow(opp: any): { ok: boolean; reason?: string } {
-  const now = Date.now();
-
-  // Rejected statuses — never biddable
   if (['CANCELLED', 'CLOSED', 'CONVERTED_TO_TRADE'].includes(opp.bidding_status)) {
     return { ok: false, reason: `This sale is ${opp.bidding_status.replace(/_/g, ' ').toLowerCase()}.` };
   }
-
-  // Scheduled — opening in the future
-  if (opp.bidding_status === 'SCHEDULED') {
-    const openAt = opp.sale_open_at ? new Date(opp.sale_open_at).getTime() : null;
-    if (openAt && openAt > now) {
-      return { ok: false, reason: `Bidding opens ${countdown(opp.sale_open_at)}.` };
-    }
-  }
-
-  // Closing date already passed
-  if (opp.sale_close_at && new Date(opp.sale_close_at).getTime() < now) {
-    return { ok: false, reason: `Bidding closed ${countdown(opp.sale_close_at)}.` };
-  }
-
   return { ok: true };
 }
 
-// ── Schedule Info Row ─────────────────────────────────────────────────────────
-
-function ScheduleRow({ opp }: { opp: any }) {
-  const { sale_open_at, sale_close_at, seller_maturity_at } = opp;
-  if (!sale_open_at && !sale_close_at && !seller_maturity_at) return null;
+function HarvestTimelineRow({ opp }: { opp: any }) {
+  const { seller_maturity_at, seller_note } = opp;
+  if (!seller_maturity_at && !seller_note) return null;
 
   return (
     <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5 text-xs">
       <div className="font-bold uppercase tracking-wider opacity-50 flex items-center gap-1 mb-1">
-        <Calendar size={11} /> Schedule
+        <Calendar size={11} /> Harvest Information
       </div>
-      {sale_open_at && (
-        <div className="flex items-center gap-1.5 opacity-80">
-          <Clock size={10} className="flex-shrink-0" />
-          <span className="opacity-60">Opens:</span>
-          <span className="font-medium">{fmtDate(sale_open_at)}</span>
-          <span className="opacity-50">({countdown(sale_open_at)})</span>
-        </div>
-      )}
-      {sale_close_at && (
-        <div className="flex items-center gap-1.5 opacity-80">
-          <Clock size={10} className="flex-shrink-0" />
-          <span className="opacity-60">Closes:</span>
-          <span className="font-medium">{fmtDate(sale_close_at)}</span>
-          <span className="opacity-50">({countdown(sale_close_at)})</span>
-        </div>
-      )}
       {seller_maturity_at && (
         <div className="flex items-center gap-1.5 opacity-80">
           <Calendar size={10} className="flex-shrink-0" />
-          <span className="opacity-60">Maturity:</span>
+          <span className="opacity-60">Expected Harvest:</span>
           <span className="font-medium">{fmtDate(seller_maturity_at)}</span>
-          <span className="opacity-50">({countdown(seller_maturity_at)})</span>
+        </div>
+      )}
+      {seller_note && (
+        <div className="pt-1 text-xs opacity-70 italic">
+          {seller_note}
         </div>
       )}
     </div>
   );
 }
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function BuyerHarvestOpportunitiesPage() {
   const supabase = createClient();
@@ -162,12 +110,11 @@ export default function BuyerHarvestOpportunitiesPage() {
             return (
               <Card key={opp.id} className="flex flex-col h-full border-t-4 border-t-[var(--agri-primary)] hover:shadow-lg hover:shadow-[var(--agri-primary)]/10 transition-all">
                 <div className="flex justify-between items-start mb-4 flex-wrap gap-2">
-                  {/* Origin badge — seller listing only */}
                   <span className="bg-purple-500/20 text-purple-400 text-xs px-2 py-1 rounded font-bold uppercase tracking-wider flex items-center">
                     <Layers size={11} className="mr-1" /> Bulk Bidding Sale
                   </span>
                   <span className="text-xs opacity-60 flex items-center">
-                    <CalendarDays size={12} className="mr-1" /> {new Date(opp.created_at).toLocaleDateString()}
+                    <Calendar size={12} className="mr-1" /> Listed {new Date(opp.created_at).toLocaleDateString()}
                   </span>
                 </div>
 
@@ -204,18 +151,9 @@ export default function BuyerHarvestOpportunitiesPage() {
                     </div>
                   </div>
 
-                  {/* Schedule row */}
-                  <ScheduleRow opp={opp} />
-
-                  {/* Seller note */}
-                  {opp.seller_note && (
-                    <div className="mt-3 pt-3 border-t border-white/10 text-xs opacity-70 italic">
-                      {opp.seller_note}
-                    </div>
-                  )}
+                  <HarvestTimelineRow opp={opp} />
                 </div>
 
-                {/* Bid button — disabled when outside schedule window */}
                 <div className="mt-auto">
                   {bidCheck.ok ? (
                     <Button
@@ -232,7 +170,7 @@ export default function BuyerHarvestOpportunitiesPage() {
                   ) : (
                     <div className="space-y-1.5">
                       <Button variant="secondary" className="w-full opacity-50 cursor-not-allowed" disabled>
-                        <Lock size={14} className="mr-1" /> Bidding Unavailable
+                        <Lock size={14} className="mr-1" /> Bidding Closed
                       </Button>
                       <p className="text-xs text-center opacity-60">{bidCheck.reason}</p>
                     </div>
