@@ -2,7 +2,7 @@ export const ROLES = {
   FARMER: 'Smallholder Farmer',
   TRADER: 'Commodity Trader',
   CARRIER: 'Logistics Carrier',
-  BUYER: 'Enterprise Buyer'
+  BUYER: 'Commercial Buyer'
 } as const;
 
 export type UserRole = typeof ROLES[keyof typeof ROLES];

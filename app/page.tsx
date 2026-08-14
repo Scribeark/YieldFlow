@@ -43,7 +43,7 @@ export default function LandingPage() {
           </Card>
           
           <Card className="flex flex-col h-full text-center hover:-translate-y-1 transition-transform">
-            <h3 className="text-xl font-bold mb-3" style={{ color: '#3b82f6' }}>Enterprise Buyer</h3>
+            <h3 className="text-xl font-bold mb-3" style={{ color: '#3b82f6' }}>Commercial Buyer</h3>
             <p className="text-sm flex-grow mb-6" style={{ color: 'var(--foreground-dim)' }}>
               Source verified agricultural commodities directly from producers with full traceability.
             </p>

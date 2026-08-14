@@ -303,7 +303,7 @@ export async function saveBulkSale(
 export async function updateBulkSaleSchedule(
   supabase: SupabaseClient<any>,
   params: {
-    predictionId: string;
+    listingId: string;
     saleOpenAt?: string | null;
     saleCloseAt?: string | null;
     sellerMaturityAt?: string | null;
@@ -311,7 +311,7 @@ export async function updateBulkSaleSchedule(
   }
 ) {
   const { data, error } = await supabase.rpc('rpc_update_bulk_sale_schedule', {
-    p_prediction_id: params.predictionId,
+    p_listing_id: params.listingId,
     p_sale_open_at: params.saleOpenAt || null,
     p_sale_close_at: params.saleCloseAt || null,
     p_seller_maturity_at: params.sellerMaturityAt || null,
@@ -325,10 +325,10 @@ export async function updateBulkSaleSchedule(
 /** Cancels a Bulk Bidding Sale listing. */
 export async function cancelBulkSale(
   supabase: SupabaseClient<any>,
-  predictionId: string
+  listingId: string
 ) {
   const { data, error } = await supabase.rpc('rpc_cancel_bulk_sale', {
-    p_prediction_id: predictionId,
+    p_listing_id: listingId,
   });
   if (error) return { data: null, error };
   if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to cancel bulk sale') };
@@ -338,10 +338,10 @@ export async function cancelBulkSale(
 /** Returns the effective sale status, resolving scheduled → open / open → closed transitions. */
 export async function getEffectiveSaleStatus(
   supabase: SupabaseClient<any>,
-  predictionId: string
+  listingId: string
 ) {
   const { data, error } = await supabase.rpc('rpc_get_effective_sale_status', {
-    p_prediction_id: predictionId,
+    p_listing_id: listingId,
   });
   if (error) return { data: null, error };
   return { data, error: null };
@@ -402,7 +402,7 @@ export async function allocateHarvestBid(
 export async function confirmPredictedHarvest(
   supabase: SupabaseClient<any>,
   params: {
-    predictionId: string;
+    listingId: string;
     finalQuantity: number;
     pickupAddress: string;
     pickupLatitude: number;
@@ -410,7 +410,7 @@ export async function confirmPredictedHarvest(
   }
 ) {
   const { data, error } = await supabase.rpc('rpc_confirm_predicted_harvest', {
-    p_prediction_id: params.predictionId,
+    p_listing_id: params.listingId,
     p_final_quantity: params.finalQuantity,
     p_pickup_address: params.pickupAddress,
     p_pickup_latitude: params.pickupLatitude,
@@ -422,10 +422,10 @@ export async function confirmPredictedHarvest(
 /** Converts all ACCEPTED/PARTIALLY_ACCEPTED bids into EVIDENCE_PENDING trade_requests. */
 export async function convertBidsToTrades(
   supabase: SupabaseClient<any>,
-  predictionId: string
+  listingId: string
 ) {
   const { data, error } = await supabase.rpc('rpc_convert_bids_to_trades', {
-    p_prediction_id: predictionId
+    p_listing_id: listingId
   });
   return { data, error };
 }
@@ -456,10 +456,10 @@ export async function recordFarmActivity(
 
 export async function getBuyerFarmActivitySummary(
   supabase: SupabaseClient<any>,
-  predictionId: string
+  listingId: string
 ) {
   const { data, error } = await supabase.rpc('rpc_get_buyer_farm_activity_summary', {
-    p_prediction_id: predictionId
+    p_listing_id: listingId
   });
   if (error) return { data: null, error };
   if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to load activity summary') };
@@ -472,14 +472,14 @@ export async function getBuyerFarmActivitySummary(
 export async function placeHarvestBid(
   supabase: SupabaseClient<any>,
   params: {
-    predictionId: string;
+    listingId: string;
     desiredQuantity: number;
     offeredPricePerUnit: number;
     buyerMessage?: string;
   }
 ) {
   const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
-    p_prediction_id: params.predictionId,
+    p_listing_id: params.listingId,
     p_desired_quantity: params.desiredQuantity,
     p_offered_price_per_unit: params.offeredPricePerUnit,
     p_buyer_message: params.buyerMessage || null
@@ -546,17 +546,17 @@ export async function getBidNegotiationEvents(supabase: SupabaseClient<any>, bid
   return { data: arr, error: null };
 }
 
-export async function declareHarvestAvailable(supabase: SupabaseClient<any>, predictionId: string) {
+export async function declareHarvestAvailable(supabase: SupabaseClient<any>, listingId: string) {
   const { data, error } = await supabase.rpc('rpc_declare_harvest_available', {
-    p_prediction_id: predictionId
+    p_listing_id: listingId
   });
   if (error) return { data: null, error };
   if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to declare harvest available') };
   return { data, error: null };
 }
 
-export async function confirmCropReadiness(supabase: SupabaseClient<any>, predictionId: string) {
-  return declareHarvestAvailable(supabase, predictionId);
+export async function confirmCropReadiness(supabase: SupabaseClient<any>, listingId: string) {
+  return declareHarvestAvailable(supabase, listingId);
 }
 
 export async function cancelProvisionalAgreement(supabase: SupabaseClient<any>, bidId: string, reason?: string) {

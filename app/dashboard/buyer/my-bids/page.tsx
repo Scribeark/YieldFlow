@@ -423,7 +423,7 @@ export default function BuyerMyBidsPage() {
     <PageContainer>
       <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>My Bids</h1>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--foreground)' }}>My Offers</h1>
           <p className="opacity-70 mt-1">Track the status of your harvest bids across the full lifecycle.</p>
         </div>
         <Button variant="ghost" size="sm" onClick={load} disabled={loading}>

@@ -74,7 +74,7 @@ export async function getMyBids(supabase: SupabaseClient<any>) {
 export async function placeHarvestBid(
   supabase: SupabaseClient<any>,
   params: {
-    predictionId: string;
+    listingId: string;
     quantity: number;
     pricePerUnit: number;
     buyerMessage?: string;
@@ -83,7 +83,7 @@ export async function placeHarvestBid(
   // Parameter names must match the RPC signature exactly:
   // rpc_place_harvest_bid(p_prediction_id, p_desired_quantity, p_offered_price_per_unit, p_buyer_message)
   const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
-    p_prediction_id: params.predictionId,
+    p_listing_id: params.listingId,
     p_desired_quantity: params.quantity,
     p_offered_price_per_unit: params.pricePerUnit,
     p_buyer_message: params.buyerMessage ?? null

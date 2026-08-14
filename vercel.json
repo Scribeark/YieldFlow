@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/auto-activate-harvests",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

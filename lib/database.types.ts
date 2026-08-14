@@ -9,6 +9,59 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
+      bulk_offtake_listings: {
+        Row: {
+          id: string
+          seller_id: string
+          farm_id: string | null
+          crop_type: string
+          listed_quantity: number
+          quantity_unit: string
+          asking_price_per_unit: number
+          planting_date: string | null
+          expected_harvest_at: string
+          pickup_address: string | null
+          pickup_latitude: number | null
+          pickup_longitude: number | null
+          seller_note: string | null
+          listing_status: string
+          harvest_available_at: string | null
+          availability_source: string | null
+          availability_declared_by: string | null
+          evidence_status: string | null
+          harvest_photo_url: string | null
+          evidence_verified_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          seller_id: string
+          farm_id?: string | null
+          crop_type: string
+          listed_quantity: number
+          quantity_unit: string
+          asking_price_per_unit: number
+          planting_date?: string | null
+          expected_harvest_at: string
+          pickup_address?: string | null
+          pickup_latitude?: number | null
+          pickup_longitude?: number | null
+          seller_note?: string | null
+          listing_status?: string
+          harvest_available_at?: string | null
+          availability_source?: string | null
+          availability_declared_by?: string | null
+          evidence_status?: string | null
+          harvest_photo_url?: string | null
+          evidence_verified_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['bulk_offtake_listings']['Insert']>
+        Relationships: []
+      }
+
       
       farm_activity_logs: {
         Row: {
@@ -278,7 +331,8 @@ export interface Database {
       harvest_bids: {
         Row: {
           id: string
-          prediction_id: string
+          listing_id: string | null
+          bulk_offtake_listing_id: string | null
           buyer_id: string
           bid_status: string
           desired_quantity: number
@@ -289,7 +343,8 @@ export interface Database {
         }
         Insert: {
           id?: string
-          prediction_id: string
+          listing_id: string | null
+          bulk_offtake_listing_id: string | null
           buyer_id: string
           bid_status?: string
           desired_quantity: number
@@ -307,7 +362,7 @@ export interface Database {
           auth_uid: string | null
           full_name: string
           phone_number: string
-          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Enterprise Buyer'
+          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Commercial Buyer'
           age: number
           gender: string
           macro_region: string
@@ -323,7 +378,7 @@ export interface Database {
           auth_uid?: string | null
           full_name: string
           phone_number: string
-          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Enterprise Buyer'
+          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Commercial Buyer'
           age: number
           gender: string
           macro_region: string

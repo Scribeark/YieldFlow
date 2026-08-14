@@ -143,7 +143,7 @@ export default function SignupPage() {
               <option value={ROLES.FARMER}>Smallholder Farmer</option>
               <option value={ROLES.TRADER}>Commodity Trader</option>
               <option value={ROLES.CARRIER}>Logistics Carrier</option>
-              <option value={ROLES.BUYER}>Enterprise Buyer</option>
+              <option value={ROLES.BUYER}>Commercial Buyer</option>
             </Select>
             <p className="mt-1 text-xs" style={{ color: 'var(--foreground-dim)' }}>Note: Your role is permanent and cannot be changed later.</p>
           </div>

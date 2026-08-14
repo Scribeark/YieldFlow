@@ -90,7 +90,7 @@ export async function bootstrapFirstAdmin(data: any) {
     auth_uid: authData.user.id,
     full_name: fullName,
     phone_number: phoneNumber,
-    declared_profession: 'Enterprise Buyer', // Default base role
+    declared_profession: 'Commercial Buyer', // Default base role
     app_role: 'admin',
     verification_status: 'approved',
     age: 30,
@@ -135,7 +135,7 @@ export async function adminSignup(data: any) {
     auth_uid: authData.user.id,
     full_name: fullName,
     phone_number: '0000000000', // Safe default
-    declared_profession: 'Enterprise Buyer', // Safe placeholder
+    declared_profession: 'Commercial Buyer', // Safe placeholder
     app_role: 'admin',
     verification_status: 'approved',
     age: 30, // Safe default
