@@ -5,17 +5,10 @@
  *
  * Modal that collects delivery address + coordinates from the buyer
  * before calling rpc_confirm_order.
- *
- * Supports two resolution strategies:
- *   1. Browser GPS (navigator.geolocation)
- *   2. Address input → Google Geocoding API
- *
- * Emits the resolved location via onConfirm callback.
- * Does NOT call rpc_confirm_order directly — caller handles that.
  */
 
 import React, { useState } from 'react';
-import { geocodeAddress } from '@/lib/maps/googleMaps';
+import { geocodeAddress, reverseGeocode } from '@/lib/maps/googleMaps';
 import { MapPin, Navigation, AlertCircle, X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 
@@ -64,9 +57,9 @@ export function DeliveryLocationModal({ apiKey, listing, onConfirm, onCancel, is
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         // Reverse geocode to get a readable address
-        const result = await geocodeAddress(`${lat},${lng}`, apiKey);
+        const formattedAddress = await reverseGeocode(lat, lng, apiKey);
         setResolved({
-          address: result?.address ?? `${lat.toFixed(5)}, ${lng.toFixed(5)}`,
+          address: formattedAddress || 'Current GPS Location (Coordinates captured)',
           lat,
           lng,
         });
@@ -74,7 +67,7 @@ export function DeliveryLocationModal({ apiKey, listing, onConfirm, onCancel, is
       },
       (err) => {
         console.warn('GPS error:', err);
-        setError('Could not get GPS location. Please enter your address instead.');
+        setError('Could not get GPS location. Please enter your delivery address manually.');
         setMode('address');
         setGpsLoading(false);
       },
@@ -157,9 +150,8 @@ export function DeliveryLocationModal({ apiKey, listing, onConfirm, onCancel, is
               className="w-full"
               onClick={handleGps}
               disabled={gpsLoading}
-              isLoading={gpsLoading}
             >
-              {gpsLoading ? 'Getting Location…' : 'Detect My Location'}
+              {gpsLoading ? <><Loader2 className="animate-spin mr-2" size={16} />Detecting Location…</> : 'Detect My Location'}
             </Button>
           )}
 
@@ -174,8 +166,8 @@ export function DeliveryLocationModal({ apiKey, listing, onConfirm, onCancel, is
                 placeholder="e.g. Kano City Market, Kano State"
                 className="flex-1 px-3 py-2 rounded-lg border border-[var(--border-color,#e5e7eb)] text-sm bg-transparent focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <Button onClick={handleGeocode} disabled={geocoding || !addressInput.trim()} isLoading={geocoding} className="shrink-0">
-                Find
+              <Button onClick={handleGeocode} disabled={geocoding || !addressInput.trim()} className="shrink-0">
+                {geocoding ? <Loader2 className="animate-spin" size={16} /> : 'Find'}
               </Button>
             </div>
           )}
@@ -212,7 +204,6 @@ export function DeliveryLocationModal({ apiKey, listing, onConfirm, onCancel, is
             <Button
               className="flex-1"
               disabled={!canConfirm || isLoading}
-              isLoading={isLoading}
               onClick={() => resolved && onConfirm(resolved, isUssd && ussdChecked)}
             >
               {isLoading ? 'Confirming…' : 'Confirm Order'}

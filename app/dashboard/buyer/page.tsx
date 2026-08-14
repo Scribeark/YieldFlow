@@ -27,7 +27,7 @@ export default function BuyerDashboard() {
         <div className="mb-4 md:mb-0">
           <h2 className="text-2xl font-bold mb-2">Purchase Verified Harvests</h2>
           <p className="opacity-90 max-w-xl">
-            Browse trade requests submitted directly by farmers and commodity traders. All listings require authentic photo evidence.
+            Browse trade requests submitted directly by farmers and commodity traders. All listings require an authentic Harvest Confirmation Photo.
           </p>
         </div>
         <Link href="/dashboard/buyer/buy">

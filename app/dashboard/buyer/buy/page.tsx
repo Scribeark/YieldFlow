@@ -213,7 +213,7 @@ function BuyPageClient({ apiKey }: BuyPageClientProps) {
                           <>
                             <p className="text-xs text-amber-600 font-medium flex items-center mb-2">
                               <AlertTriangle className="h-3 w-3 mr-1 shrink-0" />
-                              Purchase disabled: No photo evidence
+                              Purchase disabled: No Harvest Confirmation Photo
                             </p>
                             <Button className="w-full" disabled>Confirm & Claim Order</Button>
                           </>

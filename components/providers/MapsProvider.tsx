@@ -35,5 +35,11 @@ export function MapsProvider({
 
 /** Use this hook in any Client Component that needs the Maps API key. */
 export function useMapsKey(): string {
-  return useContext(MapsKeyContext);
+  const contextKey = useContext(MapsKeyContext);
+  return (
+    contextKey ||
+    process.env.NEXT_PUBLIC_MAPS_PLATFORM_API_KEY ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+    ''
+  );
 }

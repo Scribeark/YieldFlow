@@ -34,7 +34,7 @@ const CANCELLATION_REASONS = [
 const getStageTooltip = (status: string) => {
   switch (status) {
     case 'AWAITING_BUYER':      return 'Listing is open and awaiting buyer confirmation.';
-    case 'EVIDENCE_PENDING':    return 'Evidence or exemption is required before buyer confirmation.';
+    case 'EVIDENCE_PENDING':    return 'Harvest Confirmation Photo is required before buyer confirmation.';
     case 'SEARCHING_LOGISTICS': return 'Buyer and seller agreement is confirmed. Waiting for a logistics provider.';
     case 'ALLOCATED':           return 'Logistics provider has accepted the job. Awaiting pickup confirmation from both seller and carrier.';
     case 'DISPATCHED':          return 'Both seller and carrier have confirmed pickup. Goods are in transit. Normal cancellation is blocked.';
@@ -102,7 +102,7 @@ export default function MyRequestsPage() {
   const handleUpload = async (reqId: string) => {
     if (!profile || !file) return;
     setIsUploading(true);
-    setUploadStatus({ id: reqId, message: 'Uploading photo...', type: 'info' });
+    setUploadStatus({ id: reqId, message: 'Uploading Harvest Confirmation Photo...', type: 'info' });
     const { url, error: uploadError } = await uploadHarvestPhoto(supabase, file, profile.id);
     if (uploadError) {
       setUploadStatus({ id: reqId, message: `Failed to upload: ${uploadError.message}`, type: 'error' });
@@ -111,11 +111,11 @@ export default function MyRequestsPage() {
     }
     const { error: rpcError } = await uploadEvidence(supabase, reqId, url!);
     if (rpcError) {
-      setUploadStatus({ id: reqId, message: `Failed to save evidence: ${rpcError.message}`, type: 'error' });
+      setUploadStatus({ id: reqId, message: `Failed to save photo: ${rpcError.message}`, type: 'error' });
       setIsUploading(false);
       return;
     }
-    setUploadStatus({ id: reqId, message: 'Evidence uploaded. The buyer must now review and final-confirm the order.', type: 'success' });
+    setUploadStatus({ id: reqId, message: 'Harvest Confirmation Photo uploaded. The buyer must now review and final-confirm the order.', type: 'success' });
     setIsUploading(false);
     setFile(null);
     setActiveUploadId(null);

@@ -108,6 +108,44 @@ export async function cancelAcceptedHarvestBid(supabase: SupabaseClient<any>, bi
   return { data, error: null };
 }
 
+/**
+ * Buyer reviews the Harvest Confirmation Photo uploaded by the seller.
+ * If APPROVED -> establishes the trade and activates SEARCHING_LOGISTICS.
+ * If REJECTED -> preserves agreement and allows seller to upload a replacement photo.
+ */
+export async function reviewHarvestPhoto(
+  supabase: SupabaseClient<any>,
+  params: {
+    bidId: string;
+    decision: 'APPROVED' | 'REJECTED';
+    reason?: string;
+  }
+) {
+  // 1. Try rpc_review_buyer_evidence
+  const { data, error } = await supabase.rpc('rpc_review_buyer_evidence', {
+    p_bid_id: params.bidId,
+    p_decision: params.decision,
+    p_reason: params.reason || null,
+  });
+
+  if (!error && data?.success !== false) {
+    return { data, error: null };
+  }
+
+  // 2. Try rpc_review_harvest_evidence
+  const { data: altData, error: altErr } = await supabase.rpc('rpc_review_harvest_evidence', {
+    p_bid_id: params.bidId,
+    p_decision: params.decision,
+    p_reason: params.reason || null,
+  });
+
+  if (!altErr && altData?.success !== false) {
+    return { data: altData, error: null };
+  }
+
+  return { data: null, error: altErr || error };
+}
+
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {
   const { data, error } = await supabase.rpc('rpc_get_buyer_harvest_opportunities');
   return { data, error };

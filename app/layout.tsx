@@ -34,8 +34,11 @@ export default function RootLayout({
   // Read the Maps API key server-side. The key is passed to the MapsProvider
   // Client Component, making it available to the browser via context.
   // It will be visible in the browser (required by Maps JavaScript).
-  // Restrict this key in Google Cloud Console with HTTP referrer restrictions.
-  const mapsApiKey = process.env.Maps_Platform_API_Key ?? '';
+  const mapsApiKey =
+    process.env.NEXT_PUBLIC_MAPS_PLATFORM_API_KEY ||
+    process.env.Maps_Platform_API_Key ||
+    process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+    '';
 
   return (
     <html lang="en" suppressHydrationWarning className="h-full antialiased font-sans">
