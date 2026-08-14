@@ -336,29 +336,7 @@ export async function getSellerBidListings(
     return { data: null, error: v8Error };
   }
 
-  // 2. Secondary: Load migrated/historical harvest_predictions (if any exist for this seller's farms)
-  let historicalListings: any[] = [];
-  try {
-    const { data: farms } = await supabase
-      .from('farms')
-      .select('id')
-      .eq('user_id', userId);
-
-    if (farms && farms.length > 0) {
-      const farmIds = farms.map((f: any) => f.id);
-      const { data: v6Data } = await supabase
-        .from('harvest_predictions')
-        .select('*, farms(id, name, physical_address, latitude, longitude, user_id), farm_crop_allocations(crop_type), harvest_bids(*, buyer_profile:buyer_id(full_name, phone_number))')
-        .in('farm_id', farmIds)
-        .order('created_at', { ascending: false });
-
-      if (v6Data) historicalListings = v6Data;
-    }
-  } catch (e) {
-    console.warn('Historical listings lookup error:', e);
-  }
-
-  // 3. Normalize V8 listings to unified schema
+  // 2. Normalize V8 listings to unified schema
   const normalisedV8 = (v8Listings || []).map((l: any) => ({
     id: l.id,
     is_v8: true,
@@ -379,6 +357,7 @@ export async function getSellerBidListings(
     seller_note: l.seller_note,
     listing_status: l.listing_status || 'OPEN',
     bidding_status: l.listing_status || 'OPEN',
+    seller_hidden: l.seller_hidden ?? false,
     harvest_available_at: l.harvest_available_at,
     availability_source: l.availability_source,
     availability_declared_by: l.availability_declared_by,
@@ -391,42 +370,7 @@ export async function getSellerBidListings(
     trade_requests: l.trade_requests || [],
   }));
 
-  // 4. Normalize legacy V6 listings
-  const normalisedV6 = (historicalListings || [])
-    .filter((hp: any) => !normalisedV8.some((v8: any) => v8.id === hp.id))
-    .map((hp: any) => ({
-      id: hp.id,
-      is_v8: false,
-      seller_id: hp.farms?.user_id || userId,
-      crop_type: hp.farm_crop_allocations?.crop_type || hp.crop_type || 'Crop',
-      listed_quantity: Number(hp.expected_quantity_volume || hp.expected_quantity_max || 0),
-      expected_quantity_volume: Number(hp.expected_quantity_volume || 0),
-      expected_quantity_max: Number(hp.expected_quantity_max || 0),
-      expected_quantity_unit: hp.expected_quantity_unit || 'units',
-      quantity_unit: hp.expected_quantity_unit || 'units',
-      asking_price_per_unit: Number(hp.asking_price_per_unit || hp.minimum_price_per_unit || 0),
-      expected_harvest_at: hp.seller_maturity_at || hp.created_at,
-      seller_maturity_at: hp.seller_maturity_at,
-      planting_date: null,
-      pickup_address: hp.farms?.physical_address,
-      pickup_latitude: hp.farms?.latitude,
-      pickup_longitude: hp.farms?.longitude,
-      seller_note: hp.seller_note,
-      listing_status: hp.bidding_status || 'OPEN',
-      bidding_status: hp.bidding_status || 'OPEN',
-      harvest_available_at: hp.harvest_available_at,
-      availability_source: hp.availability_source,
-      availability_declared_by: hp.availability_declared_by,
-      evidence_status: hp.evidence_status || 'PENDING',
-      harvest_photo_url: hp.harvest_photo_url,
-      evidence_verified_at: hp.evidence_verified_at,
-      created_at: hp.created_at,
-      updated_at: hp.updated_at,
-      harvest_bids: hp.harvest_bids || [],
-      trade_requests: [],
-    }));
-
-  return { data: [...normalisedV8, ...normalisedV6], error: null };
+  return { data: normalisedV8, error: null };
 }
 
 // ── V8 Negotiation RPCs ─────────────────────────────────────────────────────
