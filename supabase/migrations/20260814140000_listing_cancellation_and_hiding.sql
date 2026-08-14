@@ -4,7 +4,7 @@ BEGIN;
 -- Phase 2: Database-Level Listing Cancellation, Hiding & Soft Delete
 -- ============================================================================
 
--- 1. Ensure soft-delete and cancellation tracking columns exist
+-- 1. Ensure soft-delete and cancellation tracking columns exist on bulk_offtake_listings
 ALTER TABLE public.bulk_offtake_listings
   ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS cancelled_by UUID REFERENCES public.users(id),
@@ -26,6 +26,7 @@ DECLARE
   v_listing public.bulk_offtake_listings%ROWTYPE;
   v_has_active_trades BOOLEAN;
   v_buyer_rec RECORD;
+  v_reason_clean TEXT;
 BEGIN
   -- 1. Verify Authentication
   SELECT id INTO v_actor_id FROM public.users WHERE auth_uid = auth.uid();
@@ -62,6 +63,8 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'Cannot cancel listing: Active trade fulfilment or logistics dispatch is already underway.');
   END IF;
 
+  v_reason_clean := COALESCE(NULLIF(BTRIM(p_reason), ''), 'No reason provided');
+
   -- 4. Update listing status to CANCELLED atomically
   UPDATE public.bulk_offtake_listings
   SET listing_status = 'CANCELLED',
@@ -78,9 +81,7 @@ BEGIN
       bid_status = 'CANCELLED',
       cancelled_at = NOW(),
       cancelled_by = v_actor_id,
-      cancellation_reason =
-        'Bulk listing cancelled by seller: ' ||
-        COALESCE(NULLIF(BTRIM(p_reason), ''), 'No reason provided'),
+      cancellation_reason = 'Bulk listing cancelled by seller: ' || v_reason_clean,
       updated_at = NOW()
     WHERE bulk_offtake_listing_id = p_listing_id
       AND bid_status IN (
@@ -119,18 +120,31 @@ BEGIN
     'CANCELLED',
     event_quantity,
     event_price,
-    'Listing cancelled by seller: ' ||
-      COALESCE(NULLIF(BTRIM(p_reason), ''), 'No reason provided'),
+    'Listing cancelled by seller: ' || v_reason_clean,
     NOW()
   FROM cancelled_bids;
 
-  -- 7. Notify affected buyers
+  -- 7. Update associated pre-logistics trade requests to CANCELLED
+  UPDATE public.trade_requests
+  SET request_status = 'CANCELLED',
+      cancelled_at = NOW(),
+      cancelled_by = v_actor_id,
+      cancellation_reason = 'Bulk listing cancelled by seller: ' || v_reason_clean,
+      updated_at = NOW()
+  WHERE bulk_offtake_listing_id = p_listing_id
+    AND request_status IN ('AWAITING_BUYER', 'EVIDENCE_PENDING');
+
+  -- 8. Notify affected buyers (deduplicated across bids and pre-logistics trade requests)
   FOR v_buyer_rec IN (
-    SELECT DISTINCT buyer_id 
-    FROM public.harvest_bids 
-    WHERE bulk_offtake_listing_id = p_listing_id 
-      AND buyer_id IS NOT NULL 
-      AND buyer_id != v_actor_id
+    SELECT DISTINCT buyer_id
+    FROM (
+      SELECT buyer_id FROM public.harvest_bids
+      WHERE bulk_offtake_listing_id = p_listing_id AND buyer_id IS NOT NULL
+      UNION
+      SELECT buyer_id FROM public.trade_requests
+      WHERE bulk_offtake_listing_id = p_listing_id AND buyer_id IS NOT NULL
+    ) all_buyers
+    WHERE buyer_id != v_actor_id
   ) LOOP
     INSERT INTO public.notifications (
       recipient_id, actor_id, bulk_offtake_listing_id, event_type, message
@@ -185,6 +199,7 @@ $$;
 REVOKE ALL ON FUNCTION public.rpc_hide_bulk_offtake_listing(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.rpc_hide_bulk_offtake_listing(UUID) TO authenticated;
 
-COMMIT;
-
+-- Notify PostgREST schema cache reload before transaction commit
 NOTIFY pgrst, 'reload schema';
+
+COMMIT;
