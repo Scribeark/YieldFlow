@@ -92,12 +92,7 @@ export default function SignupPage() {
       }
       
       // 4. Derive correct destination from the specific chosen role
-      const destination = ROLE_ROUTES[formData.declared_profession as UserRole];
-      if (!destination) {
-        setError(`Invalid role selected. Could not determine dashboard destination.`);
-        setIsLoading(false);
-        return;
-      }
+      const destination = ROLE_ROUTES[formData.declared_profession as string] || '/unauthorized';
 
       router.push(destination);
     } catch (err: unknown) {

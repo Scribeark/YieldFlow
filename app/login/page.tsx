@@ -68,7 +68,7 @@ export default function LoginPage() {
     }
 
     // 3. Derive destination from confirmed declared_profession
-    const destination = ROLE_ROUTES[currentProfile.declared_profession];
+    const destination = ROLE_ROUTES[currentProfile.declared_profession as string] || '/unauthorized';
     router.push(destination);
   };
 

@@ -175,10 +175,11 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     if (!isPublicRoute && !profile) {
       router.push('/login');
     } else if (profile) {
-      const correctDashboard = ROLE_ROUTES[profile.declared_profession];
+      const correctDashboard = ROLE_ROUTES[profile.declared_profession as string] || '/unauthorized';
 
       // Allow /dashboard/settings for any authenticated user
       if (
+        pathname &&
         pathname.startsWith('/dashboard/') &&
         !pathname.startsWith('/dashboard/settings') &&
         !pathname.startsWith(correctDashboard)
@@ -194,8 +195,8 @@ export default function NavigationShell({ children }: { children: React.ReactNod
     return <div className="flex h-screen items-center justify-center">Loading...</div>;
   }
 
-  if (profile && pathname.startsWith('/dashboard/')) {
-    const correctDashboard = ROLE_ROUTES[profile.declared_profession];
+  if (profile && pathname && pathname.startsWith('/dashboard/')) {
+    const correctDashboard = ROLE_ROUTES[profile.declared_profession as string] || '/unauthorized';
     if (!pathname.startsWith('/dashboard/settings') && !pathname.startsWith(correctDashboard)) {
       return null;
     }
@@ -240,7 +241,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
           </>
         ) : null}
 
-        {profile.declared_profession === ROLES.BUYER ? (
+        {profile.declared_profession === ROLES.BUYER || profile.declared_profession === ROLES.LEGACY_BUYER ? (
           <>
             <Link href="/dashboard/buyer" className="hover:opacity-80 transition block py-2 md:py-0">
               Dashboard
@@ -298,7 +299,7 @@ export default function NavigationShell({ children }: { children: React.ReactNod
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <Link
-              href={profile ? ROLE_ROUTES[profile.declared_profession] : '/'}
+              href={profile ? (ROLE_ROUTES[profile.declared_profession as string] || '/') : '/'}
               className="text-xl font-bold whitespace-nowrap"
             >
               Agro-Data Hub
