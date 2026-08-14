@@ -67,32 +67,62 @@ BEGIN
   SET listing_status = 'CANCELLED',
       cancelled_at = NOW(),
       cancelled_by = v_actor_id,
-      cancellation_reason = COALESCE(p_reason, 'Cancelled by seller'),
+      cancellation_reason = COALESCE(NULLIF(BTRIM(p_reason), ''), 'Cancelled by seller'),
       updated_at = NOW()
   WHERE id = p_listing_id;
 
-  -- 5. Cancel eligible pending purchase offers and provisional agreements
-  UPDATE public.harvest_bids
-  SET bid_status = 'CANCELLED',
+  -- 5 & 6. Cancel eligible pending purchase offers and provisional agreements, logging events atomically
+  WITH cancelled_bids AS (
+    UPDATE public.harvest_bids
+    SET
+      bid_status = 'CANCELLED',
       cancelled_at = NOW(),
       cancelled_by = v_actor_id,
-      cancellation_reason = 'Bulk listing cancelled by seller: ' || COALESCE(p_reason, ''),
+      cancellation_reason =
+        'Bulk listing cancelled by seller: ' ||
+        COALESCE(NULLIF(BTRIM(p_reason), ''), 'No reason provided'),
       updated_at = NOW()
-  WHERE bulk_offtake_listing_id = p_listing_id
-    AND bid_status IN ('PENDING', 'BUYER_COUNTERED', 'SELLER_COUNTERED', 'ACCEPTED', 'PARTIALLY_ACCEPTED');
-
-  -- 6. Log cancellation negotiation events for audit history
+    WHERE bulk_offtake_listing_id = p_listing_id
+      AND bid_status IN (
+        'PENDING',
+        'BUYER_COUNTERED',
+        'SELLER_COUNTERED',
+        'ACCEPTED',
+        'PARTIALLY_ACCEPTED'
+      )
+    RETURNING
+      id,
+      COALESCE(
+        final_accepted_quantity,
+        accepted_quantity,
+        desired_quantity
+      ) AS event_quantity,
+      COALESCE(
+        final_accepted_price_per_unit,
+        offered_price_per_unit
+      ) AS event_price
+  )
   INSERT INTO public.bid_negotiation_events (
-    bid_id, actor_id, actor_role, event_type, message, created_at
+    bid_id,
+    actor_id,
+    actor_role,
+    event_type,
+    offered_quantity,
+    offered_price_per_unit,
+    message,
+    created_at
   )
   SELECT
-    id, v_actor_id, 'SELLER', 'CANCELLED',
-    'Listing cancelled by seller: ' || COALESCE(p_reason, 'Terms withdrawn'),
+    id,
+    v_actor_id,
+    'SELLER',
+    'CANCELLED',
+    event_quantity,
+    event_price,
+    'Listing cancelled by seller: ' ||
+      COALESCE(NULLIF(BTRIM(p_reason), ''), 'No reason provided'),
     NOW()
-  FROM public.harvest_bids
-  WHERE bulk_offtake_listing_id = p_listing_id
-    AND bid_status = 'CANCELLED'
-    AND cancelled_at >= NOW() - INTERVAL '5 seconds';
+  FROM cancelled_bids;
 
   -- 7. Notify affected buyers
   FOR v_buyer_rec IN (
