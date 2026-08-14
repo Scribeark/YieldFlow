@@ -362,7 +362,7 @@ export interface Database {
           auth_uid: string | null
           full_name: string
           phone_number: string
-          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Commercial Buyer'
+          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Commercial Buyer' | 'Enterprise Buyer'
           age: number
           gender: string
           macro_region: string
@@ -378,7 +378,7 @@ export interface Database {
           auth_uid?: string | null
           full_name: string
           phone_number: string
-          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Commercial Buyer'
+          declared_profession: 'Smallholder Farmer' | 'Commodity Trader' | 'Logistics Carrier' | 'Commercial Buyer' | 'Enterprise Buyer'
           age: number
           gender: string
           macro_region: string
