@@ -847,7 +847,7 @@ export default function SellerBulkBiddingSalePage() {
                               >
                                 <div>
                                   <div className="font-medium flex items-center gap-2">
-                                    <span>{bid?.buyer_profile?.full_name || 'Commercial Buyer'}</span>
+                                    <span>{bid?.buyer?.full_name || bid?.buyer_profile?.full_name || 'Commercial Buyer'}</span>
                                     <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded font-bold uppercase border border-green-500/30">
                                       Provisional Agreement Agreed
                                     </span>
@@ -909,7 +909,7 @@ export default function SellerBulkBiddingSalePage() {
                               >
                                 <div>
                                   <div className="text-sm font-medium">
-                                    {bid.buyer_profile?.full_name || 'Commercial Buyer'} · {bid.desired_quantity} {unit}
+                                    {bid?.buyer?.full_name || bid?.buyer_profile?.full_name || 'Commercial Buyer'} · {bid.desired_quantity} {unit}
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">

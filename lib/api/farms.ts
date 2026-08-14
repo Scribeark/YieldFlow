@@ -327,12 +327,13 @@ export async function getSellerBidListings(
   // 1. Primary: Load all V8 bulk_offtake_listings for this seller with their bids and buyer profiles
   const { data: v8Listings, error: v8Error } = await supabase
     .from('bulk_offtake_listings')
-    .select('*, harvest_bids(*, buyer_profile:buyer_id(full_name, phone_number)), trade_requests(*)')
+    .select('*, harvest_bids(*, buyer:users!buyer_id(full_name, phone_number)), trade_requests(*)')
     .eq('seller_id', userId)
     .order('created_at', { ascending: false });
 
   if (v8Error) {
-    console.warn('V8 listings fetch warning:', v8Error.message);
+    console.error('V8 listings fetch error:', v8Error);
+    return { data: null, error: v8Error };
   }
 
   // 2. Secondary: Load migrated/historical harvest_predictions (if any exist for this seller's farms)
