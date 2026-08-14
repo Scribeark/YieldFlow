@@ -362,7 +362,7 @@ export default function SellerBulkBiddingSalePage() {
     setError('');
     const { data, error: fetchError } = await getSellerBidListings(supabase, profile.id);
     if (fetchError) {
-      setError('Failed to load listings: ' + fetchError.message);
+      setError('Failed to load listings: ' + ((fetchError as any)?.message || 'Unknown error'));
     } else {
       setListings(data || []);
       if (data && data.length > 0 && !expandedId) {
@@ -392,7 +392,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingListingId(listingId);
     const { error } = await declareHarvestAvailable(supabase, listingId);
     if (error) {
-      notify(listingId, error.message, true);
+      notify(listingId, (error as any)?.message || 'Failed to declare harvest available', true);
     } else {
       notify(listingId, 'Harvest declared ready! You can now upload a Harvest Confirmation Photo.');
       await load();
@@ -404,7 +404,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingBidId(bidId);
     const { error } = await acceptOffer(supabase, bidId);
     if (error) {
-      notify(listingId, error.message, true);
+      notify(listingId, (error as any)?.message || 'Failed to accept offer', true);
     } else {
       notify(listingId, 'Purchase offer accepted as provisional agreement! Trade request record created automatically.');
       await load();
@@ -417,7 +417,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingBidId(bidId);
     const { error } = await rejectOffer(supabase, bidId);
     if (error) {
-      notify(listingId, error.message, true);
+      notify(listingId, (error as any)?.message || 'Failed to reject offer', true);
     } else {
       notify(listingId, 'Offer rejected.');
       await load();
@@ -436,7 +436,7 @@ export default function SellerBulkBiddingSalePage() {
       message: msg,
     });
     if (error) {
-      notify(listing?.id || '', error.message, true);
+      notify(listing?.id || '', (error as any)?.message || 'Failed to send counteroffer', true);
     } else {
       notify(listing?.id || '', 'Counteroffer sent to buyer.');
       await load();
@@ -450,7 +450,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingBidId(bidId);
     const { error } = await cancelProvisionalAgreement(supabase, bidId, reason);
     if (error) {
-      notify(listingId, error.message, true);
+      notify(listingId, (error as any)?.message || 'Failed to cancel agreement', true);
     } else {
       notify(listingId, 'Provisional agreement cancelled.');
       await load();
@@ -463,7 +463,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingListingId(listingId);
     const { error } = await cancelBulkOfftakeListing(supabase, listingId, reason);
     if (error) {
-      notify(listingId, error.message, true);
+      notify(listingId, (error as any)?.message || 'Failed to cancel listing', true);
     } else {
       notify(listingId, 'Listing cancelled and moved to history.');
       await load();
@@ -475,7 +475,7 @@ export default function SellerBulkBiddingSalePage() {
     setProcessingListingId(listingId);
     const { error } = await hideBulkOfftakeListing(supabase, listingId);
     if (error) {
-      notify(listingId, error.message, true);
+      notify(listingId, (error as any)?.message || 'Failed to hide listing', true);
     } else {
       notify(listingId, 'Listing hidden from active view.');
       await load();

@@ -84,7 +84,7 @@ export function HarvestPhotoModal({
 
       // Try rpc_upload_harvest_evidence if available
       try {
-        const { error: rpcErr } = await supabase.rpc('rpc_upload_harvest_evidence', {
+        const { error: rpcErr } = await (supabase as any).rpc('rpc_upload_harvest_evidence', {
           p_listing_id: listingId,
           p_photo_url: publicUrl,
         });
@@ -95,7 +95,7 @@ export function HarvestPhotoModal({
 
       // If RPC was not available or as fallback, update records directly
       if (!rpcSucceeded) {
-        await supabase
+        await (supabase as any)
           .from('bulk_offtake_listings')
           .update({
             harvest_photo_url: publicUrl,
@@ -105,7 +105,7 @@ export function HarvestPhotoModal({
           .eq('id', listingId);
 
         if (bidId) {
-          await supabase
+          await (supabase as any)
             .from('harvest_bids')
             .update({
               buyer_evidence_status: 'PROVIDED',
