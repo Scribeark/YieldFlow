@@ -68,7 +68,7 @@ export default function BuyerHarvestOpportunitiesPage() {
     setLoading(true);
     setError('');
     const { data, error: apiError } = await getHarvestOpportunities(supabase);
-    if (apiError) setError('Failed to load harvest opportunities.');
+    if (apiError) setError('Failed to load harvest opportunities: ' + (apiError.message || JSON.stringify(apiError)));
     else setOpportunities(data || []);
     setLoading(false);
   };

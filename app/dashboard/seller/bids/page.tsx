@@ -496,8 +496,9 @@ export default function SellerBulkBiddingSalePage() {
   };
 
   // Filter active vs historical
-  const activeListings = listings.filter((l) => !['CANCELLED', 'CLOSED'].includes(l.listing_status));
-  const historicalListings = listings.filter((l) => ['CANCELLED', 'CLOSED'].includes(l.listing_status));
+  const visibleListings = listings.filter((l) => !l.seller_hidden);
+  const activeListings = visibleListings.filter((l) => !['CANCELLED', 'CLOSED'].includes(l.listing_status));
+  const historicalListings = visibleListings.filter((l) => ['CANCELLED', 'CLOSED'].includes(l.listing_status));
   const displayedListings = activeTab === 'active' ? activeListings : historicalListings;
 
   return (

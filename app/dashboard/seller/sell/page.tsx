@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
 import { PageContainer } from '@/components/ui/PageContainer';
@@ -14,8 +14,9 @@ import { useAuthStore } from '@/store/authStore';
 import { getSellerFarms, publishBulkBiddingSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
 import { LocationPicker } from '@/components/shared/LocationPicker';
-import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar } from 'lucide-react';
+import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar, Camera, Image as ImageIcon, X, RefreshCw } from 'lucide-react';
 import { useMapsKey } from '@/components/providers/MapsProvider';
+import { uploadHarvestPhoto } from '@/lib/supabase/storage';
 
 type ListingMode = 'standard' | 'bulk';
 
@@ -54,6 +55,11 @@ export default function SellerSellPage() {
   const [stdAddress, setStdAddress] = useState('');
   const [stdLat, setStdLat] = useState<number | string>('');
   const [stdLng, setStdLng] = useState<number | string>('');
+  const [stdFile, setStdFile] = useState<File | null>(null);
+  const [stdPreviewUrl, setStdPreviewUrl] = useState<string | null>(null);
+  
+  const stdLiveInputRef = useRef<HTMLInputElement>(null);
+  const stdDeviceInputRef = useRef<HTMLInputElement>(null);
 
   // ── Bulk Sale standalone fields ───────────────────────────────────────────
   const [bulkCommoditySelect, setBulkCommoditySelect] = useState('Maize');
@@ -103,6 +109,28 @@ export default function SellerSellPage() {
     }
   };
 
+  const handleStdFileChange = (selectedFile: File | null) => {
+    setError('');
+    if (!selectedFile) return;
+
+    if (!selectedFile.type.startsWith('image/')) {
+      setError('Please select a valid image file (JPG, PNG, WebP).');
+      return;
+    }
+
+    setStdFile(selectedFile);
+    const objectUrl = URL.createObjectURL(selectedFile);
+    setStdPreviewUrl(objectUrl);
+  };
+
+  const handleStdClearPhoto = () => {
+    setStdFile(null);
+    if (stdPreviewUrl) URL.revokeObjectURL(stdPreviewUrl);
+    setStdPreviewUrl(null);
+    if (stdLiveInputRef.current) stdLiveInputRef.current.value = '';
+    if (stdDeviceInputRef.current) stdDeviceInputRef.current.value = '';
+  };
+
   const handleStandardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(''); setSuccess('');
@@ -111,8 +139,18 @@ export default function SellerSellPage() {
     const finalCommodity = stdCommoditySelect === 'Other' ? stdCommodityCustom.trim() : stdCommoditySelect;
     if (!finalCommodity) { setError('Commodity type is required.'); return; }
     if (!stdAddress.trim()) { setError('Pickup address is required.'); return; }
+    if (!stdFile) { setError('A listing photo is required for Standard Sales.'); return; }
 
     setSubmitting(true);
+    
+    // Upload photo
+    const { url: photoUrl, error: uploadError } = await uploadHarvestPhoto(supabase, stdFile, profile.id);
+    if (uploadError || !photoUrl) {
+      setError(uploadError?.message || 'Failed to upload listing photo.');
+      setSubmitting(false);
+      return;
+    }
+
     const { data, error: apiError } = await createTradeRequest(supabase, {
       user_id: profile.id,
       commodity_variety: finalCommodity,
@@ -121,6 +159,7 @@ export default function SellerSellPage() {
       physical_address: stdAddress,
       computed_latitude: typeof stdLat === 'string' ? parseFloat(stdLat) : stdLat,
       computed_longitude: typeof stdLng === 'string' ? parseFloat(stdLng) : stdLng,
+      harvest_photo_url: photoUrl,
     });
     setSubmitting(false);
 
@@ -130,6 +169,7 @@ export default function SellerSellPage() {
       setSuccess('Standard listing created! Buyers can now claim it directly.');
       setSuccessId(data?.id || '');
       setStdQuantity('');
+      handleStdClearPhoto();
     }
   };
 
@@ -283,6 +323,84 @@ export default function SellerSellPage() {
                     label="Pickup / Farm Location"
                     hideAdvancedCoordinates={true}
                   />
+                </div>
+
+                {/* Photo Selection / Preview Area */}
+                <div className="space-y-2 border-t border-white/10 pt-5">
+                  <Label>Listing Photo <span className="text-red-400">*</span></Label>
+                  <p className="text-xs opacity-50 mb-3">Provide a clear photo of the harvest to attract buyers. Required for Standard Sales.</p>
+
+                  <input
+                    ref={stdLiveInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={(e) => handleStdFileChange(e.target.files?.[0] || null)}
+                  />
+                  <input
+                    ref={stdDeviceInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleStdFileChange(e.target.files?.[0] || null)}
+                  />
+
+                  {!stdPreviewUrl ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                      <button
+                        type="button"
+                        onClick={() => stdLiveInputRef.current?.click()}
+                        className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-white/20 hover:border-[var(--agri-primary)] hover:bg-white/5 transition-all group"
+                      >
+                        <div className="p-3 rounded-full bg-[var(--agri-primary)]/10 text-[var(--agri-primary)] mb-2 group-hover:scale-110 transition-transform">
+                          <Camera size={24} />
+                        </div>
+                        <span className="text-sm font-semibold">Take Photo Live</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => stdDeviceInputRef.current?.click()}
+                        className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-white/20 hover:border-blue-400 hover:bg-white/5 transition-all group"
+                      >
+                        <div className="p-3 rounded-full bg-blue-500/10 text-blue-400 mb-2 group-hover:scale-110 transition-transform">
+                          <ImageIcon size={24} />
+                        </div>
+                        <span className="text-sm font-semibold">Choose From Device</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 mb-5">
+                      <div className="relative rounded-xl overflow-hidden border border-white/20 bg-black/40 max-h-72 flex items-center justify-center">
+                        <img
+                          src={stdPreviewUrl}
+                          alt="Listing Preview"
+                          className="max-h-72 w-auto object-contain rounded-lg"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleStdClearPhoto}
+                          disabled={submitting}
+                          className="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-black text-white rounded-full transition-colors"
+                          title="Remove photo"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <div className="flex items-center justify-between text-xs opacity-70 px-1">
+                        <span>{stdFile?.name}</span>
+                        <button
+                          type="button"
+                          onClick={handleStdClearPhoto}
+                          disabled={submitting}
+                          className="text-[var(--agri-primary)] hover:underline flex items-center gap-1"
+                        >
+                          <RefreshCw size={12} /> Replace photo
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-end pt-2">
