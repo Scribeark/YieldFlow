@@ -1,13 +1,6 @@
 -- ============================================================================
 -- MIGRATION: 20260815130000_v8_pure_commercial_architecture.sql
 -- COMPLETE REMOVAL OF RETIRED FARM-SENSOR & HARVEST-PREDICTION COMMERCIAL LOGIC
--- AUTHORITATIVE ARCHITECTURE:
---   - bulk_offtake_listings
---   - harvest_bids
---   - bid_negotiation_events
---   - trade_requests
---   - notifications
---   - logistics_bookings / vehicle_states
 -- ============================================================================
 
 -- 1. Ensure V8 Columns exist on bulk_offtake_listings, harvest_bids, and trade_requests
@@ -189,22 +182,22 @@ BEGIN
   SELECT 
     bol.id,
     bol.listed_quantity::NUMERIC AS expected_quantity_volume,
-    bol.quantity_unit AS expected_quantity_unit,
+    bol.quantity_unit::TEXT AS expected_quantity_unit,
     bol.listed_quantity::NUMERIC AS expected_quantity_min,
     bol.listed_quantity::NUMERIC AS expected_quantity_max,
     bol.asking_price_per_unit::NUMERIC,
     bol.asking_price_per_unit::NUMERIC AS minimum_price_per_unit,
-    bol.listing_status AS bidding_status,
+    bol.listing_status::TEXT AS bidding_status,
     'MANUAL'::TEXT AS bidding_origin,
     bol.created_at,
-    bol.crop_type,
+    bol.crop_type::TEXT,
     bol.expected_harvest_at AS seller_maturity_at,
-    bol.seller_note,
-    bol.pickup_address,
+    bol.seller_note::TEXT,
+    bol.pickup_address::TEXT,
     bol.pickup_latitude::NUMERIC,
     bol.pickup_longitude::NUMERIC,
-    u.full_name AS seller_name,
-    u.phone_number AS seller_phone
+    u.full_name::TEXT AS seller_name,
+    u.phone_number::TEXT AS seller_phone
   FROM public.bulk_offtake_listings bol
   LEFT JOIN public.users u ON u.id = bol.seller_id
   WHERE bol.listing_status = 'OPEN'
@@ -676,7 +669,7 @@ AS $$
 DECLARE
   v_actor_id UUID;
   v_bid public.harvest_bids%ROWTYPE;
-  BEGIN
+BEGIN
   SELECT id INTO v_actor_id FROM public.users WHERE auth_uid = auth.uid();
   IF v_actor_id IS NULL THEN RETURN jsonb_build_object('success', false, 'error', 'Authentication required.'); END IF;
 
@@ -1111,19 +1104,19 @@ BEGIN
     hb.id,
     NULL::UUID AS prediction_id,
     bol.id AS bulk_offtake_listing_id,
-    hb.desired_quantity,
-    hb.accepted_quantity,
-    hb.offered_price_per_unit,
-    hb.total_offer_value,
-    hb.bid_status,
-    COALESCE(hb.harvest_photo_url, bol.harvest_photo_url) AS harvest_photo_url,
+    hb.desired_quantity::NUMERIC,
+    hb.accepted_quantity::NUMERIC,
+    hb.offered_price_per_unit::NUMERIC,
+    hb.total_offer_value::NUMERIC,
+    hb.bid_status::TEXT,
+    COALESCE(hb.harvest_photo_url, bol.harvest_photo_url)::TEXT AS harvest_photo_url,
     hb.created_at,
-    bol.crop_type,
-    bol.quantity_unit AS expected_quantity_unit,
-    bol.quantity_unit,
-    bol.pickup_address,
-    u.full_name AS seller_name,
-    u.phone_number AS seller_phone,
+    bol.crop_type::TEXT,
+    bol.quantity_unit::TEXT AS expected_quantity_unit,
+    bol.quantity_unit::TEXT,
+    bol.pickup_address::TEXT,
+    u.full_name::TEXT AS seller_name,
+    u.phone_number::TEXT AS seller_phone,
     jsonb_build_object(
       'id', bol.id,
       'crop_type', bol.crop_type,
