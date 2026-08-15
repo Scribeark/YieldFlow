@@ -10,7 +10,7 @@
 --   - logistics_bookings / vehicle_states
 -- ============================================================================
 
--- 1. Ensure V8 Columns and Constraints exist on bulk_offtake_listings & harvest_bids
+-- 1. Ensure V8 Columns exist on bulk_offtake_listings, harvest_bids, and trade_requests
 ALTER TABLE public.bulk_offtake_listings 
   ADD COLUMN IF NOT EXISTS harvest_available_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS availability_source TEXT,
@@ -39,28 +39,44 @@ ALTER TABLE public.trade_requests
   ADD COLUMN IF NOT EXISTS bulk_offtake_listing_id UUID REFERENCES public.bulk_offtake_listings(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS harvest_bid_id UUID REFERENCES public.harvest_bids(id) ON DELETE SET NULL;
 
--- 2. Drop all legacy overloads and retired prediction functions
-DROP FUNCTION IF EXISTS public.rpc_place_harvest_bid(UUID, NUMERIC, NUMERIC, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_place_harvest_bid(UUID, INTEGER, NUMERIC, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_submit_harvest_bid(UUID, NUMERIC, NUMERIC, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_counter_harvest_bid(UUID, NUMERIC, NUMERIC, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_counter_harvest_bid(UUID, INTEGER, NUMERIC, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_accept_harvest_bid(UUID);
-DROP FUNCTION IF EXISTS public.rpc_accept_offer(UUID);
-DROP FUNCTION IF EXISTS public.rpc_reject_harvest_bid(UUID);
-DROP FUNCTION IF EXISTS public.rpc_reject_offer(UUID);
-DROP FUNCTION IF EXISTS public.rpc_withdraw_harvest_bid(UUID);
-DROP FUNCTION IF EXISTS public.rpc_withdraw_offer(UUID);
-DROP FUNCTION IF EXISTS public.rpc_cancel_provisional_agreement(UUID, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_declare_harvest_availability(UUID);
-DROP FUNCTION IF EXISTS public.rpc_declare_harvest_available(UUID);
-DROP FUNCTION IF EXISTS public.rpc_upload_harvest_evidence(UUID, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_upload_prediction_evidence(UUID, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_review_buyer_evidence(UUID, TEXT, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_review_harvest_evidence(UUID, TEXT, TEXT);
-DROP FUNCTION IF EXISTS public.rpc_get_buyer_harvest_opportunities();
-DROP FUNCTION IF EXISTS public.rpc_get_buyer_my_bids();
-DROP FUNCTION IF EXISTS public.rpc_publish_bulk_bidding_sale(NUMERIC, TEXT, TIMESTAMPTZ, NUMERIC, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DATE, TEXT);
+-- 2. DYNAMICALLY DROP ALL CONFLICTING OVERLOADS OF COMMERCIAL FUNCTIONS
+DO $$
+DECLARE
+    r RECORD;
+BEGIN
+    FOR r IN (
+        SELECT p.proname, pg_get_function_identity_arguments(p.oid) AS args
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public'
+          AND p.proname IN (
+            'rpc_publish_bulk_bidding_sale',
+            'rpc_place_harvest_bid',
+            'rpc_submit_harvest_bid',
+            'rpc_counter_harvest_bid',
+            'rpc_accept_harvest_bid',
+            'rpc_accept_offer',
+            'rpc_reject_harvest_bid',
+            'rpc_reject_offer',
+            'rpc_withdraw_harvest_bid',
+            'rpc_withdraw_offer',
+            'rpc_cancel_provisional_agreement',
+            'rpc_declare_harvest_availability',
+            'rpc_declare_harvest_available',
+            'rpc_upload_harvest_evidence',
+            'rpc_upload_prediction_evidence',
+            'rpc_review_buyer_evidence',
+            'rpc_review_harvest_evidence',
+            'rpc_get_buyer_harvest_opportunities',
+            'rpc_get_buyer_my_bids',
+            'rpc_cancel_bulk_offtake_listing',
+            'rpc_hide_bulk_offtake_listing',
+            'rpc_hide_or_delete_bid_record'
+          )
+    ) LOOP
+        EXECUTE 'DROP FUNCTION IF EXISTS public.' || quote_ident(r.proname) || '(' || r.args || ') CASCADE;';
+    END LOOP;
+END $$;
 
 -- ============================================================================
 -- 3. RPC: rpc_publish_bulk_bidding_sale (V8 Standalone)
@@ -138,7 +154,7 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_publish_bulk_bidding_sale TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_publish_bulk_bidding_sale(NUMERIC, TEXT, TIMESTAMPTZ, NUMERIC, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DATE, TEXT) TO authenticated;
 
 -- ============================================================================
 -- 4. RPC: rpc_get_buyer_harvest_opportunities (V8 Marketplace)
@@ -196,7 +212,7 @@ BEGIN
   ORDER BY bol.created_at DESC;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_get_buyer_harvest_opportunities TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_get_buyer_harvest_opportunities() TO authenticated;
 
 -- ============================================================================
 -- 5. RPC: rpc_place_harvest_bid & rpc_submit_harvest_bid (V8 Commercial Bidding)
@@ -307,7 +323,7 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_place_harvest_bid TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_place_harvest_bid(UUID, NUMERIC, NUMERIC, TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.rpc_submit_harvest_bid(
   p_listing_id UUID,
@@ -324,7 +340,7 @@ BEGIN
   RETURN public.rpc_place_harvest_bid(p_listing_id, p_quantity, p_price, p_message);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_submit_harvest_bid TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_submit_harvest_bid(UUID, NUMERIC, NUMERIC, TEXT) TO authenticated;
 
 -- ============================================================================
 -- 6. RPC: rpc_counter_harvest_bid (Alternating Bi-Directional Negotiation)
@@ -457,7 +473,7 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_counter_harvest_bid TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_counter_harvest_bid(UUID, NUMERIC, NUMERIC, TEXT) TO authenticated;
 
 -- ============================================================================
 -- 7. RPC: rpc_accept_harvest_bid & rpc_accept_offer (Provisional Agreement)
@@ -596,7 +612,7 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_accept_harvest_bid TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_accept_harvest_bid(UUID) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.rpc_accept_offer(p_bid_id UUID)
 RETURNS JSONB
@@ -608,7 +624,7 @@ BEGIN
   RETURN public.rpc_accept_harvest_bid(p_bid_id);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_accept_offer TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_accept_offer(UUID) TO authenticated;
 
 -- ============================================================================
 -- 8. RPC: rpc_reject_harvest_bid & rpc_withdraw_harvest_bid
@@ -649,7 +665,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'bid_id', p_bid_id, 'status', 'REJECTED');
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_reject_harvest_bid TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_reject_harvest_bid(UUID) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.rpc_withdraw_harvest_bid(p_bid_id UUID)
 RETURNS JSONB
@@ -688,7 +704,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'bid_id', p_bid_id, 'status', 'WITHDRAWN');
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_withdraw_harvest_bid TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_withdraw_harvest_bid(UUID) TO authenticated;
 
 -- ============================================================================
 -- 9. RPC: rpc_cancel_provisional_agreement
@@ -739,7 +755,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'bid_id', p_bid_id, 'status', 'CANCELLED');
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_cancel_provisional_agreement TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_cancel_provisional_agreement(UUID, TEXT) TO authenticated;
 
 -- ============================================================================
 -- 10. RPC: rpc_declare_harvest_availability & rpc_declare_harvest_available
@@ -797,7 +813,7 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_declare_harvest_availability TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_declare_harvest_availability(UUID) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.rpc_declare_harvest_available(p_listing_id UUID)
 RETURNS JSONB
@@ -809,7 +825,7 @@ BEGIN
   RETURN public.rpc_declare_harvest_availability(p_listing_id);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_declare_harvest_available TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_declare_harvest_available(UUID) TO authenticated;
 
 -- ============================================================================
 -- 11. RPC: rpc_upload_harvest_evidence (V8 Photo Evidence Submission)
@@ -884,10 +900,10 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_upload_harvest_evidence TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_upload_harvest_evidence(UUID, TEXT) TO authenticated;
 
 -- ============================================================================
--- 12. RPC: rpc_review_buyer_evidence & rpc_review_harvest_evidence (Trade Conversion & Logistics Activation)
+-- 12. RPC: rpc_review_buyer_evidence & rpc_review_harvest_evidence
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.rpc_review_buyer_evidence(
   p_bid_id UUID,
@@ -1038,7 +1054,7 @@ BEGIN
   END IF;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_review_buyer_evidence TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_review_buyer_evidence(UUID, TEXT, TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.rpc_review_harvest_evidence(
   p_bid_id UUID,
@@ -1054,7 +1070,7 @@ BEGIN
   RETURN public.rpc_review_buyer_evidence(p_bid_id, p_decision, p_reason);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_review_harvest_evidence TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_review_harvest_evidence(UUID, TEXT, TEXT) TO authenticated;
 
 -- ============================================================================
 -- 13. RPC: rpc_get_buyer_my_bids (V8 Direct Bid Query)
@@ -1136,7 +1152,7 @@ BEGIN
   ORDER BY hb.created_at DESC;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_get_buyer_my_bids TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_get_buyer_my_bids() TO authenticated;
 
 -- ============================================================================
 -- 14. RPC: rpc_cancel_bulk_offtake_listing & rpc_hide_bulk_offtake_listing
@@ -1183,7 +1199,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'listing_id', p_listing_id, 'status', 'CANCELLED');
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_cancel_bulk_offtake_listing TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_cancel_bulk_offtake_listing(UUID, TEXT) TO authenticated;
 
 CREATE OR REPLACE FUNCTION public.rpc_hide_bulk_offtake_listing(p_listing_id UUID)
 RETURNS JSONB
@@ -1204,7 +1220,7 @@ BEGIN
   RETURN jsonb_build_object('success', true, 'listing_id', p_listing_id, 'seller_hidden', true);
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_hide_bulk_offtake_listing TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_hide_bulk_offtake_listing(UUID) TO authenticated;
 
 -- ============================================================================
 -- 15. RPC: rpc_hide_or_delete_bid_record
@@ -1239,7 +1255,7 @@ BEGIN
   END IF;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_hide_or_delete_bid_record TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_hide_or_delete_bid_record(UUID) TO authenticated;
 
 -- ============================================================================
 -- 16. Ensure Authoritative RLS Policies on V8 Tables
