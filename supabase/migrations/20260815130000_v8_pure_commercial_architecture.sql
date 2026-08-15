@@ -88,8 +88,8 @@ CREATE OR REPLACE FUNCTION public.rpc_publish_bulk_bidding_sale(
   p_expected_quantity NUMERIC,
   p_expected_quantity_unit TEXT DEFAULT 'kg',
   p_pickup_address TEXT DEFAULT NULL,
-  p_pickup_latitude DOUBLE PRECISION DEFAULT NULL,
-  p_pickup_longitude DOUBLE PRECISION DEFAULT NULL,
+  p_pickup_latitude NUMERIC DEFAULT NULL,
+  p_pickup_longitude NUMERIC DEFAULT NULL,
   p_planting_date DATE DEFAULT NULL,
   p_seller_note TEXT DEFAULT NULL
 )
@@ -154,7 +154,7 @@ BEGIN
   );
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.rpc_publish_bulk_bidding_sale(NUMERIC, TEXT, TIMESTAMPTZ, NUMERIC, TEXT, TEXT, DOUBLE PRECISION, DOUBLE PRECISION, DATE, TEXT) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rpc_publish_bulk_bidding_sale(NUMERIC, TEXT, TIMESTAMPTZ, NUMERIC, TEXT, TEXT, NUMERIC, NUMERIC, DATE, TEXT) TO authenticated;
 
 -- ============================================================================
 -- 4. RPC: rpc_get_buyer_harvest_opportunities (V8 Marketplace)
@@ -175,8 +175,8 @@ RETURNS TABLE (
   seller_maturity_at TIMESTAMPTZ,
   seller_note TEXT,
   pickup_address TEXT,
-  pickup_latitude DOUBLE PRECISION,
-  pickup_longitude DOUBLE PRECISION,
+  pickup_latitude NUMERIC,
+  pickup_longitude NUMERIC,
   seller_name TEXT,
   seller_phone TEXT
 )
@@ -188,12 +188,12 @@ BEGIN
   RETURN QUERY
   SELECT 
     bol.id,
-    bol.listed_quantity AS expected_quantity_volume,
+    bol.listed_quantity::NUMERIC AS expected_quantity_volume,
     bol.quantity_unit AS expected_quantity_unit,
-    bol.listed_quantity AS expected_quantity_min,
-    bol.listed_quantity AS expected_quantity_max,
-    bol.asking_price_per_unit,
-    bol.asking_price_per_unit AS minimum_price_per_unit,
+    bol.listed_quantity::NUMERIC AS expected_quantity_min,
+    bol.listed_quantity::NUMERIC AS expected_quantity_max,
+    bol.asking_price_per_unit::NUMERIC,
+    bol.asking_price_per_unit::NUMERIC AS minimum_price_per_unit,
     bol.listing_status AS bidding_status,
     'MANUAL'::TEXT AS bidding_origin,
     bol.created_at,
@@ -201,8 +201,8 @@ BEGIN
     bol.expected_harvest_at AS seller_maturity_at,
     bol.seller_note,
     bol.pickup_address,
-    bol.pickup_latitude,
-    bol.pickup_longitude,
+    bol.pickup_latitude::NUMERIC,
+    bol.pickup_longitude::NUMERIC,
     u.full_name AS seller_name,
     u.phone_number AS seller_phone
   FROM public.bulk_offtake_listings bol
@@ -676,7 +676,7 @@ AS $$
 DECLARE
   v_actor_id UUID;
   v_bid public.harvest_bids%ROWTYPE;
-BEGIN
+  BEGIN
   SELECT id INTO v_actor_id FROM public.users WHERE auth_uid = auth.uid();
   IF v_actor_id IS NULL THEN RETURN jsonb_build_object('success', false, 'error', 'Authentication required.'); END IF;
 
