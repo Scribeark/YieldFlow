@@ -68,7 +68,93 @@ export async function confirmOrder(
 
 export async function getMyBids(supabase: SupabaseClient<any>) {
   const { data, error } = await supabase.rpc('rpc_get_buyer_my_bids');
-  return { data, error };
+  if (!error && data) {
+    return { data, error: null };
+  }
+
+  // Resilient direct table query fallback
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { data: [], error: null };
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('id')
+      .eq('auth_uid', user.id)
+      .maybeSingle();
+
+    if (!userData) return { data: [], error: null };
+
+    const { data: bidsData, error: bidsError } = await supabase
+      .from('harvest_bids')
+      .select(`
+        id,
+        desired_quantity,
+        accepted_quantity,
+        offered_price_per_unit,
+        total_offer_value,
+        bid_status,
+        harvest_photo_url,
+        created_at,
+        bulk_offtake_listing_id,
+        bulk_offtake_listings (
+          id,
+          crop_type,
+          listed_quantity,
+          quantity_unit,
+          asking_price_per_unit,
+          pickup_address,
+          harvest_photo_url,
+          seller_id,
+          users:seller_id (
+            full_name,
+            phone_number
+          )
+        )
+      `)
+      .eq('buyer_id', userData.id)
+      .or('visible_to_buyer.is.null,visible_to_buyer.eq.true')
+      .order('created_at', { ascending: false });
+
+    if (bidsError) return { data: null, error: bidsError };
+
+    const formatted = (bidsData || []).map((b: any) => {
+      const bol = b.bulk_offtake_listings;
+      const seller = bol?.users;
+      return {
+        id: b.id,
+        prediction_id: null,
+        bulk_offtake_listing_id: b.bulk_offtake_listing_id,
+        desired_quantity: b.desired_quantity,
+        accepted_quantity: b.accepted_quantity,
+        offered_price_per_unit: b.offered_price_per_unit,
+        total_offer_value: b.total_offer_value,
+        bid_status: b.bid_status,
+        harvest_photo_url: b.harvest_photo_url || bol?.harvest_photo_url,
+        created_at: b.created_at,
+        crop_type: bol?.crop_type,
+        expected_quantity_unit: bol?.quantity_unit || 'kg',
+        quantity_unit: bol?.quantity_unit || 'kg',
+        pickup_address: bol?.pickup_address,
+        seller_name: seller?.full_name,
+        seller_phone: seller?.phone_number,
+        bulk_offtake_listings: bol,
+        harvest_predictions: bol ? {
+          id: bol.id,
+          crop_type: bol.crop_type,
+          expected_quantity_unit: bol.quantity_unit,
+          quantity_unit: bol.quantity_unit,
+          pickup_address: bol.pickup_address,
+          harvest_photo_url: b.harvest_photo_url || bol.harvest_photo_url,
+          bidding_origin: 'MANUAL'
+        } : null
+      };
+    });
+
+    return { data: formatted, error: null };
+  } catch (err: any) {
+    return { data: null, error: err };
+  }
 }
 
 export async function placeHarvestBid(

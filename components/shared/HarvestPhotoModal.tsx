@@ -4,10 +4,11 @@ import React, { useState, useRef } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
-import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, RefreshCw, ArrowLeft } from 'lucide-react';
 import { uploadHarvestPhoto } from '@/lib/supabase/storage';
 import { uploadHarvestEvidence } from '@/lib/api/farms';
 import { createClient } from '@/lib/supabase/client';
+import { CameraCapture } from '@/components/ui/CameraCapture';
 
 interface HarvestPhotoModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export function HarvestPhotoModal({
   const supabase = createClient();
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [isLiveCamera, setIsLiveCamera] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -141,19 +143,44 @@ export function HarvestPhotoModal({
           onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
         />
 
-        {/* Photo Selection / Preview Area */}
-        {!previewUrl ? (
+        {/* Photo Selection / Live Camera / Preview Area */}
+        {isLiveCamera ? (
+          <div className="space-y-3 mb-5">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-[var(--agri-primary)] flex items-center gap-1">
+                <Camera size={14} /> Live Viewfinder Active
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsLiveCamera(false)}
+                className="text-xs opacity-70 hover:opacity-100 flex items-center gap-1"
+              >
+                <ArrowLeft size={12} /> Choose another option
+              </button>
+            </div>
+            <CameraCapture
+              onCapture={(capturedFile) => {
+                handleFileChange(capturedFile);
+                setIsLiveCamera(false);
+              }}
+              onClear={() => {
+                handleClear();
+                setIsLiveCamera(false);
+              }}
+            />
+          </div>
+        ) : !previewUrl ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
             <button
               type="button"
-              onClick={() => liveInputRef.current?.click()}
+              onClick={() => setIsLiveCamera(true)}
               className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-white/20 hover:border-[var(--agri-primary)] hover:bg-white/5 transition-all group"
             >
               <div className="p-3 rounded-full bg-[var(--agri-primary)]/10 text-[var(--agri-primary)] mb-2 group-hover:scale-110 transition-transform">
                 <Camera size={24} />
               </div>
               <span className="text-sm font-semibold">Take Photo Live</span>
-              <span className="text-[11px] opacity-60 mt-1">Use device camera</span>
+              <span className="text-[11px] opacity-60 mt-1">Open camera viewfinder</span>
             </button>
 
             <button

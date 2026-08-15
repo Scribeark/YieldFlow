@@ -58,11 +58,11 @@ export function CameraCapture({ onCapture, onClear }: CameraCaptureProps) {
   }, [stream]);
 
   useEffect(() => {
-    // Cleanup on unmount
+    startCamera();
     return () => {
       stopCamera();
     };
-  }, [stopCamera]);
+  }, []);
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;

@@ -14,9 +14,10 @@ import { useAuthStore } from '@/store/authStore';
 import { createTradeRequest } from '@/lib/api/seller';
 import { publishBulkBiddingSale } from '@/lib/api/farms';
 import { LocationPicker } from '@/components/shared/LocationPicker';
-import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar, Camera, Image as ImageIcon, X, RefreshCw } from 'lucide-react';
+import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar, Camera, Image as ImageIcon, X, RefreshCw, ArrowLeft } from 'lucide-react';
 import { useMapsKey } from '@/components/providers/MapsProvider';
 import { uploadHarvestPhoto } from '@/lib/supabase/storage';
+import { CameraCapture } from '@/components/ui/CameraCapture';
 
 type ListingMode = 'standard' | 'bulk';
 
@@ -55,6 +56,7 @@ export default function SellerSellPage() {
   const [stdLng, setStdLng] = useState<number | string>('');
   const [stdFile, setStdFile] = useState<File | null>(null);
   const [stdPreviewUrl, setStdPreviewUrl] = useState<string | null>(null);
+  const [stdLiveCamera, setStdLiveCamera] = useState(false);
   
   const stdLiveInputRef = useRef<HTMLInputElement>(null);
   const stdDeviceInputRef = useRef<HTMLInputElement>(null);
@@ -299,17 +301,43 @@ export default function SellerSellPage() {
                     onChange={(e) => handleStdFileChange(e.target.files?.[0] || null)}
                   />
 
-                  {!stdPreviewUrl ? (
+                  {stdLiveCamera ? (
+                    <div className="space-y-3 mb-5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-[var(--agri-primary)] flex items-center gap-1">
+                          <Camera size={14} /> Live Viewfinder Active
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setStdLiveCamera(false)}
+                          className="text-xs opacity-70 hover:opacity-100 flex items-center gap-1"
+                        >
+                          <ArrowLeft size={12} /> Choose another option
+                        </button>
+                      </div>
+                      <CameraCapture
+                        onCapture={(capturedFile) => {
+                          handleStdFileChange(capturedFile);
+                          setStdLiveCamera(false);
+                        }}
+                        onClear={() => {
+                          handleStdClearPhoto();
+                          setStdLiveCamera(false);
+                        }}
+                      />
+                    </div>
+                  ) : !stdPreviewUrl ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
                       <button
                         type="button"
-                        onClick={() => stdLiveInputRef.current?.click()}
+                        onClick={() => setStdLiveCamera(true)}
                         className="flex flex-col items-center justify-center p-6 rounded-xl border-2 border-dashed border-white/20 hover:border-[var(--agri-primary)] hover:bg-white/5 transition-all group"
                       >
                         <div className="p-3 rounded-full bg-[var(--agri-primary)]/10 text-[var(--agri-primary)] mb-2 group-hover:scale-110 transition-transform">
                           <Camera size={24} />
                         </div>
                         <span className="text-sm font-semibold">Take Photo Live</span>
+                        <span className="text-[11px] opacity-60 mt-1">Open camera viewfinder</span>
                       </button>
 
                       <button
@@ -321,6 +349,7 @@ export default function SellerSellPage() {
                           <ImageIcon size={24} />
                         </div>
                         <span className="text-sm font-semibold">Choose From Device</span>
+                        <span className="text-[11px] opacity-60 mt-1">Gallery or files</span>
                       </button>
                     </div>
                   ) : (
