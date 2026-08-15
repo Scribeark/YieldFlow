@@ -11,8 +11,8 @@ import { Label } from '@/components/ui/Label';
 import { Alert } from '@/components/ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { getSellerFarms, publishBulkBiddingSale } from '@/lib/api/farms';
 import { createTradeRequest } from '@/lib/api/seller';
+import { publishBulkBiddingSale } from '@/lib/api/farms';
 import { LocationPicker } from '@/components/shared/LocationPicker';
 import { Store, Layers, Loader2, CheckCircle, ArrowRight, Info, Calendar, Camera, Image as ImageIcon, X, RefreshCw } from 'lucide-react';
 import { useMapsKey } from '@/components/providers/MapsProvider';
@@ -39,15 +39,13 @@ export default function SellerSellPage() {
   const mapsApiKey = useMapsKey();
 
   const [mode, setMode] = useState<ListingMode>('standard');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [farms, setFarms] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [successId, setSuccessId] = useState('');
 
   // ── Standard Sale fields ──────────────────────────────────────────────────
-  const [stdFarmId, setStdFarmId] = useState('');
   const [stdCommoditySelect, setStdCommoditySelect] = useState('Maize');
   const [stdCommodityCustom, setStdCommodityCustom] = useState('');
   const [stdQuantity, setStdQuantity] = useState('');
@@ -75,39 +73,6 @@ export default function SellerSellPage() {
   const [plantingDate, setPlantingDate] = useState('');
   const [sellerMaturityAt, setSellerMaturityAt] = useState('');
   const [sellerNote, setSellerNote] = useState('');
-
-  useEffect(() => {
-    if (user) loadFarms();
-  }, [user]);
-
-  const loadFarms = async () => {
-    setLoading(true);
-    const { data } = await getSellerFarms(supabase, user!.id);
-    const farmList = data || [];
-    setFarms(farmList);
-    if (farmList.length > 0) {
-      selectFarmForStandard(farmList[0].id, farmList);
-    }
-    setLoading(false);
-  };
-
-  const getCommodityValue = (cropType: string) => {
-    if (COMMODITY_OPTIONS.includes(cropType)) return cropType;
-    return 'Other';
-  };
-
-  const selectFarmForStandard = (fId: string, source = farms) => {
-    setStdFarmId(fId);
-    const farm = source.find((f) => f.id === fId);
-    if (farm) {
-      const crop = farm.crop_type || 'Maize';
-      setStdCommoditySelect(getCommodityValue(crop));
-      if (getCommodityValue(crop) === 'Other') setStdCommodityCustom(crop);
-      setStdAddress(farm.physical_address || '');
-      setStdLat(farm.latitude || '');
-      setStdLng(farm.longitude || '');
-    }
-  };
 
   const handleStdFileChange = (selectedFile: File | null) => {
     setError('');
@@ -278,18 +243,6 @@ export default function SellerSellPage() {
                 <Store className="mr-2 text-[var(--agri-primary)]" /> Standard Listing Details
               </h2>
               <form onSubmit={handleStandardSubmit} className="space-y-5">
-                {farms.length > 0 && (
-                  <div className="space-y-2">
-                    <Label>Source Farm (optional — auto-fills location)</Label>
-                    <select className={selectStyle} value={stdFarmId} onChange={(e) => selectFarmForStandard(e.target.value)}>
-                      <option value="" className="bg-[#1a1f2e]">— Enter location manually —</option>
-                      {farms.map((f) => (
-                        <option key={f.id} value={f.id} className="bg-[#1a1f2e]">{f.name} ({f.crop_type})</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div className="space-y-2">
                     <Label>Commodity / Crop Type</Label>

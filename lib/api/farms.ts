@@ -318,13 +318,12 @@ export async function cancelBulkSale(
 
 /**
  * Loads all active and historical listings for a seller's dashboard with all bids.
- * Prioritizes V8 bulk_offtake_listings, while maintaining backward compatibility with legacy harvest_predictions.
+ * Authoritative V8 bulk_offtake_listings.
  */
 export async function getSellerBidListings(
   supabase: SupabaseClient<any>,
   userId: string
 ) {
-  // 1. Primary: Load all V8 bulk_offtake_listings for this seller with their bids and buyer profiles
   const { data: v8Listings, error: v8Error } = await supabase
     .from('bulk_offtake_listings')
     .select('*, harvest_bids(*, buyer:users!buyer_id(full_name, phone_number)), trade_requests(*)')
@@ -336,7 +335,6 @@ export async function getSellerBidListings(
     return { data: null, error: v8Error };
   }
 
-  // 2. Normalize V8 listings to unified schema
   const normalisedV8 = (v8Listings || []).map((l: any) => ({
     id: l.id,
     is_v8: true,
@@ -363,7 +361,6 @@ export async function getSellerBidListings(
     availability_declared_by: l.availability_declared_by,
     evidence_status: l.evidence_status || 'PENDING',
     harvest_photo_url: l.harvest_photo_url,
-    evidence_verified_at: l.evidence_verified_at,
     created_at: l.created_at,
     updated_at: l.updated_at,
     harvest_bids: l.harvest_bids || [],
@@ -384,28 +381,16 @@ export async function placeHarvestBid(
     buyerMessage?: string;
   }
 ) {
-  // 1. Try V8 rpc_submit_harvest_bid
-  const { data, error } = await supabase.rpc('rpc_submit_harvest_bid', {
-    p_listing_id: params.listingId,
-    p_quantity: params.desiredQuantity,
-    p_price: params.offeredPricePerUnit,
-    p_message: params.buyerMessage || null,
-  });
-
-  if (!error && data?.success !== false) {
-    return { data, error: null };
-  }
-
-  // 2. Fallback to legacy rpc_place_harvest_bid
-  const { data: legacyData, error: legacyError } = await supabase.rpc('rpc_place_harvest_bid', {
+  const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
     p_listing_id: params.listingId,
     p_desired_quantity: params.desiredQuantity,
     p_offered_price_per_unit: params.offeredPricePerUnit,
     p_buyer_message: params.buyerMessage || null,
   });
 
-  if (legacyError) return { data: null, error: legacyError };
-  return { data: legacyData, error: null };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to place harvest bid') };
+  return { data, error: null };
 }
 
 export async function counterHarvestBid(
@@ -417,7 +402,6 @@ export async function counterHarvestBid(
     message?: string;
   }
 ) {
-  // Parameter names in installed RPC
   const { data, error } = await supabase.rpc('rpc_counter_harvest_bid', {
     p_bid_id: params.bidId,
     p_counter_price: params.counterPrice,
@@ -425,35 +409,16 @@ export async function counterHarvestBid(
     p_message: params.message || null,
   });
 
-  if (error) {
-    // Try alternate parameter names if needed
-    const { data: altData, error: altErr } = await supabase.rpc('rpc_counter_harvest_bid', {
-      p_bid_id: params.bidId,
-      p_price: params.counterPrice,
-      p_quantity: params.counterQuantity,
-      p_message: params.message || null,
-    });
-    if (altErr) return { data: null, error: altErr };
-    return { data: altData, error: null };
-  }
-
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to send counteroffer') };
   return { data, error: null };
 }
 
 export async function acceptOffer(supabase: SupabaseClient<any>, bidId: string) {
-  // 1. Try V8 rpc_accept_harvest_bid
-  const { data: v8Data, error: v8Err } = await supabase.rpc('rpc_accept_harvest_bid', {
+  const { data, error } = await supabase.rpc('rpc_accept_harvest_bid', {
     p_bid_id: bidId,
   });
 
-  if (!v8Err && v8Data?.success !== false) {
-    return { data: v8Data, error: null };
-  }
-
-  // 2. Fallback to rpc_accept_offer
-  const { data, error } = await supabase.rpc('rpc_accept_offer', {
-    p_bid_id: bidId,
-  });
   if (error) return { data: null, error };
   if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to accept offer') };
   return { data, error: null };
@@ -463,13 +428,8 @@ export async function rejectOffer(supabase: SupabaseClient<any>, bidId: string) 
   const { data, error } = await supabase.rpc('rpc_reject_harvest_bid', {
     p_bid_id: bidId,
   });
-  if (error) {
-    const { data: altData, error: altErr } = await supabase.rpc('rpc_reject_offer', {
-      p_bid_id: bidId,
-    });
-    if (altErr) return { data: null, error: altErr };
-    return { data: altData, error: null };
-  }
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to reject offer') };
   return { data, error: null };
 }
 
@@ -477,13 +437,8 @@ export async function withdrawOffer(supabase: SupabaseClient<any>, bidId: string
   const { data, error } = await supabase.rpc('rpc_withdraw_harvest_bid', {
     p_bid_id: bidId,
   });
-  if (error) {
-    const { data: altData, error: altErr } = await supabase.rpc('rpc_withdraw_offer', {
-      p_bid_id: bidId,
-    });
-    if (altErr) return { data: null, error: altErr };
-    return { data: altData, error: null };
-  }
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to withdraw offer') };
   return { data, error: null };
 }
 
@@ -494,46 +449,33 @@ export async function getBidNegotiationEvents(supabase: SupabaseClient<any>, bid
     .eq('bid_id', bidId)
     .order('created_at', { ascending: true });
 
-  if (!error && data) {
-    return { data, error: null };
-  }
-
-  const { data: rpcData, error: rpcError } = await supabase.rpc('rpc_get_bid_negotiation_events', {
-    p_bid_id: bidId,
-  });
-  if (rpcError) return { data: null, error: rpcError };
-  const arr = Array.isArray(rpcData) ? rpcData : Array.isArray(rpcData?.data) ? rpcData.data : [];
-  return { data: arr, error: null };
+  if (error) return { data: null, error };
+  return { data: data || [], error: null };
 }
 
 export async function declareHarvestAvailable(supabase: SupabaseClient<any>, listingId: string) {
-  // 1. Try V8 rpc_declare_harvest_availability
   const { data, error } = await supabase.rpc('rpc_declare_harvest_availability', {
     p_listing_id: listingId,
   });
 
-  if (!error && data?.success !== false) {
-    return { data, error: null };
-  }
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to declare harvest availability') };
+  return { data, error: null };
+}
 
-  // 2. Fallback to rpc_declare_harvest_available
-  const { data: legData, error: legErr } = await supabase.rpc('rpc_declare_harvest_available', {
+export async function uploadHarvestEvidence(
+  supabase: SupabaseClient<any>,
+  listingId: string,
+  photoUrl: string
+) {
+  const { data, error } = await supabase.rpc('rpc_upload_harvest_evidence', {
     p_listing_id: listingId,
+    p_photo_url: photoUrl,
   });
-  if (legErr) {
-    // Direct update fallback
-    await supabase
-      .from('bulk_offtake_listings')
-      .update({
-        harvest_available_at: new Date().toISOString(),
-        availability_source: 'SELLER_DECLARATION',
-        evidence_status: 'PENDING',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', listingId);
-    return { data: { success: true }, error: null };
-  }
-  return { data: legData, error: null };
+
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to upload harvest evidence') };
+  return { data, error: null };
 }
 
 export async function confirmCropReadiness(supabase: SupabaseClient<any>, listingId: string) {
@@ -545,29 +487,7 @@ export async function cancelProvisionalAgreement(supabase: SupabaseClient<any>, 
     p_bid_id: bidId,
     p_reason: reason || 'Cancelled by participant before trade establishment',
   });
-  if (error) {
-    // Direct update fallback
-    const now = new Date().toISOString();
-    await supabase
-      .from('harvest_bids')
-      .update({
-        bid_status: 'CANCELLED',
-        cancellation_reason: reason || 'Cancelled before trade establishment',
-        cancelled_at: now,
-        updated_at: now,
-      })
-      .eq('id', bidId);
-    return { data: { success: true }, error: null };
-  }
-  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to cancel provisional agreement') };
-  return { data, error: null };
-}
-
-export async function closeCropAllocationBidding(supabase: SupabaseClient<any>, cropAllocationId: string) {
-  const { data, error } = await supabase.rpc('rpc_close_crop_allocation_bidding', {
-    p_crop_allocation_id: cropAllocationId,
-  });
   if (error) return { data: null, error };
-  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to close crop listing') };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to cancel provisional agreement') };
   return { data, error: null };
 }

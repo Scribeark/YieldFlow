@@ -80,8 +80,6 @@ export async function placeHarvestBid(
     buyerMessage?: string;
   }
 ) {
-  // Parameter names must match the RPC signature exactly:
-  // rpc_place_harvest_bid(p_prediction_id, p_desired_quantity, p_offered_price_per_unit, p_buyer_message)
   const { data, error } = await supabase.rpc('rpc_place_harvest_bid', {
     p_listing_id: params.listingId,
     p_desired_quantity: params.quantity,
@@ -121,29 +119,15 @@ export async function reviewHarvestPhoto(
     reason?: string;
   }
 ) {
-  // 1. Try rpc_review_buyer_evidence
   const { data, error } = await supabase.rpc('rpc_review_buyer_evidence', {
     p_bid_id: params.bidId,
     p_decision: params.decision,
     p_reason: params.reason || null,
   });
 
-  if (!error && data?.success !== false) {
-    return { data, error: null };
-  }
-
-  // 2. Try rpc_review_harvest_evidence
-  const { data: altData, error: altErr } = await supabase.rpc('rpc_review_harvest_evidence', {
-    p_bid_id: params.bidId,
-    p_decision: params.decision,
-    p_reason: params.reason || null,
-  });
-
-  if (!altErr && altData?.success !== false) {
-    return { data: altData, error: null };
-  }
-
-  return { data: null, error: altErr || error };
+  if (error) return { data: null, error };
+  if (data?.success === false) return { data: null, error: new Error(data.error || 'Failed to review harvest photo') };
+  return { data, error: null };
 }
 
 export async function getHarvestOpportunities(supabase: SupabaseClient<any>) {

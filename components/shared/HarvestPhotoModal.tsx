@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
 import { Camera, Image as ImageIcon, X, Loader2, CheckCircle2, RefreshCw } from 'lucide-react';
 import { uploadHarvestPhoto } from '@/lib/supabase/storage';
+import { uploadHarvestEvidence } from '@/lib/api/farms';
 import { createClient } from '@/lib/supabase/client';
 
 interface HarvestPhotoModalProps {
@@ -79,40 +80,10 @@ export function HarvestPhotoModal({
         throw new Error(uploadError?.message || 'Failed to upload photo to storage.');
       }
 
-      // 2. Call RPC or update bulk_offtake_listings and harvest_bids
-      let rpcSucceeded = false;
-
-      // Try rpc_upload_harvest_evidence if available
-      try {
-        const { error: rpcErr } = await (supabase as any).rpc('rpc_upload_harvest_evidence', {
-          p_listing_id: listingId,
-          p_photo_url: publicUrl,
-        });
-        if (!rpcErr) rpcSucceeded = true;
-      } catch (e) {
-        console.warn('rpc_upload_harvest_evidence call error:', e);
-      }
-
-      // If RPC was not available or as fallback, update records directly
-      if (!rpcSucceeded) {
-        await (supabase as any)
-          .from('bulk_offtake_listings')
-          .update({
-            harvest_photo_url: publicUrl,
-            evidence_status: 'PROVIDED',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', listingId);
-
-        if (bidId) {
-          await (supabase as any)
-            .from('harvest_bids')
-            .update({
-              buyer_evidence_status: 'PROVIDED',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', bidId);
-        }
+      // 2. Call V8 authoritative RPC rpc_upload_harvest_evidence
+      const { error: rpcError } = await uploadHarvestEvidence(supabase, listingId, publicUrl);
+      if (rpcError) {
+        throw rpcError;
       }
 
       setSuccess('Harvest Confirmation Photo submitted successfully!');

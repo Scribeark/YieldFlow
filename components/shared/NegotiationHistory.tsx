@@ -21,15 +21,8 @@ export function NegotiationHistory({ bidId }: { bidId: string }) {
         if (error) {
           setError(error.message);
           setEvents([]);
-        } else if (payload?.success === false) {
-          setError(payload.error || 'Unable to load negotiation history.');
-          setEvents([]);
         } else {
-          const extractedEvents = Array.isArray(payload)
-            ? payload
-            : Array.isArray(payload?.data)
-              ? payload.data
-              : [];
+          const extractedEvents = Array.isArray(payload) ? payload : [];
           setEvents(extractedEvents);
         }
         setLoading(false);

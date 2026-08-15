@@ -274,17 +274,16 @@ export default function BuyerMyBidsPage() {
   const closedBids = bids.filter((b) => ['REJECTED', 'WITHDRAWN', 'CANCELLED', 'EXPIRED'].includes(b.bid_status));
 
   const renderBid = (bid: any) => {
-    const opp = bid.harvest_predictions || bid.bulk_offtake_listings || {};
+    const opp = bid.bulk_offtake_listings || bid.harvest_predictions || {};
     const cropType = opp.crop_type || bid.crop_type || 'Crop';
-    const unit = opp.expected_quantity_unit || opp.quantity_unit || 'units';
-    const isIoT = opp.bidding_origin && opp.bidding_origin !== 'MANUAL';
+    const unit = opp.quantity_unit || opp.expected_quantity_unit || 'kg';
     const style = STATUS_STYLES[bid.bid_status] || STATUS_STYLES.EXPIRED;
     const isActioning = actionState?.id === bid.id && actionState?.status === 'loading';
 
     const effectiveQty = bid.accepted_quantity ?? bid.desired_quantity;
     const effectiveTotal = effectiveQty * Number(bid.offered_price_per_unit || 0);
 
-    const locationText = opp.pickup_address || opp.farm_physical_address || (opp.farm_name ? `${opp.farm_name}` : 'Pickup location provided upon agreement');
+    const locationText = opp.pickup_address || 'Pickup location provided upon agreement';
     const photoUrl = bid.harvest_photo_url || opp.harvest_photo_url;
     const hasPhoto = !!photoUrl;
     const isProvisional = ['ACCEPTED', 'PARTIALLY_ACCEPTED'].includes(bid.bid_status);
@@ -306,15 +305,9 @@ export default function BuyerMyBidsPage() {
               <span className={`text-xs px-2 py-1 rounded font-bold uppercase tracking-wide ${style.badge}`}>
                 {style.label}
               </span>
-              {isIoT ? (
-                <span className="bg-green-500/10 text-green-400 text-xs px-2 py-1 rounded font-bold flex items-center">
-                  <Activity size={11} className="mr-1" /> Upcoming Harvest
-                </span>
-              ) : (
-                <span className="bg-purple-500/10 text-purple-400 text-xs px-2 py-1 rounded font-bold flex items-center">
-                  <Layers size={11} className="mr-1" /> Bulk Bidding Sale
-                </span>
-              )}
+              <span className="bg-purple-500/10 text-purple-400 text-xs px-2 py-1 rounded font-bold flex items-center">
+                <Layers size={11} className="mr-1" /> Bulk Bidding Sale
+              </span>
               <span className="text-xs opacity-50 flex items-center">
                 <CalendarDays size={11} className="mr-1" /> {new Date(bid.created_at).toLocaleDateString()}
               </span>
