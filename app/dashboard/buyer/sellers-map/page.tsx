@@ -60,7 +60,7 @@ export default function SellersMapPage() {
         supabase
           .from('bulk_offtake_listings')
           .select('*')
-          .eq('listing_status', 'OPEN')
+          .or('listing_status.eq.OPEN,bidding_status.eq.OPEN')
           .not('pickup_latitude', 'is', null)
           .not('pickup_longitude', 'is', null)
           .order('created_at', { ascending: false })
@@ -72,8 +72,8 @@ export default function SellersMapPage() {
         commodity_variety: t.commodity_variety,
         quantity_volume: t.quantity_volume,
         physical_address: t.physical_address,
-        computed_latitude: t.computed_latitude,
-        computed_longitude: t.computed_longitude,
+        computed_latitude: Number(t.computed_latitude),
+        computed_longitude: Number(t.computed_longitude),
         request_status: t.request_status,
         submission_channel: t.submission_channel,
         harvest_photo_url: t.harvest_photo_url,
@@ -84,16 +84,16 @@ export default function SellersMapPage() {
       const bulkList = (bulkRes.data ?? []).map((b: any) => ({
         id: b.id,
         commodity_variety: b.crop_type,
-        quantity_volume: b.listed_quantity,
-        physical_address: b.pickup_address || 'Pickup Location',
-        computed_latitude: b.pickup_latitude,
-        computed_longitude: b.pickup_longitude,
+        quantity_volume: b.listed_quantity || b.expected_quantity,
+        physical_address: b.pickup_address || 'Seller Pickup Location',
+        computed_latitude: Number(b.pickup_latitude),
+        computed_longitude: Number(b.pickup_longitude),
         request_status: 'OPEN',
         submission_channel: 'bulk_offtake',
         harvest_photo_url: b.harvest_photo_url,
         evidence_status: b.evidence_status,
         asking_price_per_unit: b.asking_price_per_unit,
-        quantity_unit: b.quantity_unit,
+        quantity_unit: b.quantity_unit || b.expected_quantity_unit || 'kg',
         is_bulk: true,
       }));
 

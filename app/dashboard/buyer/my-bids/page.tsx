@@ -283,7 +283,7 @@ export default function BuyerMyBidsPage() {
     const effectiveQty = bid.accepted_quantity ?? bid.desired_quantity;
     const effectiveTotal = effectiveQty * Number(bid.offered_price_per_unit || 0);
 
-    const locationText = opp.pickup_address || 'Pickup location provided upon agreement';
+    const locationText = opp.pickup_address || bid.pickup_address || (opp.seller_name ? `Farm in Nigeria (${opp.seller_name})` : 'Pickup location specified by seller');
     const photoUrl = bid.harvest_photo_url || opp.harvest_photo_url;
     const hasPhoto = !!photoUrl;
     const isProvisional = ['ACCEPTED', 'PARTIALLY_ACCEPTED'].includes(bid.bid_status);
@@ -319,9 +319,9 @@ export default function BuyerMyBidsPage() {
                 by {bid?.seller?.full_name || bid?.seller_profile?.full_name || opp.seller_name || 'Seller'}
               </span>
             </h3>
-            <div className="text-sm opacity-70 flex items-center mb-2">
-              <MapPin size={13} className="mr-1 flex-shrink-0" />
-              {locationText}
+            <div className="text-sm font-medium flex items-center mb-2 text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20 w-fit">
+              <MapPin size={14} className="mr-1.5 flex-shrink-0 text-emerald-400" />
+              <span>{locationText}</span>
             </div>
 
             {/* Lifecycle note */}

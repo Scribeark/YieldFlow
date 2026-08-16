@@ -123,9 +123,9 @@ export default function BuyerHarvestOpportunitiesPage() {
                   {opp.crop_type || 'Unknown Crop'}
                 </h3>
 
-                <div className="text-sm opacity-80 flex items-center mb-4">
-                  <MapPin size={14} className="mr-1 flex-shrink-0" />
-                  Location hidden until trade conversion
+                <div className="text-sm font-medium flex items-center mb-4 text-emerald-400 bg-emerald-500/10 px-2.5 py-1.5 rounded-lg border border-emerald-500/20">
+                  <MapPin size={15} className="mr-1.5 flex-shrink-0 text-emerald-400" />
+                  <span className="truncate">{opp.pickup_address || (opp.seller_name ? `Farm in Nigeria (by ${opp.seller_name})` : 'Location Specified by Seller')}</span>
                 </div>
 
                 <div className="bg-black/20 p-4 rounded-lg mb-4 flex-grow">

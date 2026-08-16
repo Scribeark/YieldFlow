@@ -6,7 +6,7 @@ import { Label } from '../ui/Label';
 import { Alert } from '../ui/Alert';
 import { createClient } from '@/lib/supabase/client';
 import { placeHarvestBid } from '@/lib/api/buyer';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
 
 interface HarvestBidModalProps {
   isOpen: boolean;
@@ -27,6 +27,7 @@ export function HarvestBidModal({ isOpen, onClose, onSuccess, opportunity }: Har
   const minPrice = opportunity.minimum_price_per_unit || 0;
   const availableQty = opportunity.expected_quantity_volume || 0;
   const unit = opportunity.expected_quantity_unit || 'units';
+  const pickupLocation = opportunity.pickup_address || (opportunity.seller_name ? `Farm in Nigeria (${opportunity.seller_name})` : 'Location Specified by Seller');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,10 +60,17 @@ export function HarvestBidModal({ isOpen, onClose, onSuccess, opportunity }: Har
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999] p-4 sm:p-6">
       <Card className="w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <h2 className="text-2xl font-bold mb-2">Submit Offer</h2>
-        <p className="text-sm opacity-80 mb-6 border-b border-white/10 pb-4">
+        <h2 className="text-2xl font-bold mb-1">Submit Offer</h2>
+        <p className="text-sm opacity-80 mb-3">
           Bidding on <strong>{opportunity.crop_type || 'Bulk Crop'}</strong> (Bulk Bidding Sale)
         </p>
+
+        {pickupLocation && (
+          <div className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-lg mb-4 flex items-center text-xs text-emerald-300">
+            <MapPin size={15} className="mr-1.5 flex-shrink-0 text-emerald-400" />
+            <span><strong>Seller Pickup Location:</strong> {pickupLocation}</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && <Alert variant="error" title="Error">{error}</Alert>}
